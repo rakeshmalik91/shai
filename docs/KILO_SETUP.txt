@@ -1,0 +1,61 @@
+SHAI + KILO AI GATEWAY
+
+Gateway
+  Base URL:  https://ai-gateway.kilo.ai/api/v1
+  Chat API:  https://ai-gateway.kilo.ai/api/v1/chat/completions
+  Models:    https://ai-gateway.kilo.ai/api/v1/models
+  API key environment variable: KILO_API_KEY
+
+1. Create a Kilo Gateway API key
+   - Open https://app.kilo.ai
+   - Open your personal profile (not the organization profile).
+   - Scroll to the bottom and copy your API key.
+
+2. Set the key in iSH
+   For the current shell session:
+     export KILO_API_KEY='paste-your-kilo-key-here'
+
+   If you use setup_keys.sh, add this block to it so the key is
+   prompted for and exported whenever you source that script:
+
+     printf 'Kilo Gateway API key: '
+     stty -echo
+     IFS= read -r KILO_API_KEY
+     stty echo
+     printf '\n'
+     export KILO_API_KEY
+
+   Then load your keys with:
+     . ./setup_keys.sh
+
+   Do not run setup_keys.sh as a child process; source it so exports
+   remain in the current shell. Do not commit API keys to Git.
+
+3. Run Shai chat mode
+     python3 chat.py kilo
+
+4. Run Shai coding-agent mode
+     python3 agent.py /path/to/project kilo
+
+   Example if your project is in /root/projects/myapp:
+     python3 agent.py /root/projects/myapp kilo
+
+5. Choose a model from the list. Kilo model IDs use provider/model-name,
+   for example:
+     anthropic/claude-sonnet-4.6
+     google/gemini-2.5-flash
+     openai/gpt-5.4-mini
+
+   The selected provider and model are saved in shai_config.json next to
+   the Shai scripts. Passing 'kilo' on the command line selects Kilo for
+   that run; the model is reused only if it belongs to that provider and
+   is still present in the model catalogue.
+
+Billing notes
+   - Paid gateway inference uses your Kilo balance, at upstream model rates.
+   - Kilo free models are marked with :free and are rate-limited by IP.
+   - If you configured a provider BYOK key in Kilo, the provider bills you
+     directly for matching requests; Kilo records $0 for those requests.
+   - A 402 generally means the Kilo balance is insufficient; a 401 means
+     the key is missing/invalid; a 403 can mean an organization model policy
+     blocks that model; 429 means rate limiting.

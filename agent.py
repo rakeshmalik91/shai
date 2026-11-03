@@ -57,6 +57,12 @@ PROVIDERS = {
         "models_url": "https://api.openai.com/v1/models",
         "key_env": "OPENAI_API_KEY",
         "format": "openai"
+    },
+    "kilo": {
+        "url": "https://ai-gateway.kilo.ai/api/v1/chat/completions",
+        "models_url": "https://ai-gateway.kilo.ai/api/v1/models",
+        "key_env": "KILO_API_KEY",
+        "format": "openai"
     }
 }
 
@@ -184,7 +190,7 @@ def get_available_models(provider):
 
         return sorted(set(models))
 
-    if provider in ("anthropic", "openai"):
+    if provider in ("anthropic", "openai", "kilo"):
         data = http_get(
             PROVIDERS[provider]["models_url"],
             key,
@@ -236,7 +242,7 @@ def initialize_provider():
 
     if provider not in PROVIDERS:
         raise ValueError(
-            "Invalid provider. Use: openrouter, gemini, anthropic or openai"
+            "Invalid provider. Use: openrouter, gemini, anthropic, openai or kilo"
         )
 
     print("Provider:", provider)
@@ -879,7 +885,7 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("\nProviders: openrouter, gemini, anthropic")
+    print("\nProviders: openrouter, gemini, anthropic, openai, kilo")
     print("Commands: /help /status /files /diff /reset /exit")
 
     while True:

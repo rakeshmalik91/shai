@@ -2,7 +2,7 @@
 """
 Shai interactive chat client.
 
-Supports OpenRouter (free models), Gemini, and Anthropic.
+Supports OpenRouter (free models), Gemini, Anthropic, OpenAI, and Kilo Gateway.
 Uses the same shai_config.json and provider/model selection behaviour as agent.py.
 Standard-library only.
 """
@@ -49,6 +49,12 @@ PROVIDERS = {
         "url": "https://api.openai.com/v1/chat/completions",
         "models_url": "https://api.openai.com/v1/models",
         "key_env": "OPENAI_API_KEY",
+        "format": "openai",
+    },
+    "kilo": {
+        "url": "https://ai-gateway.kilo.ai/api/v1/chat/completions",
+        "models_url": "https://ai-gateway.kilo.ai/api/v1/models",
+        "key_env": "KILO_API_KEY",
         "format": "openai",
     },
 }
@@ -134,9 +140,8 @@ def save_config(provider, model):
 def request_json(url, key, provider, body=None):
     if provider == "gemini":
         headers = {}
-        if body is None:
-            separator = "&" if "?" in url else "?"
-            url += separator + urllib.parse.urlencode({"key": key})
+        separator = "&" if "?" in url else "?"
+        url += separator + urllib.parse.urlencode({"key": key})
     elif provider == "anthropic":
         headers = {
             "x-api-key": key,
@@ -247,7 +252,7 @@ def initialize_provider():
 
     if provider not in PROVIDERS:
         raise ValueError(
-            "Invalid provider. Use: openrouter, gemini, anthropic or openai"
+            "Invalid provider. Use: openrouter, gemini, anthropic, openai or kilo"
         )
 
     print("Provider:", provider)
