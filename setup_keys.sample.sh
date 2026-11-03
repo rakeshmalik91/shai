@@ -1,0 +1,4 @@
+export GEMINI_API_KEY='your-gemini-key'
+export OPENROUTER_API_KEY='your-openrouter-key'
+export OPENAI_API_KEY='your-openai-key'
+export ANTHROPIC_API_KEY='your-anthropic-key'
