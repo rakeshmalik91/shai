@@ -34,6 +34,30 @@ class ProviderSelectionTests(unittest.TestCase):
                 models = selection.get_available_models("kilo-free")
         self.assertEqual(models, ["provider/model-a:free", "provider/model-c:free"])
 
+    def test_model_context_window_metadata_is_captured_and_saved(self):
+        with mock.patch.dict("os.environ", {"KILO_API_KEY": "test-key"}):
+            with mock.patch.object(selection, "_get_json", return_value={
+                "data": [{
+                    "id": "provider/model-a:free",
+                    "context_length": 131072,
+                }]
+            }):
+                models = selection.get_available_models("kilo-free")
+        self.assertEqual(models, ["provider/model-a:free"])
+        self.assertEqual(
+            selection.MODEL_CONTEXT_WINDOWS["provider/model-a:free"], 131072
+        )
+        selection.save_config(
+            "kilo-free", "provider/model-a:free",
+            selection.MODEL_CONTEXT_WINDOWS["provider/model-a:free"]
+        )
+        saved = json.loads(selection.CONFIG_FILE.read_text(encoding="utf-8"))
+        self.assertEqual(saved["context_window_tokens"], 131072)
+        self.assertEqual(
+            saved["model_context_windows"]["kilo-free::provider/model-a:free"],
+            131072
+        )
+
     def test_provider_zero_reuses_saved_provider_and_model(self):
         selection.CONFIG_FILE.write_text(json.dumps({
             "provider": "kilo-free",

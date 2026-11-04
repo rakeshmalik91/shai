@@ -44,7 +44,7 @@ Start chat mode:
 python3 chat.py
 ```
 
-Choose a provider/model when prompted. Shai remembers the last selection. Use `/help` inside either mode for available commands; `/model` switches provider/model and `/exit` quits.
+Choose a provider/model when prompted. Shai remembers the last selection. During requests, it shows an estimated context size and, when available, the model context percentage; after a response it shows provider-reported token usage. Use `/help` inside either mode for available commands; `/model` switches provider/model and `/exit` quits.
 
 ## Tests
 

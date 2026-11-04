@@ -23,6 +23,10 @@ from modules.logging_config import init_default_logging, get_logger, log_api_pay
 from modules.reasoning_handlers import display_reasoning_summary
 from modules.conversation_history import ConversationHistory, input_with_history
 from modules.agent_safeguards import compact_conversation_history
+from modules.context_meter import (
+    estimate_messages_tokens, get_context_window, format_context_status,
+    log_and_display_usage
+)
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
 LOGGER = get_logger("shai.chat")
@@ -425,12 +429,27 @@ def main():
                 max_recent_tool_cycles=history_limit("max_recent_tool_cycles", 6)
             )
         history_store.save(history, provider=provider, model=model)
-        spinner = Spinner("Shai is thinking")
+        context_limit = get_context_window(provider, model, load_config())
+        estimated_prompt_tokens = estimate_messages_tokens(history)
+        context_status = format_context_status(
+            estimated_prompt_tokens, context_limit
+        )
+        LOGGER.debug(
+            "Chat context estimate provider=%s model=%s estimated_prompt_tokens=%d "
+            "context_limit=%s history_messages=%d",
+            provider, model, estimated_prompt_tokens, context_limit, len(history)
+        )
+        print("\n[Shai] {}".format(context_status))
+        spinner = Spinner("Shai is thinking | " + context_status)
         spinner.start()
         LOGGER.info("Chat turn started provider=%s model=%s user_chars=%d history_messages=%d",
                     provider, model, len(user_text), len(history))
         try:
             response = api_request(history, provider, model)
+            log_and_display_usage(
+                LOGGER, response, PROVIDERS[provider]["format"],
+                estimated_prompt_tokens, context_limit
+            )
             display_reasoning_summary(provider, response)
             answer = response_text(response, provider)
             LOGGER.debug("Chat response parsed answer_chars=%d", len(answer or ""))

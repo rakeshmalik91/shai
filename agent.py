@@ -29,6 +29,10 @@ from modules.logging_config import init_default_logging, get_logger, log_api_pay
 from modules.reasoning_handlers import display_reasoning_summary
 from modules.conversation_history import ConversationHistory, input_with_history
 from modules.file_change_display import print_change_preview
+from modules.context_meter import (
+    estimate_messages_tokens, get_context_window, format_context_status,
+    log_and_display_usage
+)
 from modules.agent_safeguards import (
     bound_tool_result, compact_conversation_history, validate_tool_arguments,
     ToolArgumentFailureTracker, read_file_cache_marker, marker_in_history,
@@ -2199,6 +2203,35 @@ def resolve_tool_name(name):
     return None
 
 
+def normalize_tool_call(name, args):
+    """Repair the known edit_file/patch_file argument-shape mix-up."""
+    if not isinstance(args, dict):
+        return name, args, None
+    if (
+        name == "edit_file"
+        and "content" not in args
+        and "old_text" in args
+        and "new_text" in args
+        and "path" in args
+    ):
+        repaired = {
+            "path": args["path"],
+            "old_text": args["old_text"],
+            "new_text": args["new_text"],
+        }
+        note = (
+            "Model supplied patch_file arguments under edit_file; "
+            "automatically routing this call to patch_file."
+        )
+        LOGGER.warning(
+            "Tool compatibility routing requested_name=edit_file "
+            "executed_name=patch_file argument_keys=%s",
+            sorted(repaired)
+        )
+        return "patch_file", repaired, note
+    return name, args, None
+
+
 def handle_tool_selection(name, args, call_tracker, invalid_tool_counter,
                           invalid_args_tracker=None, history=None):
     """Validate tool names and disable tools after repeated bad arguments."""
@@ -2206,6 +2239,7 @@ def handle_tool_selection(name, args, call_tracker, invalid_tool_counter,
         invalid_args_tracker = ToolArgumentFailureTracker(
             AGENT_SAFEGUARDS["max_invalid_argument_attempts_per_tool"]
         )
+    name, args, compatibility_note = normalize_tool_call(name, args)
     resolved_name = resolve_tool_name(name)
     if resolved_name is None:
         invalid_tool_counter["count"] += 1
@@ -2275,6 +2309,11 @@ def handle_tool_selection(name, args, call_tracker, invalid_tool_counter,
     result = execute_tool_with_safeguards(
         resolved_name, args, call_tracker, history=history
     )
+    if compatibility_note:
+        result = dict(result) if isinstance(result, dict) else {"result": result}
+        result["compatibility_note"] = compatibility_note
+        result["tool_name_normalized_from"] = "edit_file"
+        result["tool_name_executed"] = "patch_file"
     if resolved_name != name:
         if isinstance(result, dict):
             result = dict(result)
@@ -2468,6 +2507,7 @@ def display_tool_call(name, args):
         "list_files": "Listing project files",
         "edit_file": "Preparing file edit",
         "patch_file": "Applying file patch",
+        "replace_lines": "Replacing file lines",
         "run_checks": "Running project checks",
         "git_status": "Checking Git status",
         "git_diff": "Inspecting Git changes",
@@ -2665,7 +2705,22 @@ def _ask_model_impl(history, user_text):
         LOGGER.debug("Agent iteration %d/%d history_messages=%d history_chars=%d",
                      iteration + 1, MAX_ITERATIONS, len(history),
                      len(json.dumps(history, ensure_ascii=False)))
-        spinner = Spinner("Shai is thinking")
+        context_limit = get_context_window(PROVIDER, MODEL, load_config())
+        estimated_prompt_tokens = estimate_messages_tokens(
+            history, tools=FUNCTIONS,
+            system_text=SYSTEM_PROMPT if PROVIDERS[PROVIDER]["format"] == "anthropic" else None
+        )
+        context_status = format_context_status(
+            estimated_prompt_tokens, context_limit
+        )
+        LOGGER.debug(
+            "Context estimate provider=%s model=%s estimated_prompt_tokens=%d "
+            "context_limit=%s history_messages=%d history_chars=%d",
+            PROVIDER, MODEL, estimated_prompt_tokens, context_limit,
+            len(history), len(json.dumps(history, ensure_ascii=False))
+        )
+        print("\n[Shai] {}".format(context_status))
+        spinner = Spinner("Shai is thinking | " + context_status)
         spinner.start()
 
         try:
@@ -2725,6 +2780,10 @@ def _ask_model_impl(history, user_text):
         finally:
             spinner.stop()
 
+        log_and_display_usage(
+            LOGGER, response, PROVIDERS[PROVIDER]["format"],
+            estimated_prompt_tokens, context_limit
+        )
         display_reasoning_summary(PROVIDER, response)
 
         # A length/max-token finish means the response may be incomplete.
@@ -2796,6 +2855,9 @@ def _ask_model_impl(history, user_text):
                 name = tool_use.get("name")
                 args = tool_use.get("input", {})
                 tool_use_id = tool_use.get("id")
+                name, args, compatibility_note = normalize_tool_call(name, args)
+                if compatibility_note:
+                    print("\n[Shai] {}".format(compatibility_note))
                 iteration_tool_signatures.append(_tool_call_signature(name, args))
                 total_tool_calls += 1
 
@@ -2880,6 +2942,9 @@ def _ask_model_impl(history, user_text):
                             "Tool arguments must be an object."
                         )
 
+                    name, args, compatibility_note = normalize_tool_call(name, args)
+                    if compatibility_note:
+                        print("\n[Shai] {}".format(compatibility_note))
                     display_tool_call(name, args)
                     iteration_tool_signatures.append(_tool_call_signature(name, args))
                     call_signature_added = True

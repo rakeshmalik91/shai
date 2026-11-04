@@ -137,6 +137,31 @@ class ToolSafetyTests(unittest.TestCase):
         ])
         self.assertEqual(function.call_count, 3)
 
+    def test_edit_file_patch_arguments_are_routed_to_patch_file(self):
+        patch = mock.Mock(return_value={"result": "patched"})
+        original_patch = agent.TOOL_DISPATCH.get("patch_file")
+        agent.TOOL_DISPATCH["patch_file"] = patch
+        try:
+            result, should_abort = agent.handle_tool_selection(
+                "edit_file",
+                {
+                    "path": "sample.py",
+                    "old_text": "before",
+                    "new_text": "after",
+                },
+                {},
+                {"count": 0},
+            )
+        finally:
+            agent.TOOL_DISPATCH["patch_file"] = original_patch
+        self.assertFalse(should_abort)
+        patch.assert_called_once_with(
+            path="sample.py", old_text="before", new_text="after"
+        )
+        self.assertEqual(result["tool_name_executed"], "patch_file")
+        self.assertEqual(result["tool_name_normalized_from"], "edit_file")
+        self.assertIn("compatibility_note", result)
+
     def test_tool_name_resolution_accepts_prefix_and_close_typo(self):
         self.assertEqual(
             agent.resolve_tool_name("functions.run_checks"), "run_checks"

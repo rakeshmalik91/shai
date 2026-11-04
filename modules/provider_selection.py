@@ -10,6 +10,8 @@ import urllib.request
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent.parent
 CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
 
+MODEL_CONTEXT_WINDOWS = {}
+
 PROVIDERS = {
     "openrouter": {
         "url": "https://openrouter.ai/api/v1/chat/completions",
@@ -59,11 +61,25 @@ def load_config():
         return {}
 
 
-def save_config(provider, model):
-    """Update provider/model while preserving all other Shai settings."""
+def save_config(provider, model, context_window_tokens=None):
+    """Update provider/model and context metadata, preserving other settings."""
     config = load_config()
     config["provider"] = provider
     config["model"] = model
+    context_key = "{}::{}".format(provider, model)
+    context_mapping = config.get("model_context_windows", {})
+    if not isinstance(context_mapping, dict):
+        context_mapping = {}
+    if isinstance(context_window_tokens, int) and not isinstance(context_window_tokens, bool) and context_window_tokens > 0:
+        context_mapping[context_key] = context_window_tokens
+        config["context_window_tokens"] = context_window_tokens
+    else:
+        saved_limit = context_mapping.get(context_key)
+        if isinstance(saved_limit, int) and saved_limit > 0:
+            config["context_window_tokens"] = saved_limit
+        else:
+            config.pop("context_window_tokens", None)
+    config["model_context_windows"] = context_mapping
     temporary = CONFIG_FILE.with_name(CONFIG_FILE.name + ".tmp")
     with temporary.open("w", encoding="utf-8") as handle:
         json.dump(config, handle, indent=2, ensure_ascii=False)
@@ -96,6 +112,34 @@ def _get_json(url, key, provider):
         raise RuntimeError("Network error while loading models: " + str(error))
 
 
+def _model_context_limit(item):
+    """Extract a provider-reported input context limit when available."""
+    if not isinstance(item, dict):
+        return None
+    for key in ("context_length", "context_window", "max_context_length",
+                "input_token_limit", "inputTokenLimit"):
+        value = item.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+    return None
+
+
+def get_saved_context_window(provider, model):
+    """Return a persisted provider-reported or user-configured context limit."""
+    config = load_config()
+    key = "{}::{}".format(provider, model)
+    mapping = config.get("model_context_windows", {})
+    if isinstance(mapping, dict):
+        value = mapping.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+    if config.get("provider") == provider and config.get("model") == model:
+        value = config.get("context_window_tokens")
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+    return None
+
+
 def get_available_models(provider):
     config = PROVIDERS[provider]
     key = os.environ.get(config["key_env"])
@@ -103,6 +147,7 @@ def get_available_models(provider):
         raise RuntimeError(config["key_env"] + " is not set. Source setup_keys.sh first.")
 
     data = _get_json(config["models_url"], key, provider)
+    MODEL_CONTEXT_WINDOWS.clear()
 
     if provider == "gemini":
         models = []
@@ -114,12 +159,18 @@ def get_available_models(provider):
                 name = name[len("models/"):]
             if name:
                 models.append(name)
+                limit = _model_context_limit(item)
+                if limit:
+                    MODEL_CONTEXT_WINDOWS[name] = limit
     else:
-        models = [
-            item.get("id", "")
-            for item in data.get("data", [])
-            if item.get("id")
-        ]
+        models = []
+        for item in data.get("data", []):
+            model_name = item.get("id", "")
+            if model_name:
+                models.append(model_name)
+                limit = _model_context_limit(item)
+                if limit:
+                    MODEL_CONTEXT_WINDOWS[model_name] = limit
 
     if provider in ("openrouter", "kilo-free"):
         models = [model for model in models if model.endswith(":free")]
@@ -203,6 +254,11 @@ def initialize_provider():
 
     preferred = saved_model if saved_provider == provider else None
     model = choose_model(models, preferred)
-    save_config(provider, model)
+    context_limit = MODEL_CONTEXT_WINDOWS.get(model)
+    save_config(provider, model, context_limit)
+    if context_limit:
+        print("Model context window: {:,} tokens".format(context_limit))
+    else:
+        print("Model context window: unknown (configure it in shai_config.json if needed)")
     print("Selected:", provider, "/", model)
     return provider, model

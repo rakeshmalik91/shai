@@ -66,12 +66,13 @@ Edits are previewed, approved according to configuration, validated where suppor
 | `modules/logging_config.py` | Run-based logs, retention, console settings and API payload redaction. |
 | `modules/file_change_display.py` | Bounded diff previews. |
 | `modules/reasoning_handlers/` | Provider-specific extraction and display of supported reasoning summaries. |
+| `modules/context_meter.py` | Prompt-token estimation, provider usage normalization and context-window percentage formatting. |
 
 ## Provider integration
 
 Provider selection is shared by both modes. API requests use Python's standard-library HTTP facilities. OpenRouter, OpenAI, Gemini and Kilo use compatible chat/tool payloads where supported; Anthropic uses its Messages API format.
 
-Reasoning handlers expose provider-supplied summaries when available. They do not expose hidden private chain-of-thought.
+Reasoning handlers expose provider-supplied summaries when available. They do not expose hidden private chain-of-thought. The context meter estimates prompt size before a request and uses provider usage metadata for exact prompt/completion counts after a response. Percentages are shown only when the model context limit is known from provider metadata or configuration.
 
 ## Persistent data
 

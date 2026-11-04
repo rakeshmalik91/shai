@@ -91,5 +91,6 @@
   "reasoning_display": {
     "enabled": true,
     "max_chars": 6000
-  }
+  },
+  "model_context_windows": {}
 }

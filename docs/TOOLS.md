@@ -29,7 +29,7 @@ The eight priority tools are `get_file_outline`, `find_symbol`, `find_references
 
 | Tool | Parameters | Purpose |
 |---|---|---|
-| `edit_file` | `path`, `content` | Propose a whole-file replacement with a diff preview. |
+| `edit_file` | `path`, `content` | Propose a whole-file replacement with a diff preview. If a model mistakenly sends `old_text` and `new_text` under this tool name, Shai automatically routes it to `patch_file`. |
 | `patch_file` | `path`, `old_text`, `new_text` | Replace one exact text block, only when it matches exactly once. |
 | `replace_lines` | `path`, `start_line`, `end_line`, `new_text` | Replace a 1-based inclusive line range. Useful when exact matching fails because of indentation or whitespace. |
 
@@ -72,3 +72,11 @@ These are internal capabilities rather than model-callable tools:
 ## Configuration
 
 `shai_config.json` controls provider/model selection, approval behaviour, safeguards, test execution, logging, history limits and display settings. API keys belong in environment variables, not this file.
+
+## Context meter
+
+Before each request, Agent and Chat display an approximate prompt-token count. The estimate is also shown in the thinking indicator. After the response, Shai displays exact prompt/completion/total token counts when the provider returns usage metadata.
+
+A context percentage is shown only when a context limit is known. Shai captures model context metadata from the provider's model catalogue when available and stores it in `shai_config.json`. If the provider does not publish a limit, the display explicitly says the limit is unknown rather than inventing a percentage. A user may add `context_window_tokens` for the currently selected model or an entry in `model_context_windows` keyed as `provider::model`.
+
+The pre-request estimate is heuristic and should not be treated as tokenizer-exact. Debug logs record both estimates and provider-reported usage.
