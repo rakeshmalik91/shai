@@ -56,6 +56,7 @@ sh ./run_all_tests.sh
 
 ## Documentation
 
+- [Commands reference](docs/COMMANDS.md)
 - [Existing tools](docs/TOOLS.md)
 - [Project architecture](docs/ARCHITECTURE.md)
 - [Future tools roadmap](docs/roadmap/TOOLS_ROADMAP.md)
