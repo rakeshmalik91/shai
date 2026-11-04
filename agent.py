@@ -3092,7 +3092,7 @@ def main():
     init_default_logging(load_config())
     LOGGER.info("Starting Shai coding agent root=%s api_timeout=%ss",
                 ROOT, API_TIMEOUT_SECONDS)
-    PROVIDER, MODEL = initialize_provider()
+    PROVIDER, MODEL = initialize_provider(auto_select=True)
     LOGGER.info("Selected provider=%s model=%s", PROVIDER, MODEL)
 
     history_store = ConversationHistory(ROOT, "agent", SYSTEM_PROMPT)

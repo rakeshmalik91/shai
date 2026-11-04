@@ -1,8 +1,8 @@
 {
   "provider": "kilo-free",
-  "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
   "max_tool_call_iterations": 500,
-  "yes_to_all": false,
+  "yes_to_all": true,
   "tool_safeguards": {
     "duplicate_call_detection": true,
     "duplicate_call_limit": 2,
@@ -92,5 +92,8 @@
     "enabled": true,
     "max_chars": 6000
   },
-  "model_context_windows": {}
+  "model_context_windows": {
+    "kilo-free::nvidia/nemotron-3-ultra-550b-a55b:free": 1000000
+  },
+  "context_window_tokens": 1000000
 }

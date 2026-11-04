@@ -207,14 +207,35 @@ def choose_model(models, preferred=None):
         print("Invalid selection. Enter a number from the list.")
 
 
-def initialize_provider():
+def initialize_provider(auto_select=False):
     """Prompt for provider, then model, on every invocation.
 
     Provider 0 reuses the last provider/model pair and skips the model prompt.
+
+    If auto_select is True, automatically use the last saved provider/model
+    if valid (provider exists and model is available), otherwise fall back
+    to interactive selection.
     """
     saved = load_config()
     saved_provider = saved.get("provider")
     saved_model = saved.get("model")
+
+    # Auto-select: try to use saved provider/model without prompting
+    if auto_select and saved_provider in PROVIDERS and saved_model:
+        try:
+            models = get_available_models(saved_provider)
+            if saved_model in models:
+                context_limit = MODEL_CONTEXT_WINDOWS.get(saved_model)
+                if context_limit:
+                    print("Model context window: {:,} tokens".format(context_limit))
+                else:
+                    print("Model context window: unknown (configure it in shai_config.json if needed)")
+                print("Selected: {} / {} (auto-selected)".format(saved_provider, saved_model))
+                return saved_provider, saved_model
+            else:
+                print("Saved model '{}' not available for provider '{}'; falling back to interactive selection.".format(saved_model, saved_provider))
+        except Exception as error:
+            print("Could not validate saved selection ({}); falling back to interactive selection.".format(error))
 
     names = list(PROVIDERS)
     print("\nSelect provider:")
