@@ -21,6 +21,7 @@ import urllib.request
 from modules.provider_selection import PROVIDERS, initialize_provider
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
+from modules.conversation_history import ConversationHistory, input_with_history
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
 LOGGER = get_logger("shai.chat")
@@ -340,16 +341,23 @@ def main():
         return
 
     LOGGER.info("Selected provider=%s model=%s", provider, model)
-    history = [{"role": "system", "content": SYSTEM_PROMPT}]
+    history_store = ConversationHistory(pathlib.Path.cwd(), "chat", SYSTEM_PROMPT)
+    history = history_store.load()
+    previous_provider = history_store.metadata().get("provider")
+    if previous_provider and previous_provider != provider:
+        history = history_for_new_provider(history)
+        print("[Shai] Previous provider changed; retained text history.")
+    history_store.save(history, provider=provider, model=model)
 
     print("\nShai - Chat")
     print("Provider:", provider)
     print("Model:", model)
+    print("History:", history_store.path)
     print("Commands: /help /model /status /reset /exit")
 
     while True:
         try:
-            user_text = input("\nYou: ").strip()
+            user_text = input_with_history("\nYou: ", history_store).strip()
         except (KeyboardInterrupt, EOFError):
             print("\nGoodbye.")
             break
@@ -376,6 +384,7 @@ def main():
                 print("\nCould not switch model: {}".format(error))
                 continue
             history = history_for_new_provider(history)
+            history_store.save(history, provider=provider, model=model)
             LOGGER.debug("Provider switch retained history_messages=%d", len(history))
             print("\nSwitched to: {} / {}".format(provider, model))
             continue
@@ -395,10 +404,12 @@ def main():
         if user_text == "/reset":
             LOGGER.info("Conversation history reset")
             history = [{"role": "system", "content": SYSTEM_PROMPT}]
+            history_store.clear()
             print("Conversation history cleared.")
             continue
 
         history.append({"role": "user", "content": user_text})
+        history_store.save(history, provider=provider, model=model)
         spinner = Spinner("Shai is thinking")
         spinner.start()
         LOGGER.info("Chat turn started provider=%s model=%s user_chars=%d history_messages=%d",
@@ -425,12 +436,15 @@ def main():
                 })
             else:
                 history.append({"role": "assistant", "content": answer})
+            history_store.save(history, provider=provider, model=model)
         elif answer == "":
             print("\nNo text response returned.")
             history.pop()
+            history_store.save(history, provider=provider, model=model)
         else:
             # Remove the failed user turn so it doesn't poison future context.
             history.pop()
+            history_store.save(history, provider=provider, model=model)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ from chat import Spinner, extract_anthropic_response
 from modules.provider_selection import PROVIDERS, initialize_provider
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
+from modules.conversation_history import ConversationHistory, input_with_history
 
 # -------------------------------------------------------------------
 # Configuration
@@ -1695,6 +1696,18 @@ def _block_text(value):
     return str(value)
 
 
+def display_assistant_message_content(message):
+    """Display user-facing assistant text, including text paired with tools."""
+    if not isinstance(message, dict):
+        return False
+    assistant_text = _block_text(message.get("content", ""))
+    if not assistant_text.strip():
+        return False
+    print("\n" + assistant_text)
+    sys.stdout.flush()
+    return True
+
+
 def _bounded_recovery_text(value, limit):
     text = _block_text(value)
     if len(text) <= limit:
@@ -1983,16 +1996,16 @@ def _ask_model_impl(history, user_text):
             message = choices[0].get("message", {})
             history.append(message)
 
+            # OpenAI-compatible responses may contain BOTH user-facing text
+            # and tool_calls. Display the text before executing those tools;
+            # otherwise Kilo's explanations disappear and the user sees only
+            # the tool activity.
+            has_assistant_text = display_assistant_message_content(message)
             tool_calls = message.get("tool_calls", [])
 
             if not tool_calls:
-                content = message.get("content")
-
-                if content:
-                    print("\n" + str(content))
-                else:
+                if not has_assistant_text:
                     print("\nNo text response returned.")
-
                 return
 
             abort_for_invalid_tool = False
@@ -2111,23 +2124,27 @@ def main():
     PROVIDER, MODEL = initialize_provider()
     LOGGER.info("Selected provider=%s model=%s", PROVIDER, MODEL)
 
-    history = [{
-        "role": "system",
-        "content": SYSTEM_PROMPT
-    }]
+    history_store = ConversationHistory(ROOT, "agent", SYSTEM_PROMPT)
+    history = history_store.load()
+    previous_provider = history_store.metadata().get("provider")
+    if previous_provider and previous_provider != PROVIDER:
+        history = history_for_new_provider(history)
+        print("[Shai] Previous provider changed; retained text history and cleared old tool exchanges.")
+    history_store.save(history, provider=PROVIDER, model=MODEL)
 
     print("\nShai - Coding Agent")
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
     print("Max tool-call iterations:", MAX_ITERATIONS)
+    print("History:", history_store.path)
     print("\nProvider and model are selected interactively at startup.")
     print("Commands: /help /model /status /files /diff /reset /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
 
     while True:
         try:
-            user_text = input("\nYou: ").strip()
+            user_text = input_with_history("\nYou: ", history_store).strip()
 
             if not user_text:
                 continue
@@ -2154,6 +2171,7 @@ def main():
                 LOGGER.info("Provider/model switched provider=%s model=%s",
                             PROVIDER, MODEL)
                 history = history_for_new_provider(history)
+                history_store.save(history, provider=PROVIDER, model=MODEL)
                 print("\n[Shai] Switched to: {} / {}".format(PROVIDER, MODEL))
                 print("[Shai] Text conversation context retained; old tool-call records cleared for provider compatibility.")
                 continue
@@ -2213,6 +2231,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                     "role": "system",
                     "content": SYSTEM_PROMPT
                 }]
+                history_store.clear()
                 print("Conversation history cleared.")
                 continue
 
@@ -2221,6 +2240,8 @@ Type 'a' or 'all' at any prompt to approve all future actions.
             except Exception as error:
                 LOGGER.exception("Unhandled agent request error")
                 print("\nError:", error)
+            finally:
+                history_store.save(history, provider=PROVIDER, model=MODEL)
 
         except (KeyboardInterrupt, EOFError):
             print("\nGoodbye.")
