@@ -12,6 +12,8 @@ The code is designed for Python 3.8+ and uses the Python standard library. `pyte
 - **Providers:** OpenRouter, Gemini, Anthropic, OpenAI, Kilo Gateway (all listed models), and Kilo Gateway (free models only).
 - **In-session model switching:** `/model`, `/switch`, or `/switch-model` in both modes.
 - **Project tools:** list/read/search files, Git status/diff, edit files, and run checks.
+- **Explicit file pagination:** `read_file` requires `path`, zero-based `offset`, and `limit`; each result provides the exact `next_offset` for the next chunk. Every requested read executes against the current file instead of being replaced by a synthetic duplicate-suppression response. Tool calls display their effective parameters before execution.
+- **Advisory repeat verification:** exact tool name and complete parameters are tracked for diagnostics; repeated successful calls are allowed, and invalid arguments do not permanently disable a tool.
 - **Approval control:** approve individual actions or choose `a` / `all` to persist `yes_to_all`.
 - **Iteration controls:** configurable maximum tool-call iterations and Ctrl+D/Ctrl+C interruption in agent mode.
 - **Loop protection:** duplicate tool-call detection, repeat-call warnings, and bounded recovery from invalid tool names.

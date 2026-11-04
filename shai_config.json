@@ -74,7 +74,7 @@
     "max_tool_result_chars": 8000,
     "keep_recent_turns": 4,
     "max_recent_tool_cycles": 6,
-    "max_consecutive_no_progress_iterations": 3,
+    "max_consecutive_no_progress_iterations": 5,
     "max_tool_calls_per_request": 500,
     "validate_tool_arguments": true,
     "reject_unknown_tool_arguments": true,
@@ -82,7 +82,7 @@
     "default_read_file_lines": 100,
     "max_read_file_lines": 500,
     "max_read_file_chars": 4000,
-    "deduplicate_read_file_calls": true
+    "deduplicate_read_file_calls": false
   },
   "tool_call_display": {
     "show_parameters": true,

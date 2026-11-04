@@ -106,7 +106,7 @@ class AgentSafeguardModuleTests(unittest.TestCase):
 
     def test_tool_argument_schema_rejects_unknown_parameters(self):
         error = validate_tool_arguments(
-            "read_file", {"path": "README.md", "query": "bad"},
+            "read_file", {"path": "README.md", "offset": 0, "limit": 100, "query": "bad"},
             agent.FUNCTIONS, reject_unknown=True
         )
         self.assertIn("Unexpected argument", error)
@@ -114,7 +114,7 @@ class AgentSafeguardModuleTests(unittest.TestCase):
     def test_tool_argument_schema_checks_required_and_types(self):
         missing = validate_tool_arguments("read_file", {}, agent.FUNCTIONS)
         wrong_type = validate_tool_arguments(
-            "read_file", {"path": 123}, agent.FUNCTIONS
+            "read_file", {"path": 123, "offset": 0, "limit": 100}, agent.FUNCTIONS
         )
         self.assertIn("Missing required", missing)
         self.assertIn("must be string", wrong_type)
@@ -226,23 +226,26 @@ class AgentSafeguardModuleTests(unittest.TestCase):
             "read_file", {"path": "a.py", "offset": 300, "limit": 100},
             agent.FUNCTIONS
         ))
+        self.assertIn("offset", validate_tool_arguments(
+            "read_file", {"path": "a.py"}, agent.FUNCTIONS
+        ))
         self.assertIn("at least 0", validate_tool_arguments(
-            "read_file", {"path": "a.py", "offset": -1}, agent.FUNCTIONS
+            "read_file", {"path": "a.py", "offset": -1, "limit": 100}, agent.FUNCTIONS
         ))
 
     def test_invalid_arguments_do_not_permanently_disable_tool(self):
         tracker = ToolArgumentFailureTracker(max_failures=2)
         with mock.patch.object(agent, "execute_tool", return_value={"result": "ok"}) as execute:
             first, abort_first = agent.handle_tool_selection(
-                "read_file", {"path": "x", "query": "unsupported"},
+                "read_file", {"path": "x", "offset": 0, "limit": 100, "query": "unsupported"},
                 {}, {"count": 0}, invalid_args_tracker=tracker
             )
             second, abort_second = agent.handle_tool_selection(
-                "read_file", {"path": "x", "query": "unsupported"},
+                "read_file", {"path": "x", "offset": 0, "limit": 100, "query": "unsupported"},
                 {}, {"count": 0}, invalid_args_tracker=tracker
             )
             third, abort_third = agent.handle_tool_selection(
-                "read_file", {"path": "x"}, {}, {"count": 0},
+                "read_file", {"path": "x", "offset": 0, "limit": 100}, {}, {"count": 0},
                 invalid_args_tracker=tracker
             )
         self.assertFalse(abort_first)
@@ -253,42 +256,36 @@ class AgentSafeguardModuleTests(unittest.TestCase):
         self.assertEqual(third["result"], "ok")
         execute.assert_called_once()
 
-    def test_duplicate_read_file_uses_previous_result_without_repeating_content(self):
-        marker = read_file_cache_marker("sample.py", 0, 100)
-        tracker = {
-            agent._tool_call_signature("read_file", {"path": "sample.py"}): {
-                "count": 1,
-                "result": {"result": "large file contents"},
-                "cache_marker": marker
-            }
-        }
-        history = [{"role": "tool", "content": marker + "\nfile contents"}]
-        with mock.patch.object(agent, "execute_tool") as execute:
+    def test_repeated_read_file_executes_instead_of_synthetic_suppression(self):
+        args = {"path": "sample.py", "offset": 0, "limit": 100}
+        signature = agent._tool_call_signature("read_file", args)
+        tracker = {signature: {
+            "count": 1, "result": {"result": "old contents"},
+            "parameters": dict(args)
+        }}
+        with mock.patch.object(
+            agent, "execute_tool", return_value={"result": "fresh file contents"}
+        ) as execute:
             result = agent.execute_tool_with_safeguards(
-                "read_file", {"path": "sample.py"}, tracker, history=history
+                "read_file", args, tracker,
+                history=[{"role": "tool", "content": "old contents"}]
             )
-        self.assertTrue(result["duplicate_read_reused"])
-        self.assertEqual(result["result"], "large file contents")
-        self.assertEqual(result["repeat_verification"]["parameters"], {"path": "sample.py"})
-        execute.assert_not_called()
+        self.assertEqual(result["result"], "fresh file contents")
+        self.assertNotIn("duplicate_read_suppressed", result)
+        execute.assert_called_once_with("read_file", args)
 
-    def test_file_edit_invalidates_cached_read_pages_for_same_path(self):
-        marker = read_file_cache_marker("sample.py", 0, 100)
-        signature = agent._tool_call_signature("read_file", {"path": "sample.py"})
-        tracker = {
-            signature: {
-                "count": 1,
-                "result": {"result": "old content"},
-                "cache_marker": marker,
-                "parameters": {"path": "sample.py"}
-            }
-        }
+    def test_file_edit_does_not_affect_read_execution(self):
+        signature = agent._tool_call_signature(
+            "read_file", {"path": "sample.py", "offset": 0, "limit": 100}
+        )
+        tracker = {signature: {"count": 1, "parameters": {
+            "path": "sample.py", "offset": 0, "limit": 100
+        }}}
         with mock.patch.object(agent, "execute_tool", return_value={"result": "updated"}) as execute:
             result = agent.execute_tool_with_safeguards(
                 "edit_file", {"path": "sample.py"}, tracker, history=[]
             )
         self.assertEqual(result["result"], "updated")
-        self.assertNotIn(signature, tracker)
         execute.assert_called_once()
 
     def test_parameterized_signatures_distinguish_read_file_pages(self):
@@ -356,7 +353,7 @@ class AgentSafeguardModuleTests(unittest.TestCase):
         self.assertIn("Completed work", joined)
         self.assertIn("Read file part", joined)
 
-    def test_read_file_can_be_reread_if_previous_result_was_compacted(self):
+    def test_read_file_can_be_reread_even_if_previous_result_is_in_history(self):
         marker = read_file_cache_marker("sample.py", 0, 100)
         tracker = {
             agent._tool_call_signature("read_file", {"path": "sample.py"}): {

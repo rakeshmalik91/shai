@@ -1307,11 +1307,14 @@ FUNCTIONS = [
         "function": {
             "name": "read_file",
             "description": (
-                "Read a UTF-8 project file in line-based chunks. offset is a "
-                "zero-based line offset (default 0); limit is the number of "
-                "lines to return (default 100). For large files, continue "
-                "using the next_offset shown in the result. Do not reread an "
-                "already returned chunk; use its prior result or the next offset."
+                "Read a UTF-8 project file in line-based chunks. ALWAYS supply "
+                "all three arguments: path, offset, and limit. For the first "
+                "chunk use offset=0. offset is a zero-based line offset and "
+                "limit is the number of lines to return (1-500). If the result "
+                "shows More content available, make another read_file call "
+                "with the SAME path and limit and offset set to the exact "
+                "next_offset shown. Never repeat an earlier offset unless "
+                "the user explicitly asks you to reread it."
             ),
             "parameters": {
                 "type": "object",
@@ -1320,7 +1323,7 @@ FUNCTIONS = [
                     "offset": {"type": "integer", "minimum": 0},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 500}
                 },
-                "required": ["path"]
+                "required": ["path", "offset", "limit"]
             }
         }
     },
@@ -1886,25 +1889,9 @@ def execute_tool_with_safeguards(name, args, call_tracker, history=None):
     count = previous["count"] if previous else 0
     settings = TOOL_SAFEGUARDS
 
-    # Reuse an identical read_file page only while its content remains in
-    # history. Return the cached content itself, not a refusal/instruction.
-    if name == "read_file" and previous and AGENT_SAFEGUARDS.get(
-        "deduplicate_read_file_calls", True
-    ):
-        marker = previous.get("cache_marker")
-        if marker and marker_in_history(history, marker):
-            previous["count"] = count + 1
-            cached = previous.get("result")
-            if isinstance(cached, dict):
-                cached = dict(cached)
-                cached["duplicate_read_reused"] = True
-                cached["repeat_verification"] = {
-                    "tool": name, "parameters": dict(args),
-                    "same_parameter_set_count": count + 1,
-                    "action": "returned_cached_result"
-                }
-                return cached
-
+    # Never synthesize a duplicate-read response or silently suppress a read.
+    # Each request executes against the current file contents. Pagination is
+    # distinguished by offset/limit in the exact call signature.
     # Identical calls remain allowed. Different offsets/limits are distinct
     # signatures and are always independently executed.
     result = execute_tool(name, args)
@@ -1917,18 +1904,8 @@ def execute_tool_with_safeguards(name, args, call_tracker, history=None):
     ):
         invalidate_cached_reads_for_path(call_tracker, args["path"])
     count += 1
-    cache_marker = None
-    if name == "read_file":
-        try:
-            relative = relative_path(safe_path(args.get("path", "")))
-        except Exception:
-            relative = str(args.get("path", ""))
-        offset = args.get("offset", 0)
-        limit = args.get("limit", AGENT_SAFEGUARDS["default_read_file_lines"])
-        cache_marker = read_file_cache_marker(relative, offset, limit)
-
     call_tracker[signature] = {
-        "count": count, "result": result, "cache_marker": cache_marker,
+        "count": count, "result": result,
         "parameters": dict(args) if isinstance(args, dict) else args
     }
     warning_after = settings["repeat_call_warning_after"]
@@ -1977,10 +1954,16 @@ def _block_text(value):
 
 
 def display_tool_call(name, args):
-    """Display tool parameters, including pagination, before execution."""
+    """Display effective tool parameters, including pagination, before execution."""
+    display_args = dict(args) if isinstance(args, dict) else args
+    if name == "read_file" and isinstance(display_args, dict):
+        display_args.setdefault("offset", 0)
+        display_args.setdefault(
+            "limit", AGENT_SAFEGUARDS["default_read_file_lines"]
+        )
     if TOOL_CALL_DISPLAY["show_parameters"]:
         print("\n" + format_tool_call_for_display(
-            name, args, TOOL_CALL_DISPLAY["max_argument_chars"]
+            name, display_args, TOOL_CALL_DISPLAY["max_argument_chars"]
         ))
     else:
         print("\n[Shai tool] " + str(name))
