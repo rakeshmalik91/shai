@@ -88,3 +88,21 @@ Reasoning handlers expose provider-supplied summaries when available. They do no
 ## Tests
 
 `test/` contains unit tests for the agent, chat, providers, safeguards, bounded execution, history, logging, reasoning handlers and tool functionality. `run_all_tests.sh` runs `unittest`, optionally runs `pytest`, and compiles source and test files.
+
+## Pinned live status dashboard
+
+During agent requests, Shai reserves a small terminal scroll region at the
+bottom of interactive terminals. Conversation output scrolls in the body while
+the status dashboard is redrawn in place. It shows the current phase, context
+window usage, current/last tool and tool count, plus the latest task-plan items.
+The dashboard is owned by `modules/live_status.py` and falls back to compact
+status lines when stdout is not an interactive terminal or the terminal is too
+short.
+
+### Tool activity rendering
+
+The live status module does not reserve terminal rows or freeze conversation
+output. It collapses only each consecutive batch of tool calls into one
+in-place-updated status line. Normal assistant text and warnings remain normal
+scrolling chat output. Context-meter and task-plan values are maintained as
+state without independently printing repetitive status messages.

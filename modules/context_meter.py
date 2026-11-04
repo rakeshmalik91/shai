@@ -104,9 +104,12 @@ def log_and_display_usage(logger, response, provider_format, estimated_prompt,
             "Token usage unavailable; estimated_prompt_tokens=%d context_limit=%s",
             estimated_prompt, context_limit
         )
-        print("{} {}".format(
-            prefix, format_context_status(estimated_prompt, context_limit)
-        ))
+        status = format_context_status(estimated_prompt, context_limit)
+        try:
+            from modules.live_status import STATUS
+            STATUS.set_context(status)
+        except Exception:
+            print("{} {}".format(prefix, status))
         return usage
 
     prompt = usage.get("prompt_tokens", estimated_prompt)
@@ -115,9 +118,15 @@ def log_and_display_usage(logger, response, provider_format, estimated_prompt,
     line = format_context_status(
         prompt, context_limit, generated_tokens=completion, exact=True
     )
-    print("{} {} | prompt {:,} + generated {:,} = {:,} tokens".format(
-        prefix, line, prompt, completion, total
-    ))
+    try:
+        from modules.live_status import STATUS
+        STATUS.set_context(line + " | prompt {:,} + generated {:,} = {:,}".format(
+            prompt, completion, total
+        ))
+    except Exception:
+        print("{} {} | prompt {:,} + generated {:,} = {:,} tokens".format(
+            prefix, line, prompt, completion, total
+        ))
     logger.debug(
         "Token usage exact_prompt=%s completion=%s total=%s estimated_prompt=%d context_limit=%s",
         prompt, completion, total, estimated_prompt, context_limit

@@ -84,3 +84,10 @@ Before each request, Agent and Chat display an approximate prompt-token count. T
 A context percentage is shown only when a context limit is known. Shai captures model context metadata from the provider's model catalogue when available and stores it in `shai_config.json`. If the provider does not publish a limit, the display explicitly says the limit is unknown rather than inventing a percentage. A user may add `context_window_tokens` for the currently selected model or an entry in `model_context_windows` keyed as `provider::model`.
 
 The pre-request estimate is heuristic and should not be treated as tokenizer-exact. Debug logs record both estimates and provider-reported usage.
+
+## Live tool activity display
+
+Tool activity is shown in the pinned terminal status dashboard rather than as
+a new block of output for every invocation. Context usage, current/last tool,
+tool count, and task-plan statuses update in place. Normal assistant messages
+and errors remain in the scrolling output area.

@@ -59,3 +59,8 @@ sh ./run_all_tests.sh
 - [Existing tools](docs/TOOLS.md)
 - [Project architecture](docs/ARCHITECTURE.md)
 - [Future tools roadmap](docs/roadmap/TOOLS_ROADMAP.md)
+
+
+During agent/code requests, Shai keeps a pinned live status area at the bottom
+of interactive terminals. Tool activity, context-window usage, and the task
+checklist update in place while normal conversation output scrolls above it.

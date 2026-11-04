@@ -1,0 +1,105 @@
+"""Compact in-place tool activity display.
+
+Conversation text remains ordinary scrolling output. Only a consecutive batch
+of tool calls is rendered on one transient terminal line, rewritten in place
+as each tool starts/completes. Context and task state are retained internally
+for diagnostics but never reserve or freeze terminal rows.
+"""
+import shutil
+import sys
+import threading
+
+
+class LiveStatusPanel:
+    def __init__(self, stream=None):
+        self.stream = stream or sys.stdout
+        self.lock = threading.RLock()
+        self.active = False
+        self.enabled = False
+        self.context = "Context: not calculated"
+        self.phase = "Idle"
+        self.current_tool = "—"
+        self.tool_count = 0
+        self.last_tool = "—"
+        self.tasks = []
+        self.iteration = 0
+        self.max_iterations = 0
+        self.batch_size = 0
+        self.batch_position = 0
+        self.line_open = False
+
+    def start(self):
+        with self.lock:
+            self.active = True
+            # No reserved screen area: normal chat output always scrolls.
+            self.enabled = bool(getattr(self.stream, "isatty", lambda: False)())
+
+    def stop(self):
+        with self.lock:
+            self.end_tool_batch()
+            self.active = False
+            self.enabled = False
+
+    def _render_tool_line(self, state):
+        if not self.active or not self.enabled:
+            return
+        size = shutil.get_terminal_size((80, 24))
+        total = self.batch_size or "?"
+        text = "[Shai] Tools {}/{}: {} — {}".format(
+            self.batch_position, total, self.current_tool, state
+        )
+        # Carriage return + erase-to-end rewrites this one line only.
+        self.stream.write("\r\033[2K" + text[:max(1, size.columns - 1)])
+        self.stream.flush()
+        self.line_open = True
+
+    def begin_tool_batch(self, count):
+        with self.lock:
+            self.batch_size = max(0, int(count or 0))
+            self.batch_position = 0
+
+    def end_tool_batch(self):
+        with self.lock:
+            if self.line_open:
+                self.stream.write("\n")
+                self.stream.flush()
+                self.line_open = False
+            self.batch_size = 0
+            self.batch_position = 0
+
+    def update(self, **values):
+        with self.lock:
+            for key, value in values.items():
+                if key == "task_plan":
+                    self.tasks = [dict(item) for item in (value or [])]
+                elif hasattr(self, key):
+                    setattr(self, key, value)
+
+    def set_context(self, context):
+        self.update(context=context)
+
+    def set_phase(self, phase, iteration=None, max_iterations=None):
+        values = {"phase": phase}
+        if iteration is not None:
+            values["iteration"] = iteration
+        if max_iterations is not None:
+            values["max_iterations"] = max_iterations
+        self.update(**values)
+
+    def tool_started(self, name, detail=None):
+        with self.lock:
+            self.phase = "Executing tools"
+            self.current_tool = name if not detail else "{} ({})".format(name, detail)
+            self.tool_count += 1
+            self.last_tool = name
+            self.batch_position += 1
+            self._render_tool_line("running")
+
+    def tool_finished(self, name, error=False):
+        with self.lock:
+            self.current_tool = name
+            self.phase = "Executing tools"
+            self._render_tool_line("ERROR" if error else "done")
+
+
+STATUS = LiveStatusPanel()

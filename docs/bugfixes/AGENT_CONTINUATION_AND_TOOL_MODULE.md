@@ -17,3 +17,13 @@ The observed failure mode is therefore broader than a missing tool dispatch: the
 ## Verification
 
 Run `python -m unittest discover -s test -q` and `python -m compileall -q .`.
+
+## Inline tool activity display
+
+Tool activity is intentionally not a pinned dashboard. Conversation output
+continues to scroll normally. During each provider tool-call batch, Shai
+rewrites one transient terminal line (`\\r` + erase-line) with the current
+batch position, tool name, and running/completed/error state. The line is
+committed with a newline when the batch finishes. Context estimates and task
+plan state continue to update internally without reserving terminal rows or
+printing a new line for every tool call. Non-interactive output stays clean.

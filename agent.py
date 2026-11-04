@@ -33,6 +33,7 @@ from modules.logging_config import init_default_logging, get_logger, log_api_pay
 from modules.reasoning_handlers import display_reasoning_summary
 from modules.conversation_history import ConversationHistory, input_with_history
 from modules.file_change_display import print_change_preview
+from modules.live_status import STATUS
 from modules.context_meter import (
     estimate_messages_tokens, get_context_window, format_context_status,
     log_and_display_usage
@@ -1274,6 +1275,7 @@ def update_task_plan(steps):
             return "Invalid task status for {!r}.".format(title)
         updated.append({"title": title.strip(), "status": status})
     TASK_PLAN = updated
+    STATUS.update(task_plan=TASK_PLAN)
     return "Task plan updated:\n" + "\n".join(
         "[{}] {}".format(
             {"pending": " ", "in_progress": "~", "completed": "x", "blocked": "!"}[item["status"]],
@@ -2873,14 +2875,12 @@ def display_tool_call(name, args):
         "git_status": "Checking Git status",
         "git_diff": "Inspecting Git changes",
     }
-    print("\n[Shai] {}…".format(action_labels.get(name, "Running {}".format(name))))
+    detail = None
     if TOOL_CALL_DISPLAY["show_parameters"]:
-        print(format_tool_call_for_display(
+        detail = format_tool_call_for_display(
             name, display_args, TOOL_CALL_DISPLAY["max_argument_chars"]
-        ))
-    else:
-        print("[Shai tool] " + str(name))
-    sys.stdout.flush()
+        )
+    STATUS.tool_started(name, detail)
 
 
 def display_assistant_message_content(message):
@@ -3114,13 +3114,15 @@ def _ask_model_impl(history, user_text):
         context_status = format_context_status(
             estimated_prompt_tokens, context_limit
         )
+        STATUS.set_context(context_status)
+        STATUS.set_phase("Thinking", iteration=iteration + 1,
+                         max_iterations=MAX_ITERATIONS)
         LOGGER.debug(
             "Context estimate provider=%s model=%s estimated_prompt_tokens=%d "
             "context_limit=%s history_messages=%d history_chars=%d",
             PROVIDER, MODEL, estimated_prompt_tokens, context_limit,
             len(history), len(json.dumps(history, ensure_ascii=False))
         )
-        print("\n[Shai] {}".format(context_status))
         spinner = Spinner("Shai is thinking | " + context_status)
         spinner.start()
 
@@ -3267,6 +3269,7 @@ def _ask_model_impl(history, user_text):
 
             tool_results = []
             abort_for_invalid_tool = False
+            STATUS.begin_tool_batch(len(tool_uses))
 
             for tool_use in tool_uses:
                 name = tool_use.get("name")
@@ -3301,6 +3304,7 @@ def _ask_model_impl(history, user_text):
                     tool_limit_reached = True
                     print("\n[Shai] Repeated tool failure detected. Stopping this request; see the debug log for details.")
 
+                STATUS.tool_finished(name, error=bool(isinstance(result, dict) and result.get("error")))
                 tool_result = {
                     "type": "tool_result",
                     "tool_use_id": tool_use_id,
@@ -3312,6 +3316,7 @@ def _ask_model_impl(history, user_text):
                     tool_result["is_error"] = True
                 tool_results.append(tool_result)
 
+            STATUS.end_tool_batch()
             history.append({
                 "role": "user",
                 "content": tool_results
@@ -3361,6 +3366,7 @@ def _ask_model_impl(history, user_text):
                 return
 
             abort_for_invalid_tool = False
+            STATUS.begin_tool_batch(len(tool_calls))
             for call in tool_calls:
                 call_id = call.get("id")
                 function_data = call.get("function", {})
@@ -3419,6 +3425,7 @@ def _ask_model_impl(history, user_text):
                 LOGGER.info("Tool dispatch completed iteration=%d tool=%s call_id=%s error=%s",
                             iteration + 1, name, call_id,
                             bool(isinstance(result, dict) and result.get("error")))
+                STATUS.tool_finished(name, error=bool(isinstance(result, dict) and result.get("error")))
                 history.append({
                     "role": "tool",
                     "tool_call_id": call_id,
@@ -3427,6 +3434,7 @@ def _ask_model_impl(history, user_text):
                     )
                 })
 
+            STATUS.end_tool_batch()
             if abort_for_invalid_tool:
                 raise ToolSelectionFailure(
                     "The model repeatedly selected unavailable tools."
@@ -3465,6 +3473,12 @@ def ask_model(history, user_text):
     LOGGER.debug("ask_model called history_messages=%d user_chars=%d",
                  len(history), len(user_text))
     history_length = len(history)
+    STATUS.tool_count = 0
+    STATUS.current_tool = "—"
+    STATUS.last_tool = "—"
+    STATUS.update(task_plan=TASK_PLAN)
+    STATUS.set_phase("Starting request")
+    STATUS.start()
     try:
         _ask_model_impl(history, user_text)
     except IterationInterrupted:
@@ -3503,6 +3517,9 @@ def ask_model(history, user_text):
         })
         print("\n[Shai] {}".format(error))
         print("[Shai] Invalid tool-call history was cleared and a recovery note was retained. You can retry or rephrase.")
+    finally:
+        STATUS.set_phase("Idle")
+        STATUS.stop()
 
 
 # -------------------------------------------------------------------
