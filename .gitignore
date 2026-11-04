@@ -229,6 +229,20 @@ __marimo__/
 .setup_keys.sh
 .shai
 
+.shai_backup
+.shai_backups
+.backup
+.backups
+*.backup
+.tmp
+.temp
+*.tmp
+*.temp
+tmp-*
+temp-*
+*.scratch
+scratch-*
+
 logs
 log
 *.log
