@@ -79,7 +79,8 @@ def save_config(provider, model, context_window_tokens=None):
             config["context_window_tokens"] = saved_limit
         else:
             config.pop("context_window_tokens", None)
-    config["model_context_windows"] = context_mapping
+    # Sort model_context_windows by key for consistent ordering
+    config["model_context_windows"] = dict(sorted(context_mapping.items()))
     temporary = CONFIG_FILE.with_name(CONFIG_FILE.name + ".tmp")
     with temporary.open("w", encoding="utf-8") as handle:
         json.dump(config, handle, indent=2, ensure_ascii=False)
