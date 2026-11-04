@@ -63,6 +63,7 @@ DEFAULT_MAX_TOOL_CALL_ITERATIONS = 80
 HARD_MAX_TOOL_CALL_ITERATIONS = 80
 MAX_PLAN_CONTINUATIONS = 2
 CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
+TASK_FILE = SCRIPT_DIR / ".shai" / "task.json"
 LOGGER = get_logger("shai.agent")
 # Set by main() after provider selection; defaults keep helpers import-testable.
 PROVIDER = "unknown"
@@ -1259,6 +1260,33 @@ def verify_changes(path=".", test_check="unittest"):
     return "\n\n".join(reports)
 
 
+def _load_task_plan():
+    """Load the task plan from .shai/task.json if it exists."""
+    global TASK_PLAN
+    try:
+        if TASK_FILE.exists():
+            with TASK_FILE.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+                if isinstance(data, dict) and isinstance(data.get("tasks"), list):
+                    TASK_PLAN = data["tasks"]
+                    STATUS.update(task_plan=TASK_PLAN)
+    except (OSError, ValueError) as error:
+        LOGGER.warning("Failed to load task plan: %s", error)
+
+
+def _save_task_plan():
+    """Persist the current task plan to .shai/task.json."""
+    try:
+        TASK_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temporary = TASK_FILE.with_name(TASK_FILE.name + ".tmp")
+        with temporary.open("w", encoding="utf-8") as handle:
+            json.dump({"tasks": TASK_PLAN}, handle, indent=2, ensure_ascii=False)
+            handle.write("\n")
+        temporary.replace(TASK_FILE)
+    except OSError as error:
+        LOGGER.warning("Failed to save task plan: %s", error)
+
+
 def update_task_plan(steps):
     """Set the visible in-memory task checklist for the current agent task."""
     global TASK_PLAN
@@ -1277,6 +1305,7 @@ def update_task_plan(steps):
         updated.append({"title": title.strip(), "status": status})
     TASK_PLAN = updated
     STATUS.update(task_plan=TASK_PLAN)
+    _save_task_plan()
     return "Task plan updated:\n" + "\n".join(
         "[{}] {}".format(
             {"pending": " ", "in_progress": "~", "completed": "x", "blocked": "!"}[item["status"]],
@@ -3551,6 +3580,8 @@ def main():
                 ROOT, API_TIMEOUT_SECONDS)
     PROVIDER, MODEL = initialize_provider(auto_select=True)
     LOGGER.info("Selected provider=%s model=%s", PROVIDER, MODEL)
+
+    _load_task_plan()
 
     history_store = ConversationHistory(ROOT, "agent", SYSTEM_PROMPT)
     history = history_store.load()
