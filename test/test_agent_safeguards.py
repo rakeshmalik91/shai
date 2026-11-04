@@ -19,7 +19,8 @@ if _existing_agent is not None:
 
 import agent
 from modules.agent_safeguards import (
-    bound_tool_result, compact_conversation_history, validate_tool_arguments
+    bound_tool_result, compact_conversation_history, validate_tool_arguments,
+    ToolArgumentFailureTracker, update_no_progress, read_file_cache_marker
 )
 
 
@@ -80,7 +81,7 @@ class AgentSafeguardModuleTests(unittest.TestCase):
             {"role": "assistant", "content": [{"type": "text", "text": "done"}]}
         ]
         compacted = compact_conversation_history(
-            history, max_chars=4000, max_tool_result_chars=400,
+            history, max_chars=4000, max_tool_result_chars=1000,
             keep_recent_turns=1, max_recent_tool_cycles=1
         )
         self.assertTrue(any(
@@ -192,6 +193,136 @@ class AgentSafeguardModuleTests(unittest.TestCase):
             agent.PROVIDER = original_provider
             agent.AGENT_SAFEGUARDS = original_settings
             agent.MAX_ITERATIONS = original_iterations
+
+    def test_read_file_supports_offset_limit_and_continuation(self):
+        import tempfile
+        from pathlib import Path
+        original_root = agent.ROOT
+        original_settings = agent.AGENT_SAFEGUARDS
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, "sample.txt").write_text(
+                "one\ntwo\nthree\nfour\n", encoding="utf-8"
+            )
+            agent.ROOT = Path(directory)
+            agent.AGENT_SAFEGUARDS = dict(original_settings)
+            agent.AGENT_SAFEGUARDS.update({
+                "default_read_file_lines": 2,
+                "max_read_file_lines": 500,
+                "max_read_file_chars": 4000
+            })
+            try:
+                result = agent.read_file("sample.txt", offset=1, limit=2)
+                self.assertIn("Lines 2-3 of 4", result)
+                self.assertIn("two\nthree\n", result)
+                self.assertNotIn("one\n", result)
+                self.assertIn("offset=3", result)
+            finally:
+                agent.ROOT = original_root
+                agent.AGENT_SAFEGUARDS = original_settings
+
+    def test_read_file_schema_accepts_offset_and_limit(self):
+        self.assertIsNone(validate_tool_arguments(
+            "read_file", {"path": "a.py", "offset": 300, "limit": 100},
+            agent.FUNCTIONS
+        ))
+        self.assertIn("at least 0", validate_tool_arguments(
+            "read_file", {"path": "a.py", "offset": -1}, agent.FUNCTIONS
+        ))
+
+    def test_tool_is_disabled_after_two_invalid_argument_attempts(self):
+        tracker = ToolArgumentFailureTracker(max_failures=2)
+        with mock.patch.object(agent, "execute_tool") as execute:
+            first, abort_first = agent.handle_tool_selection(
+                "read_file", {"path": "x", "query": "unsupported"},
+                {}, {"count": 0}, invalid_args_tracker=tracker
+            )
+            second, abort_second = agent.handle_tool_selection(
+                "read_file", {"path": "x", "query": "unsupported"},
+                {}, {"count": 0}, invalid_args_tracker=tracker
+            )
+            third, abort_third = agent.handle_tool_selection(
+                "read_file", {"path": "x"}, {}, {"count": 0},
+                invalid_args_tracker=tracker
+            )
+        self.assertFalse(abort_first)
+        self.assertFalse(abort_second)
+        self.assertFalse(abort_third)
+        self.assertIn("attempt 1/2", first["instruction"])
+        self.assertTrue(second["tool_disabled_for_request"])
+        self.assertTrue(third["tool_disabled_for_request"])
+        execute.assert_not_called()
+
+    def test_duplicate_read_file_uses_previous_result_without_repeating_content(self):
+        marker = read_file_cache_marker("sample.py", 0, 100)
+        tracker = {
+            agent._tool_call_signature("read_file", {"path": "sample.py"}): {
+                "count": 1,
+                "result": {"result": "large file contents"},
+                "cache_marker": marker
+            }
+        }
+        history = [{"role": "tool", "content": marker + "\nfile contents"}]
+        with mock.patch.object(agent, "execute_tool") as execute:
+            result = agent.execute_tool_with_safeguards(
+                "read_file", {"path": "sample.py"}, tracker, history=history
+            )
+        self.assertTrue(result["duplicate_read_suppressed"])
+        self.assertIn("Reuse that previous", result["result"])
+        execute.assert_not_called()
+
+    def test_no_progress_distinguishes_failed_argument_variations_from_success(self):
+        recent = []
+        count, repeated = update_no_progress(
+            recent, ("read_file", "bad-args-1"), 0, True, 0
+        )
+        self.assertEqual(count, 1)
+        self.assertFalse(repeated)
+        count, repeated = update_no_progress(
+            recent, ("read_file", "bad-args-2"), count, True, 0
+        )
+        self.assertEqual(count, 2)
+        self.assertFalse(repeated)
+        count, repeated = update_no_progress(
+            recent, ("read_file", "offset-200"), count, False, 1
+        )
+        self.assertEqual(count, 0)
+        self.assertFalse(repeated)
+
+    def test_compaction_preserves_summary_of_completed_tool_work(self):
+        history = [{"role": "system", "content": "system"},
+                   {"role": "user", "content": "inspect"}]
+        for index in range(10):
+            call_id = "c{}".format(index)
+            history.append({"role": "assistant", "content": "", "tool_calls": [{
+                "id": call_id, "type": "function",
+                "function": {"name": "read_file", "arguments": "{}"}
+            }]})
+            history.append({"role": "tool", "tool_call_id": call_id,
+                            "content": json.dumps({"result": ("Read file part {} ".format(index)) + ("x" * 900)})})
+        history.append({"role": "assistant", "content": "Continue."})
+        compacted = compact_conversation_history(
+            history, max_chars=4000, max_tool_result_chars=400,
+            keep_recent_turns=1, max_recent_tool_cycles=1
+        )
+        joined = "\n".join(str(item.get("content", "")) for item in compacted)
+        self.assertIn("Completed work", joined)
+        self.assertIn("Read file part", joined)
+
+    def test_read_file_can_be_reread_if_previous_result_was_compacted(self):
+        marker = read_file_cache_marker("sample.py", 0, 100)
+        tracker = {
+            agent._tool_call_signature("read_file", {"path": "sample.py"}): {
+                "count": 3,
+                "result": {"result": "old file contents"},
+                "cache_marker": marker
+            }
+        }
+        with mock.patch.object(agent, "execute_tool", return_value={"result": "fresh chunk"}) as execute:
+            result = agent.execute_tool_with_safeguards(
+                "read_file", {"path": "sample.py"}, tracker, history=[]
+            )
+        self.assertEqual(result["result"], "fresh chunk")
+        execute.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -353,3 +353,30 @@ The settings are shared by agent and chat modes:
 
 The `patch_file` tool is registered for execution and uses its exact
 `path`, `old_text`, and `new_text` schema.
+
+## Agent tool-use safeguards
+
+`read_file` supports line-based pagination. `offset` is a zero-based line offset
+and `limit` is the maximum number of lines to return. Large-file results include
+a `next_offset` instruction so the agent can continue without repeatedly loading
+the entire file.
+
+The agent also suppresses duplicate file-chunk reads while the previous result
+is still in conversation history. If history compaction has removed that result,
+the file chunk can be read again. Invalid arguments are tracked per tool; after
+the configured number of failures, that tool is disabled for the rest of the
+current request. Successful new tool work resets the no-progress counter, while
+repeated batches and changed-but-still-invalid calls advance it.
+
+Example `agent_safeguards` settings:
+
+```json
+"agent_safeguards": {
+  "max_invalid_argument_attempts_per_tool": 2,
+  "default_read_file_lines": 100,
+  "max_read_file_lines": 500,
+  "max_read_file_chars": 4000,
+  "deduplicate_read_file_calls": true
+}
+```
+

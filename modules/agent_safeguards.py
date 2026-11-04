@@ -92,6 +92,7 @@ def _summarize_old_groups(groups, max_chars=5000):
         user_text = []
         assistant_text = []
         tool_names = []
+        tool_summaries = []
         for message in group:
             role = message.get("role")
             content = message.get("content")
@@ -106,10 +107,14 @@ def _summarize_old_groups(groups, max_chars=5000):
                         name = function.get("name")
                         if name:
                             tool_names.append(str(name))
+            elif role == "tool" or _is_anthropic_tool_result(message):
+                tool_summaries.append(_extract_tool_result_summary(message, 220))
         if user_text:
             lines.append("Earlier request: " + _truncate_text(" ".join(user_text), 700))
         if tool_names:
             lines.append("Tools used: " + ", ".join(tool_names[-12:]))
+        if tool_summaries:
+            lines.append("Completed work: " + _truncate_text(" | ".join(tool_summaries[-8:]), 1200))
         if assistant_text:
             lines.append("Earlier response: " + _truncate_text(" ".join(assistant_text), 700))
         if _json_chars(lines) >= max_chars:
@@ -165,12 +170,19 @@ def _compact_latest_group(group, max_recent_tool_cycles=6):
     compacted = []
     if first_user:
         compacted.append(first_user)
+    omitted_chunks = [
+        chunk for index, chunk in enumerate(chunks)
+        if index not in keep_indices
+    ]
     compacted.append({
         "role": "assistant",
         "content": (
             "[Earlier tool activity in this request compacted: {} older "
-            "tool-call cycle(s) omitted. The original user request is retained.]"
-        ).format(removed_cycles)
+            "tool-call cycle(s) omitted. The original user request is retained.]\n{}"
+        ).format(
+            removed_cycles,
+            _summarize_omitted_tool_chunks(omitted_chunks, max_chars=3000)
+        )
     })
     for chunk in kept:
         compacted.extend(chunk)
@@ -271,6 +283,112 @@ def compact_conversation_history(messages, max_chars=90000,
         })
     return compacted
 
+class ToolArgumentFailureTracker:
+    """Track invalid arguments per tool and disable repeatedly failing tools."""
+
+    def __init__(self, max_failures=2):
+        self.max_failures = max(1, int(max_failures))
+        self.failures = {}
+        self.last_errors = {}
+        self.disabled = set()
+
+    def record(self, tool_name, error):
+        count = self.failures.get(tool_name, 0) + 1
+        self.failures[tool_name] = count
+        self.last_errors[tool_name] = str(error)
+        if count >= self.max_failures:
+            self.disabled.add(tool_name)
+        return count, tool_name in self.disabled
+
+    def is_disabled(self, tool_name):
+        return tool_name in self.disabled
+
+
+def read_file_cache_marker(path, offset=0, limit=100):
+    """Stable marker used to avoid returning the same file chunk repeatedly."""
+    return "[Shai read_file chunk path={} offset={} limit={}]".format(
+        path, offset, limit
+    )
+
+
+def marker_in_history(history, marker):
+    """Return True when a prior tool result containing marker is still present."""
+    if not marker or not isinstance(history, list):
+        return False
+
+    def contains(value):
+        if isinstance(value, str):
+            return marker in value
+        if isinstance(value, dict):
+            return any(contains(item) for item in value.values())
+        if isinstance(value, list):
+            return any(contains(item) for item in value)
+        return False
+
+    return any(contains(message) for message in history)
+
+
+def _extract_tool_result_summary(message, max_chars=260):
+    content = message.get("content", "")
+    if isinstance(content, str):
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict):
+                content = parsed.get("result", parsed.get("error", content))
+        except (ValueError, TypeError):
+            pass
+    elif isinstance(content, list):
+        content = " ".join(
+            str(block.get("text", block.get("content", "")))
+            for block in content if isinstance(block, dict)
+        )
+    text = " ".join(str(content).split())
+    return _truncate_text(text, max_chars)
+
+
+def _summarize_omitted_tool_chunks(chunks, max_chars=3000):
+    """Keep a compact record of completed tool work when old cycles are dropped."""
+    lines = ["[Completed work from older tool calls, compacted for context:]" ]
+    for chunk in chunks:
+        names = []
+        summaries = []
+        for message in chunk:
+            if message.get("role") == "assistant":
+                for call in message.get("tool_calls", []) or []:
+                    function = call.get("function", {})
+                    if isinstance(function, dict) and function.get("name"):
+                        names.append(str(function.get("name")))
+                content = message.get("content")
+                if isinstance(content, str) and content.strip():
+                    summaries.append(_truncate_text(content.strip(), 180))
+            elif message.get("role") == "tool":
+                summaries.append(_extract_tool_result_summary(message, 260))
+            elif _is_anthropic_tool_result(message):
+                summaries.append(_extract_tool_result_summary(message, 260))
+        if names or summaries:
+            label = ", ".join(names) if names else "tool activity"
+            detail = " | ".join(item for item in summaries if item)
+            lines.append("- {}: {}".format(label, detail or "completed"))
+        if _json_chars(lines) >= max_chars:
+            break
+    return _truncate_text("\n".join(lines), max_chars)
+
+
+def update_no_progress(recent_batches, batch_signature, no_progress_count,
+                       had_errors, successful_calls):
+    """Compatibility helper for callers that keep loop state separately."""
+    repeated = batch_signature in recent_batches[-3:]
+    if repeated or (had_errors and successful_calls <= 0):
+        no_progress_count += 1
+    elif successful_calls > 0:
+        no_progress_count = 0
+    else:
+        no_progress_count = 0
+    recent_batches.append(batch_signature)
+    del recent_batches[:-4]
+    return no_progress_count, repeated
+
+
 def validate_tool_arguments(name, args, function_definitions,
                             reject_unknown=True):
     """Validate tool args against the advertised JSON schema."""
@@ -314,6 +432,10 @@ def validate_tool_arguments(name, args, function_definitions,
                 return "Argument {!r} must be a number.".format(key)
             if not isinstance(value, python_type):
                 return "Argument {!r} must be {}.".format(key, expected)
+        if "minimum" in spec and value < spec["minimum"]:
+            return "Argument {!r} must be at least {}.".format(key, spec["minimum"])
+        if "maximum" in spec and value > spec["maximum"]:
+            return "Argument {!r} must be at most {}.".format(key, spec["maximum"])
         if "enum" in spec and value not in spec["enum"]:
             return "Argument {!r} must be one of: {}.".format(
                 key, ", ".join(str(item) for item in spec["enum"])

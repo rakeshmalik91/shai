@@ -26,7 +26,9 @@ from modules.reasoning_handlers import display_reasoning_summary
 from modules.conversation_history import ConversationHistory, input_with_history
 from modules.file_change_display import print_change_preview
 from modules.agent_safeguards import (
-    bound_tool_result, compact_conversation_history, validate_tool_arguments
+    bound_tool_result, compact_conversation_history, validate_tool_arguments,
+    ToolArgumentFailureTracker, read_file_cache_marker, marker_in_history,
+    update_no_progress
 )
 
 # -------------------------------------------------------------------
@@ -134,6 +136,11 @@ DEFAULT_AGENT_SAFEGUARDS = {
     "max_recent_tool_cycles": 6,
     "max_consecutive_no_progress_iterations": 3,
     "max_tool_calls_per_request": 80,
+    "max_invalid_argument_attempts_per_tool": 2,
+    "default_read_file_lines": 100,
+    "max_read_file_lines": 500,
+    "max_read_file_chars": 4000,
+    "deduplicate_read_file_calls": True,
     "validate_tool_arguments": True,
     "reject_unknown_tool_arguments": True
 }
@@ -149,12 +156,23 @@ def load_agent_safeguards():
     for key in (
         "max_history_chars", "max_tool_result_chars", "keep_recent_turns",
         "max_recent_tool_cycles", "max_consecutive_no_progress_iterations",
-        "max_tool_calls_per_request"
+        "max_tool_calls_per_request", "max_invalid_argument_attempts_per_tool",
+        "default_read_file_lines", "max_read_file_lines", "max_read_file_chars"
     ):
         value = settings.get(key, DEFAULT_AGENT_SAFEGUARDS[key])
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             value = DEFAULT_AGENT_SAFEGUARDS[key]
         settings[key] = value
+    settings["deduplicate_read_file_calls"] = (
+        settings.get("deduplicate_read_file_calls") is True
+    )
+    settings["max_invalid_argument_attempts_per_tool"] = min(
+        settings["max_invalid_argument_attempts_per_tool"], 5
+    )
+    settings["max_read_file_lines"] = min(settings["max_read_file_lines"], 500)
+    settings["default_read_file_lines"] = min(
+        settings["default_read_file_lines"], settings["max_read_file_lines"]
+    )
     for key in (
         "validate_tool_arguments", "reject_unknown_tool_arguments"
     ):
@@ -805,23 +823,100 @@ def list_files(path="."):
     LOGGER.debug("list_files complete path=%s files=%d", path, len(results))
     return "\n".join(results) if results else "No files found."
 
-def read_file(path):
-    LOGGER.debug("read_file requested path=%s", path)
+def read_file(path, offset=0, limit=None):
+    """Read a bounded, line-addressable UTF-8 text chunk from a project file.
+
+    offset is a zero-based line offset. limit is the maximum number of lines.
+    Large files can be read sequentially using the returned next_offset.
+    """
+    LOGGER.debug("read_file requested path=%s offset=%s limit=%s", path, offset, limit)
     file_path = safe_path(path)
 
     if not file_path.is_file():
         return "File does not exist."
 
     if file_path.stat().st_size > MAX_FILE_SIZE:
-        return "File is too large to read."
+        return "File is too large to read (maximum {} bytes).".format(MAX_FILE_SIZE)
+
+    if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+        return "Invalid offset: use a non-negative, zero-based line number."
+    if limit is None:
+        limit = AGENT_SAFEGUARDS["default_read_file_lines"]
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        return "Invalid limit: use a positive number of lines."
+    maximum_lines = AGENT_SAFEGUARDS["max_read_file_lines"]
+    if limit > maximum_lines:
+        return "Requested limit {} exceeds the configured maximum of {} lines.".format(
+            limit, maximum_lines
+        )
 
     try:
         content = file_path.read_text(encoding="utf-8")
-        LOGGER.debug("read_file complete path=%s chars=%d bytes=%d",
-                     path, len(content), file_path.stat().st_size)
-        return content
     except UnicodeDecodeError:
         return "File is not UTF-8 text."
+    except OSError as error:
+        return "Unable to read file: {}".format(error)
+
+    lines = content.splitlines(True)
+    total_lines = len(lines)
+    if offset > total_lines:
+        return "Offset {} is past the end of the file ({} lines).".format(
+            offset, total_lines
+        )
+    if offset == total_lines and total_lines > 0:
+        return "Offset {} is at the end of the file ({} lines).".format(
+            offset, total_lines
+        )
+
+    max_chars = AGENT_SAFEGUARDS["max_read_file_chars"]
+    selected = []
+    used_chars = 0
+    next_offset = offset
+    line_was_truncated = False
+    for line_index in range(offset, min(total_lines, offset + limit)):
+        line = lines[line_index]
+        remaining = max_chars - used_chars
+        if len(line) > remaining:
+            if not selected and remaining > 0:
+                selected.append(line[:remaining])
+                used_chars += remaining
+                next_offset = line_index + 1
+                line_was_truncated = True
+            break
+        selected.append(line)
+        used_chars += len(line)
+        next_offset = line_index + 1
+
+    relative = relative_path(file_path)
+    marker = read_file_cache_marker(relative, offset, limit)
+    if selected:
+        first_line = offset + 1
+        last_line = offset + len(selected)
+        header = (
+            "{}\n[Lines {}-{} of {}. Returned {} line(s).]\n"
+        ).format(marker, first_line, last_line, total_lines, len(selected))
+        result = header + "".join(selected)
+    else:
+        result = "{}\n[The file is empty.]".format(marker)
+
+    has_more = next_offset < total_lines
+    if has_more:
+        result += (
+            "\n\n[More content available. Continue with read_file(path={!r}, "
+            "offset={}, limit={}).]"
+        ).format(relative, next_offset, limit)
+    if line_was_truncated:
+        result += (
+            "\n[One unusually long line was truncated at the configured "
+            "{}-character chunk limit.]"
+        ).format(max_chars)
+    LOGGER.debug(
+        "read_file complete path=%s offset=%d next_offset=%d total_lines=%d "
+        "returned_lines=%d chars=%d more=%s",
+        relative, offset, next_offset, total_lines, len(selected),
+        len(result), has_more
+    )
+    return result
 
 def search_files(query, path="."):
     LOGGER.debug("search_files query=%r path=%s", query, path)
@@ -1190,11 +1285,19 @@ FUNCTIONS = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read a UTF-8 text file in the project.",
+            "description": (
+                "Read a UTF-8 project file in line-based chunks. offset is a "
+                "zero-based line offset (default 0); limit is the number of "
+                "lines to return (default 100). For large files, continue "
+                "using the next_offset shown in the result. Do not reread an "
+                "already returned chunk; use its prior result or the next offset."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string"}
+                    "path": {"type": "string"},
+                    "offset": {"type": "integer", "minimum": 0},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 500}
                 },
                 "required": ["path"]
             }
@@ -1618,8 +1721,13 @@ def resolve_tool_name(name):
     return None
 
 
-def handle_tool_selection(name, args, call_tracker, invalid_tool_counter):
-    """Validate tool names and give the model bounded correction attempts."""
+def handle_tool_selection(name, args, call_tracker, invalid_tool_counter,
+                          invalid_args_tracker=None, history=None):
+    """Validate tool names and disable tools after repeated bad arguments."""
+    if invalid_args_tracker is None:
+        invalid_args_tracker = ToolArgumentFailureTracker(
+            AGENT_SAFEGUARDS["max_invalid_argument_attempts_per_tool"]
+        )
     resolved_name = resolve_tool_name(name)
     if resolved_name is None:
         invalid_tool_counter["count"] += 1
@@ -1645,31 +1753,49 @@ def handle_tool_selection(name, args, call_tracker, invalid_tool_counter):
             )
         return result, should_abort
 
+    if invalid_args_tracker.is_disabled(resolved_name):
+        return {
+            "error": "Tool {!r} is disabled for the rest of this request after repeated invalid arguments.".format(resolved_name),
+            "instruction": (
+                "Do not call this tool again in the current request. Use the "
+                "previous tool results, another available tool, or explain "
+                "the limitation to the user."
+            ),
+            "tool_disabled_for_request": True
+        }, False
+
     if AGENT_SAFEGUARDS["validate_tool_arguments"]:
         validation_error = validate_tool_arguments(
             resolved_name, args, FUNCTIONS,
             reject_unknown=AGENT_SAFEGUARDS["reject_unknown_tool_arguments"]
         )
         if validation_error:
-            invalid_tool_counter["count"] += 1
-            count = invalid_tool_counter["count"]
-            limit = RETRY_SETTINGS["invalid_tool_selection_max_attempts"]
-            result = {
+            count, disabled = invalid_args_tracker.record(
+                resolved_name, validation_error
+            )
+            limit = AGENT_SAFEGUARDS["max_invalid_argument_attempts_per_tool"]
+            instruction = (
+                "Correct the arguments to match the advertised schema. "
+                "Do not add unsupported parameters. Invalid argument "
+                "attempt {}/{} for this tool."
+            ).format(count, limit)
+            if disabled:
+                instruction = (
+                    "This tool is now disabled for the rest of this request. "
+                    "Do not call it again. Use existing results, another tool, "
+                    "or explain the limitation."
+                )
+            return {
                 "error": "Invalid arguments for {}: {}".format(
                     resolved_name, validation_error
                 ),
-                "instruction": (
-                    "Correct the arguments to match the advertised schema. "
-                    "Do not add unsupported parameters. Invalid argument "
-                    "attempt {}/{}."
-                ).format(count, limit)
-            }
-            return result, (
-                RETRY_SETTINGS["invalid_tool_selection_enabled"]
-                and count >= limit
-            )
+                "instruction": instruction,
+                "tool_disabled_for_request": disabled
+            }, False
 
-    result = execute_tool_with_safeguards(resolved_name, args, call_tracker)
+    result = execute_tool_with_safeguards(
+        resolved_name, args, call_tracker, history=history
+    )
     if resolved_name != name:
         if isinstance(result, dict):
             result = dict(result)
@@ -1700,43 +1826,89 @@ def execute_tool(name, args):
 
 def _tool_call_signature(name, args):
     """Stable signature for detecting repeated identical tool requests."""
+    normalized_args = args
+    if name == "read_file" and isinstance(args, dict):
+        normalized_args = dict(args)
+        normalized_args.setdefault("offset", 0)
+        normalized_args.setdefault(
+            "limit", AGENT_SAFEGUARDS["default_read_file_lines"]
+        )
     return json.dumps(
-        {"name": name, "args": args},
+        {"name": name, "args": normalized_args},
         sort_keys=True,
         ensure_ascii=False,
         separators=(",", ":")
     )
 
 
-def execute_tool_with_safeguards(name, args, call_tracker):
-    """Execute a tool while detecting repeated identical calls."""
+def execute_tool_with_safeguards(name, args, call_tracker, history=None):
+    """Execute tools once where possible and explain duplicate-call reuse."""
     signature = _tool_call_signature(name, args)
     previous = call_tracker.get(signature)
     count = previous["count"] if previous else 0
     settings = TOOL_SAFEGUARDS
 
-    if settings["duplicate_call_detection"] and count >= settings["duplicate_call_limit"]:
+    if name == "read_file" and previous and AGENT_SAFEGUARDS.get(
+        "deduplicate_read_file_calls", True
+    ):
+        marker = previous.get("cache_marker")
+        if marker and marker_in_history(history, marker):
+            previous["count"] = count + 1
+            return {
+                "result": (
+                    "This exact file chunk was already returned earlier in "
+                    "this request. Reuse that previous read_file result from "
+                    "the conversation history; do not request it again. If "
+                    "more content is needed, use the next_offset from that result."
+                ),
+                "duplicate_read_suppressed": True,
+                "instruction": "Reuse the earlier file content; do not reread this chunk."
+            }
+
+    prior_read_result_was_compacted = (
+        name == "read_file"
+        and previous is not None
+        and previous.get("cache_marker")
+        and not marker_in_history(history, previous.get("cache_marker"))
+    )
+    if (
+        settings["duplicate_call_detection"]
+        and count >= settings["duplicate_call_limit"]
+        and not prior_read_result_was_compacted
+    ):
         return {
             "error": (
                 "Repeated identical tool call blocked: this exact call has "
-                "already executed {} times in this request. Do not call it "
-                "again unless the arguments or relevant project state change."
+                "already executed {} times in this request."
             ).format(count),
-            "previous_result": previous.get("result") if previous else None
+            "instruction": (
+                "The previous result is already available earlier in the "
+                "conversation. Reuse it instead of retrying this exact call. "
+                "If you need different information, change the arguments "
+                "meaningfully (for read_file, use the next offset)."
+            ),
+            "previous_result_available": True
         }
 
     result = execute_tool(name, args)
     count += 1
+    cache_marker = None
+    if name == "read_file":
+        try:
+            relative = relative_path(safe_path(args.get("path", "")))
+        except Exception:
+            relative = str(args.get("path", ""))
+        offset = args.get("offset", 0)
+        limit = args.get("limit", AGENT_SAFEGUARDS["default_read_file_lines"])
+        cache_marker = read_file_cache_marker(relative, offset, limit)
     call_tracker[signature] = {
         "count": count,
-        "result": result
+        "result": result,
+        "cache_marker": cache_marker
     }
 
     warning_after = settings["repeat_call_warning_after"]
-    if (
-        settings["repeat_call_warning"]
-        and count >= warning_after
-    ):
+    if settings["repeat_call_warning"] and count >= warning_after:
         warning = (
             "Warning: this identical tool call has been executed {} times "
             "in the current request. Avoid repeating it; use the result "
@@ -1750,7 +1922,6 @@ def execute_tool_with_safeguards(name, args, call_tracker):
         call_tracker[signature]["result"] = result
 
     return result
-
 
 def _block_text(value):
     """Convert provider content blocks into readable text for recovery."""
@@ -1920,6 +2091,9 @@ def _invalid_tool_call_recovery_note(attempt, maximum):
 def _ask_model_impl(history, user_text):
     call_tracker = {}
     invalid_tool_counter = {"count": 0}
+    invalid_args_tracker = ToolArgumentFailureTracker(
+        AGENT_SAFEGUARDS["max_invalid_argument_attempts_per_tool"]
+    )
     invalid_tool_recovery_attempts = 0
     no_progress_count = 0
     recent_tool_batches = []
@@ -1950,6 +2124,7 @@ def _ask_model_impl(history, user_text):
                 )
         iteration_tool_signatures = []
         iteration_tool_errors = False
+        iteration_tool_successes = 0
         tool_limit_reached = False
         LOGGER.debug("Agent iteration %d/%d history_messages=%d history_chars=%d",
                      iteration + 1, MAX_ITERATIONS, len(history),
@@ -2098,9 +2273,12 @@ def _ask_model_impl(history, user_text):
                     result = {"error": "Tool arguments must be an object."}
                 else:
                     result, should_abort = handle_tool_selection(
-                        name, args, call_tracker, invalid_tool_counter
+                        name, args, call_tracker, invalid_tool_counter,
+                        invalid_args_tracker=invalid_args_tracker, history=history
                     )
                     abort_for_invalid_tool = abort_for_invalid_tool or should_abort
+                    if isinstance(result, dict) and not result.get("error"):
+                        iteration_tool_successes += 1
                 if isinstance(result, dict) and result.get("error"):
                     iteration_tool_errors = True
 
@@ -2173,9 +2351,12 @@ def _ask_model_impl(history, user_text):
                         tool_limit_reached = True
                     else:
                         result, should_abort = handle_tool_selection(
-                            name, args, call_tracker, invalid_tool_counter
+                            name, args, call_tracker, invalid_tool_counter,
+                            invalid_args_tracker=invalid_args_tracker, history=history
                         )
                         abort_for_invalid_tool = abort_for_invalid_tool or should_abort
+                        if isinstance(result, dict) and not result.get("error"):
+                            iteration_tool_successes += 1
                     if isinstance(result, dict) and result.get("error"):
                         iteration_tool_errors = True
 
@@ -2205,18 +2386,15 @@ def _ask_model_impl(history, user_text):
 
         if iteration_tool_signatures:
             batch_signature = tuple(iteration_tool_signatures)
-            repeated_batch = batch_signature in recent_tool_batches[-3:]
-            if repeated_batch or iteration_tool_errors:
-                no_progress_count += 1
-            else:
-                no_progress_count = 0
-            recent_tool_batches.append(batch_signature)
-            recent_tool_batches = recent_tool_batches[-4:]
+            no_progress_count, repeated_batch = update_no_progress(
+                recent_tool_batches, batch_signature, no_progress_count,
+                iteration_tool_errors, iteration_tool_successes
+            )
             LOGGER.info(
                 "Agent progress check no_progress=%d repeated_batch=%s "
-                "tool_errors=%s total_tool_calls=%d",
+                "tool_errors=%s successful_calls=%d total_tool_calls=%d",
                 no_progress_count, repeated_batch, iteration_tool_errors,
-                total_tool_calls
+                iteration_tool_successes, total_tool_calls
             )
             if tool_limit_reached or total_tool_calls >= AGENT_SAFEGUARDS["max_tool_calls_per_request"]:
                 print("\n[Shai] Per-request tool-call limit reached. Stopping to prevent an unbounded loop.")
