@@ -1,9 +1,8 @@
 {
   "provider": "kilo-free",
-  "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "model": "cohere/north-mini-code:free",
   "max_tool_call_iterations": 500,
   "yes_to_all": true,
-  "api_timeout_seconds": 300,
   "tool_safeguards": {
     "duplicate_call_detection": true,
     "duplicate_call_limit": 2,
@@ -56,14 +55,17 @@
     "enabled": true,
     "log_dir": "logs",
     "log_file": "shai.log",
-    "max_bytes": 5242880,
-    "backup_count": 5,
     "log_level": "DEBUG",
-    "console_level": "INFO",
-    "enable_console": true
+    "per_run_file": true,
+    "newest_first": true,
+    "retain_files": 10,
+    "enable_console": false
   },
-  "reasoning_display": {
+  "file_change_display": {
     "enabled": true,
-    "max_chars": 6000
+    "max_diff_lines": 160,
+    "max_diff_chars": 16000,
+    "preserve_head_lines": 90,
+    "preserve_tail_lines": 40
   }
 }

@@ -24,6 +24,7 @@ from modules.provider_selection import PROVIDERS, initialize_provider
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
 from modules.conversation_history import ConversationHistory, input_with_history
+from modules.file_change_display import print_change_preview
 
 # -------------------------------------------------------------------
 # Configuration
@@ -983,8 +984,16 @@ def patch_file(path, old_text, new_text):
         original.splitlines(True), updated.splitlines(True),
         fromfile="before/" + path, tofile="after/" + path
     ))
-    print("\n--- Targeted patch ---\n" + (diff or "(No changes)") + "\n----------------------")
     risk = _file_change_risk(original, updated)
+    print_change_preview(
+        diff,
+        "Targeted patch",
+        "Lines: {} -> {} ({} removed); bytes: {} -> {}".format(
+            risk["old_lines"], risk["new_lines"], risk["removed_lines"],
+            risk["old_bytes"], risk["new_bytes"]
+        ),
+        CONFIG_FILE,
+    )
     risky = risk["deletion_ratio"] > 0.25 or risk["size_reduction"] > 0.25
     if risky:
         print("Risk warning: patch removes {} of {} lines ({:.1%}); file size changes {} -> {} bytes.".format(
@@ -1025,12 +1034,15 @@ def edit_file(path, content):
         old_content.splitlines(True), content.splitlines(True),
         fromfile="before/" + path, tofile="after/" + path
     ))
-    print("\n--- Proposed changes (full-file replacement) ---")
-    print("Lines: {} -> {} ({} removed); bytes: {} -> {}".format(
-        risk["old_lines"], risk["new_lines"], risk["removed_lines"],
-        risk["old_bytes"], risk["new_bytes"]))
-    print("".join(diff) or "(No changes)")
-    print("------------------------")
+    print_change_preview(
+        diff,
+        "Proposed changes (full-file replacement)",
+        "Lines: {} -> {} ({} removed); bytes: {} -> {}".format(
+            risk["old_lines"], risk["new_lines"], risk["removed_lines"],
+            risk["old_bytes"], risk["new_bytes"]
+        ),
+        CONFIG_FILE,
+    )
 
     risky = (risk["deletion_ratio"] > 0.25 or
              risk["size_reduction"] > 0.25)
