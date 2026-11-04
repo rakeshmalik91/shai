@@ -61,7 +61,8 @@ class ConfigTests(unittest.TestCase):
         self.write_config(original)
         agent.save_yes_to_all(True)
         saved = json.loads(self.config_path.read_text(encoding="utf-8"))
-        self.assertTrue(saved["yes_to_all"])
+        self.assertTrue(saved["approve"]["all"])
+        self.assertNotIn("yes_to_all", saved)
         self.assertEqual(saved["retry"], original["retry"])
         self.assertEqual(saved["provider"], original["provider"])
         self.assertTrue(agent.load_yes_to_all())
@@ -91,6 +92,54 @@ class ConfigTests(unittest.TestCase):
         settings = agent.load_tool_safeguards()
         self.assertEqual(settings["duplicate_call_limit"], 4)
         self.assertEqual(settings["run_checks_timeout_seconds"], 45)
+
+
+    def test_approval_settings_support_category_and_tool_overrides(self):
+        self.write_config({
+            "approve": {
+                "all": True,
+                "file_edit": False,
+                "file_delete": False,
+                "execution": True,
+                "tools": {"run_checks": False, "patch_file": True}
+            }
+        })
+        self.assertFalse(agent.approval_granted("file_edit", "edit_file"))
+        self.assertTrue(agent.approval_granted("file_edit", "patch_file"))
+        self.assertFalse(agent.approval_granted("execution", "run_checks"))
+        self.assertTrue(agent.approval_granted("execution", "verify_changes"))
+        self.assertFalse(agent.approval_granted("file_delete", "delete_file"))
+
+    def test_legacy_yes_to_all_migrates_to_approve_all(self):
+        self.write_config({"yes_to_all": True, "provider": "ollama"})
+        self.assertTrue(agent.load_approval_settings()["all"])
+        agent.save_yes_to_all(False)
+        saved = json.loads(self.config_path.read_text(encoding="utf-8"))
+        self.assertFalse(saved["approve"]["all"])
+        self.assertNotIn("yes_to_all", saved)
+        self.assertEqual(saved["provider"], "ollama")
+
+    def test_global_approval_applies_when_category_is_not_explicitly_denied(self):
+        self.write_config({"approve": {"all": True}})
+        self.assertTrue(agent.approval_granted("file_edit", "edit_file"))
+        self.assertFalse(agent.approval_granted("file_truncate", "edit_file", include_all=False))
+
+    def test_risky_approval_does_not_inherit_global_all(self):
+        self.write_config({"approve": {"all": True, "file_truncate": False}})
+        self.assertFalse(agent.approval_granted("file_truncate", "edit_file", include_all=False))
+
+    def test_tool_errors_are_printed_after_status_batch_is_closed(self):
+        events = []
+        with mock.patch.object(
+            agent.STATUS, "end_tool_batch",
+            side_effect=lambda: events.append("end")
+        ), mock.patch(
+            "builtins.print",
+            side_effect=lambda value: events.append(value)
+        ):
+            agent.display_tool_errors(["Check path is not a directory."])
+        self.assertEqual(events[0], "end")
+        self.assertIn("[Tool error] Check path is not a directory.", events[1])
 
 
 class PlanContinuationTests(unittest.TestCase):

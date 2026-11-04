@@ -29,6 +29,7 @@ class LiveStatusPanel:
         self.batch_size = 0
         self.batch_position = 0
         self.line_open = False
+        self.batch_tool_counts = {}
 
     def start(self):
         with self.lock:
@@ -75,6 +76,15 @@ class LiveStatusPanel:
         with self.lock:
             self.batch_size = max(0, int(count or 0))
             self.batch_position = 0
+            self.batch_tool_counts = {}
+
+    def suspend_line(self):
+        """End the transient line before prompts or ordinary terminal output."""
+        with self.lock:
+            if self.line_open:
+                self.stream.write("\\n")
+                self.stream.flush()
+                self.line_open = False
 
     def end_tool_batch(self):
         with self.lock:
@@ -111,11 +121,19 @@ class LiveStatusPanel:
             self.tool_count += 1
             self.last_tool = name
             self.batch_position += 1
+            self.batch_tool_counts[name] = self.batch_tool_counts.get(name, 0) + 1
+            if self.batch_tool_counts[name] > 1:
+                self.current_tool = "{} ({} calls)".format(
+                    name, self.batch_tool_counts[name]
+                )
             self._render_tool_line("running")
 
     def tool_finished(self, name, error=False):
         with self.lock:
-            self.current_tool = name
+            count = self.batch_tool_counts.get(name, 1)
+            self.current_tool = (
+                "{} ({} calls)".format(name, count) if count > 1 else name
+            )
             self.phase = "Executing tools"
             self._render_tool_line("ERROR" if error else "done")
 

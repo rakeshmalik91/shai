@@ -1,5 +1,6 @@
 import io
 import pathlib
+import re
 import sys
 import unittest
 from unittest.mock import patch
@@ -38,6 +39,27 @@ class LiveStatusTests(unittest.TestCase):
         plain_output = __import__("re").sub(r"\x1b\[[0-9;]*m", "", output)
         self.assertIn("Tools 3/3: edit_file", plain_output)
         self.assertEqual(panel.tool_count, 3)
+
+
+    def test_repeated_tool_calls_are_summarized_in_same_transient_line(self):
+        stream = TTYBuffer()
+        panel = LiveStatusPanel(stream=stream)
+        with patch("modules.live_status.shutil.get_terminal_size") as terminal_size:
+            terminal_size.return_value = type("Size", (), {"columns": 100, "lines": 30})()
+            panel.start()
+            panel.begin_tool_batch(3)
+            panel.tool_started("run_checks", "path=missing")
+            panel.tool_finished("run_checks", error=True)
+            panel.tool_started("run_checks", "path=.")
+            panel.tool_finished("run_checks")
+            panel.tool_started("read_file", "README.md")
+            panel.tool_finished("read_file")
+            panel.end_tool_batch()
+        output = stream.getvalue()
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", output)
+        self.assertEqual(output.count("\r\033[2K"), 6)
+        self.assertEqual(output.count("\n"), 1)
+        self.assertIn("run_checks (2 calls)", plain)
 
     def test_context_and_task_updates_do_not_interrupt_chat_output(self):
         stream = TTYBuffer()

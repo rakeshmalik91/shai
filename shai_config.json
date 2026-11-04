@@ -2,7 +2,19 @@
   "provider": "kilo-free",
   "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
   "max_tool_call_iterations": 80,
-  "yes_to_all": true,
+  "approve": {
+    "all": false,
+    "file_edit": true,
+    "file_delete": false,
+    "file_truncate": false,
+    "execution": true,
+    "git_commit": false,
+    "git_push": false,
+    "tools": {
+      "run_checks": true,
+      "edit_file": false
+    }
+  }
   "api_timeout_seconds": 300,
   "commit_message": {
     "provider": "",

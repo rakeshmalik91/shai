@@ -618,27 +618,69 @@ def load_max_tool_call_iterations():
 
 MAX_ITERATIONS = load_max_tool_call_iterations()
 
-def load_yes_to_all():
-    """Restore the persisted approval preference from shai_config.json."""
+DEFAULT_APPROVALS = {
+    "all": False,
+    "file_edit": False,
+    "file_delete": False,
+    "file_truncate": False,
+    "execution": False,
+    "git_commit": False,
+    "git_push": False,
+    "tools": {}
+}
+
+
+def load_approval_settings():
+    """Load granular approval policy, migrating the legacy yes_to_all flag."""
+    config = load_config()
+    supplied = config.get("approve", {})
+    settings = dict(DEFAULT_APPROVALS)
+    if isinstance(supplied, dict):
+        settings.update({
+            key: value for key, value in supplied.items()
+            if key != "tools"
+        })
+        tool_overrides = supplied.get("tools", {})
+        settings["tools"] = dict(tool_overrides) if isinstance(tool_overrides, dict) else {}
+    if "approve" not in config and config.get("yes_to_all") is True:
+        # Backward compatibility for existing configurations.
+        settings["all"] = True
+
+    for key in DEFAULT_APPROVALS:
+        if key == "tools":
+            continue
+        settings[key] = settings.get(key) is True
+    settings["tools"] = {
+        str(name): value for name, value in settings["tools"].items()
+        if isinstance(value, bool)
+    }
+    return settings
+
+
+def approval_granted(category=None, tool=None, include_all=True):
+    """Resolve explicit tool override > explicit category > global all > prompt."""
+    config = load_config()
+    supplied = config.get("approve", {})
+    if not isinstance(supplied, dict):
+        supplied = {}
+    tool_overrides = supplied.get("tools", {})
+    if not isinstance(tool_overrides, dict):
+        tool_overrides = {}
+    if tool and tool in tool_overrides and isinstance(tool_overrides[tool], bool):
+        return tool_overrides[tool]
+    if category and category in supplied and isinstance(supplied[category], bool):
+        return supplied[category]
+    return bool(include_all and load_approval_settings().get("all") is True)
+
+
+def save_approval_settings(settings):
+    """Persist granular approvals without disturbing unrelated config keys."""
     try:
-        with CONFIG_FILE.open("r", encoding="utf-8") as handle:
-            config = json.load(handle)
-        return config.get("yes_to_all", False) is True if isinstance(config, dict) else False
-    except (FileNotFoundError, OSError, ValueError, TypeError):
-        return False
-
-
-def save_yes_to_all(enabled):
-    """Persist yes_to_all without disturbing other Shai configuration."""
-    try:
-        config = {}
-        if CONFIG_FILE.exists():
-            with CONFIG_FILE.open("r", encoding="utf-8") as handle:
-                existing = json.load(handle)
-            if isinstance(existing, dict):
-                config = existing
-
-        config["yes_to_all"] = bool(enabled)
+        config = load_config()
+        config["approve"] = dict(settings)
+        config["approve"]["tools"] = dict(settings.get("tools", {}))
+        # Remove the old all-or-nothing setting after migration.
+        config.pop("yes_to_all", None)
         CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
         temporary_file = CONFIG_FILE.with_name(CONFIG_FILE.name + ".tmp")
         with temporary_file.open("w", encoding="utf-8") as handle:
@@ -646,7 +688,28 @@ def save_yes_to_all(enabled):
             handle.write("\n")
         temporary_file.replace(CONFIG_FILE)
     except (OSError, ValueError, TypeError) as error:
-        print("Warning: could not save yes_to_all setting: {}".format(error))
+        print("Warning: could not save approval settings: {}".format(error))
+
+
+def load_yes_to_all():
+    """Legacy compatibility helper; true only when global approve.all is set."""
+    return load_approval_settings().get("all", False)
+
+
+def save_yes_to_all(enabled):
+    """Legacy compatibility helper that updates approve.all."""
+    settings = load_approval_settings()
+    settings["all"] = bool(enabled)
+    save_approval_settings(settings)
+
+
+def set_tool_approval(tool, enabled):
+    """Set or clear a per-tool approval override."""
+    settings = load_approval_settings()
+    settings.setdefault("tools", {})[str(tool)] = bool(enabled)
+    save_approval_settings(settings)
+
+
 
 
 # Restore the user's previous approval choice at startup.
@@ -1243,7 +1306,8 @@ def verify_changes(path=".", test_check="unittest"):
     if not confirm_action(
         "Run verification ({} ) in {}? [y/N/a=all]: ".format(
             ", ".join(name for name, _ in commands), path
-        )
+        ),
+        category="execution", tool="verify_changes"
     ):
         return "User declined verification."
     reports = []
@@ -1682,24 +1746,33 @@ def git_diff():
 # File editing
 # -------------------------------------------------------------------
 
-def confirm_action(prompt):
-    """Ask user for confirmation with yes/no/all options."""
-    global YES_TO_ALL
-    if YES_TO_ALL:
+def confirm_action(prompt, category=None, tool=None):
+    """Confirm an action using per-tool, category and global approval settings."""
+    if approval_granted(category, tool, include_all=True):
+        LOGGER.info("Action approved by config category=%s tool=%s",
+                    category, tool)
         return True
+    STATUS.suspend_line()
     try:
         answer = input(prompt).strip().lower()
     except EOFError:
         raise IterationInterrupted()
     if answer in ("a", "all"):
-        YES_TO_ALL = True
-        save_yes_to_all(True)
+        settings = load_approval_settings()
+        settings["all"] = True
+        save_approval_settings(settings)
         return True
     return answer in ("y", "yes")
 
 
-def _explicit_file_approval(prompt):
-    """Risk approvals must not be bypassed by the session-wide yes-to-all flag."""
+def _explicit_file_approval(prompt, category=None, tool=None):
+    """Risky changes require explicit category/tool approval or an interactive yes."""
+    # Deliberately ignore approve.all for destructive/high-risk file changes.
+    if approval_granted(category, tool, include_all=False):
+        LOGGER.info("High-risk action approved by explicit config category=%s tool=%s",
+                    category, tool)
+        return True
+    STATUS.suspend_line()
     try:
         answer = input(prompt).strip().lower()
     except EOFError:
@@ -1817,8 +1890,17 @@ def patch_file(path, old_text, new_text):
         print("Risk warning: patch removes {} of {} lines ({:.1%}); file size changes {} -> {} bytes.".format(
             risk["removed_lines"], risk["old_lines"], risk["deletion_ratio"],
             risk["old_bytes"], risk["new_bytes"]))
-        if not _explicit_file_approval("This is a risky edit. Explicitly approve? [y/N]: "):
+        if not _explicit_file_approval(
+                "This is a risky edit. Explicitly approve? [y/N]: ",
+                category="file_truncate",
+                tool="patch_file"
+            ):
             return "User declined risky patch. File was not changed."
+    elif not confirm_action(
+        "Apply this targeted patch? [y/N/a=all]: ",
+        category="file_edit", tool="patch_file"
+    ):
+        return "User declined patch. File was not changed."
     try:
         backup = _atomic_replace_file(file_path, updated)
     except Exception as exc:
@@ -1877,10 +1959,16 @@ def replace_lines(path, start_line, end_line, new_text):
             risk["removed_lines"], risk["old_lines"], risk["deletion_ratio"]
         ))
         approved = _explicit_file_approval(
-            "This is a risky edit. Explicitly approve? [y/N]: "
+            "This is a risky edit. Explicitly approve? [y/N]: ",
+            category="file_truncate",
+            tool="replace_lines"
         )
     else:
-        approved = confirm_action("Apply this line-range replacement? [y/N/a=all]: ")
+        approved = confirm_action(
+            "Apply this line-range replacement? [y/N/a=all]: ",
+            category="file_edit",
+            tool="replace_lines"
+        )
     if not approved:
         return "User declined line-range replacement. File was not changed."
 
@@ -1936,10 +2024,16 @@ def edit_file(path, content):
         print("HIGH-RISK REPLACEMENT: {:.1%} of lines removed; file size reduced by {:.1%}.".format(
             risk["deletion_ratio"], risk["size_reduction"]))
         approved = _explicit_file_approval(
-            "Explicitly approve this large deletion? [y/N]: "
+            "Explicitly approve this large deletion? [y/N]: ",
+            category="file_truncate",
+            tool="edit_file"
         )
     else:
-        approved = confirm_action("Apply this full-file replacement? [y/N/a=all]: ")
+        approved = confirm_action(
+            "Apply this full-file replacement? [y/N/a=all]: ",
+            category="file_edit",
+            tool="edit_file"
+        )
     if not approved:
         LOGGER.info("File edit declined path=%s", path)
         return "User declined the edit. File was not changed."
@@ -1979,7 +2073,10 @@ def run_checks(check, path="."):
     command = commands[check]
 
     print("\nRunning:", " ".join(command))
-    if not confirm_action("Allow execution? [y/N/a=all]: "):
+    if not confirm_action(
+        "Allow execution? [y/N/a=all]: ",
+        category="execution", tool="run_checks"
+    ):
         return "User declined command execution."
 
     timeout = TEST_EXECUTION["timeout_seconds"]
@@ -2885,6 +2982,13 @@ def display_tool_call(name, args):
     STATUS.tool_started(name, detail)
 
 
+def display_tool_errors(errors):
+    """Close the live status line before printing ordinary tool error text."""
+    STATUS.end_tool_batch()
+    for error in errors or []:
+        print(colorize("[Tool error]", "error") + " " + str(error))
+
+
 def display_assistant_message_content(message):
     """Display user-facing assistant text, including text paired with tools."""
     if not isinstance(message, dict):
@@ -3270,6 +3374,7 @@ def _ask_model_impl(history, user_text):
                 return
 
             tool_results = []
+            tool_error_messages = []
             abort_for_invalid_tool = False
             STATUS.begin_tool_batch(len(tool_uses))
 
@@ -3301,7 +3406,7 @@ def _ask_model_impl(history, user_text):
                 if isinstance(result, dict) and result.get("error"):
                     iteration_tool_errors = True
                 if isinstance(result, dict) and result.get("error"):
-                    print(colorize("[Tool error]", "error") + " {}".format(result.get("error")))
+                    tool_error_messages.append(str(result.get("error")))
                 if isinstance(result, dict) and result.get("stop_request"):
                     tool_limit_reached = True
                     print("\n[Shai] Repeated tool failure detected. Stopping this request; see the debug log for details.")
@@ -3318,7 +3423,7 @@ def _ask_model_impl(history, user_text):
                     tool_result["is_error"] = True
                 tool_results.append(tool_result)
 
-            STATUS.end_tool_batch()
+            display_tool_errors(tool_error_messages)
             history.append({
                 "role": "user",
                 "content": tool_results
@@ -3368,6 +3473,7 @@ def _ask_model_impl(history, user_text):
                 return
 
             abort_for_invalid_tool = False
+            tool_error_messages = []
             STATUS.begin_tool_batch(len(tool_calls))
             for call in tool_calls:
                 call_id = call.get("id")
@@ -3407,7 +3513,7 @@ def _ask_model_impl(history, user_text):
                     if isinstance(result, dict) and result.get("error"):
                         iteration_tool_errors = True
                     if isinstance(result, dict) and result.get("error"):
-                        print(colorize("[Tool error]", "error") + " {}".format(result.get("error")))
+                        tool_error_messages.append(str(result.get("error")))
                     if isinstance(result, dict) and result.get("stop_request"):
                         tool_limit_reached = True
                         print("\n[Shai] Repeated tool failure detected. Stopping this request; see the debug log for details.")
@@ -3423,6 +3529,7 @@ def _ask_model_impl(history, user_text):
                         total_tool_calls += 1
                     iteration_tool_errors = True
                     result = {"error": str(error)}
+                    tool_error_messages.append(str(error))
 
                 LOGGER.info("Tool dispatch completed iteration=%d tool=%s call_id=%s error=%s",
                             iteration + 1, name, call_id,
@@ -3436,7 +3543,7 @@ def _ask_model_impl(history, user_text):
                     )
                 })
 
-            STATUS.end_tool_batch()
+            display_tool_errors(tool_error_messages)
             if abort_for_invalid_tool:
                 raise ToolSelectionFailure(
                     "The model repeatedly selected unavailable tools."
@@ -3638,12 +3745,12 @@ Commands:
 Press Ctrl+D while Shai is processing to cancel the current iteration
 and return to the chat prompt.
 
-Configure max_tool_call_iterations, tool_safeguards, and retry in
-shai_config.json. Retry settings control API retry count, exponential
-backoff, jitter, retryable HTTP statuses, and invalid tool selection recovery.
-
-File edits and test execution require approval.
-Type 'a' or 'all' at any prompt to approve all future actions.
+Configure max_tool_call_iterations, tool_safeguards, retry, and granular
+approval policy in shai_config.json. Approval precedence is:
+approve.tools.<tool> -> approve.<category> -> approve.all -> prompt.
+Type 'a' or 'all' at a normal approval prompt to set approve.all=true.
+High-risk file truncation/deletion still requires explicit approval unless
+its category or tool is explicitly enabled in config.
 """)
                 continue
 
