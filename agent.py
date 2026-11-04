@@ -28,7 +28,7 @@ from modules.file_change_display import print_change_preview
 from modules.agent_safeguards import (
     bound_tool_result, compact_conversation_history, validate_tool_arguments,
     ToolArgumentFailureTracker, read_file_cache_marker, marker_in_history,
-    update_no_progress
+    update_no_progress, tool_call_signature, format_tool_call_for_display
 )
 
 # -------------------------------------------------------------------
@@ -61,6 +61,26 @@ def load_api_timeout_seconds():
         )
         return DEFAULT_API_TIMEOUT_SECONDS
     return value
+
+
+
+DEFAULT_TOOL_CALL_DISPLAY = {
+    "show_parameters": True,
+    "max_argument_chars": 2000
+}
+
+
+def load_tool_call_display_settings():
+    settings = dict(DEFAULT_TOOL_CALL_DISPLAY)
+    supplied = load_config().get("tool_call_display", {})
+    if isinstance(supplied, dict):
+        settings.update(supplied)
+    settings["show_parameters"] = settings["show_parameters"] is True
+    settings["max_argument_chars"] = positive_int_setting(
+        settings, "max_argument_chars",
+        DEFAULT_TOOL_CALL_DISPLAY["max_argument_chars"]
+    )
+    return settings
 
 
 
@@ -126,6 +146,7 @@ def load_tool_safeguards():
 
 
 TOOL_SAFEGUARDS = load_tool_safeguards()
+TOOL_CALL_DISPLAY = load_tool_call_display_settings()
 
 
 DEFAULT_AGENT_SAFEGUARDS = {
@@ -1776,8 +1797,9 @@ def handle_tool_selection(name, args, call_tracker, invalid_tool_counter,
             limit = AGENT_SAFEGUARDS["max_invalid_argument_attempts_per_tool"]
             instruction = (
                 "Correct the arguments to match the advertised schema. "
-                "Do not add unsupported parameters. Invalid argument "
-                "attempt {}/{} for this tool."
+                "Do not add unsupported parameters. Validation warning "
+                "{}/{} for this tool; the tool remains available and you may "
+                "retry with corrected parameters."
             ).format(count, limit)
             if disabled:
                 instruction = (
@@ -1825,72 +1847,75 @@ def execute_tool(name, args):
         return {"error": str(error)}
 
 def _tool_call_signature(name, args):
-    """Stable signature for detecting repeated identical tool requests."""
-    normalized_args = args
-    if name == "read_file" and isinstance(args, dict):
-        normalized_args = dict(args)
-        normalized_args.setdefault("offset", 0)
-        normalized_args.setdefault(
-            "limit", AGENT_SAFEGUARDS["default_read_file_lines"]
-        )
-    return json.dumps(
-        {"name": name, "args": normalized_args},
-        sort_keys=True,
-        ensure_ascii=False,
-        separators=(",", ":")
+    """Compatibility wrapper; all normalized parameters participate."""
+    return tool_call_signature(
+        name, args, AGENT_SAFEGUARDS["default_read_file_lines"]
     )
 
 
+def invalidate_cached_reads_for_path(call_tracker, changed_path):
+    """Invalidate cached read_file pages after a successful file modification."""
+    try:
+        changed = relative_path(safe_path(changed_path))
+    except Exception:
+        changed = os.path.normpath(str(changed_path))
+    for signature, entry in list(call_tracker.items()):
+        if not isinstance(entry, dict):
+            continue
+        params = entry.get("parameters")
+        if not isinstance(params, dict) or "path" not in params:
+            continue
+        try:
+            payload = json.loads(signature)
+        except (TypeError, ValueError):
+            continue
+        if payload.get("name") != "read_file":
+            continue
+        try:
+            cached_path = relative_path(safe_path(params.get("path", "")))
+        except Exception:
+            cached_path = os.path.normpath(str(params.get("path", "")))
+        if cached_path == changed:
+            del call_tracker[signature]
+
+
 def execute_tool_with_safeguards(name, args, call_tracker, history=None):
-    """Execute tools once where possible and explain duplicate-call reuse."""
+    """Track exact parameterized calls without blocking useful repeated work."""
     signature = _tool_call_signature(name, args)
     previous = call_tracker.get(signature)
     count = previous["count"] if previous else 0
     settings = TOOL_SAFEGUARDS
 
+    # Reuse an identical read_file page only while its content remains in
+    # history. Return the cached content itself, not a refusal/instruction.
     if name == "read_file" and previous and AGENT_SAFEGUARDS.get(
         "deduplicate_read_file_calls", True
     ):
         marker = previous.get("cache_marker")
         if marker and marker_in_history(history, marker):
             previous["count"] = count + 1
-            return {
-                "result": (
-                    "This exact file chunk was already returned earlier in "
-                    "this request. Reuse that previous read_file result from "
-                    "the conversation history; do not request it again. If "
-                    "more content is needed, use the next_offset from that result."
-                ),
-                "duplicate_read_suppressed": True,
-                "instruction": "Reuse the earlier file content; do not reread this chunk."
-            }
+            cached = previous.get("result")
+            if isinstance(cached, dict):
+                cached = dict(cached)
+                cached["duplicate_read_reused"] = True
+                cached["repeat_verification"] = {
+                    "tool": name, "parameters": dict(args),
+                    "same_parameter_set_count": count + 1,
+                    "action": "returned_cached_result"
+                }
+                return cached
 
-    prior_read_result_was_compacted = (
-        name == "read_file"
-        and previous is not None
-        and previous.get("cache_marker")
-        and not marker_in_history(history, previous.get("cache_marker"))
-    )
-    if (
-        settings["duplicate_call_detection"]
-        and count >= settings["duplicate_call_limit"]
-        and not prior_read_result_was_compacted
-    ):
-        return {
-            "error": (
-                "Repeated identical tool call blocked: this exact call has "
-                "already executed {} times in this request."
-            ).format(count),
-            "instruction": (
-                "The previous result is already available earlier in the "
-                "conversation. Reuse it instead of retrying this exact call. "
-                "If you need different information, change the arguments "
-                "meaningfully (for read_file, use the next offset)."
-            ),
-            "previous_result_available": True
-        }
-
+    # Identical calls remain allowed. Different offsets/limits are distinct
+    # signatures and are always independently executed.
     result = execute_tool(name, args)
+    if (
+        name in ("edit_file", "patch_file")
+        and isinstance(result, dict)
+        and not result.get("error")
+        and isinstance(args, dict)
+        and args.get("path")
+    ):
+        invalidate_cached_reads_for_path(call_tracker, args["path"])
     count += 1
     cache_marker = None
     if name == "read_file":
@@ -1901,27 +1926,32 @@ def execute_tool_with_safeguards(name, args, call_tracker, history=None):
         offset = args.get("offset", 0)
         limit = args.get("limit", AGENT_SAFEGUARDS["default_read_file_lines"])
         cache_marker = read_file_cache_marker(relative, offset, limit)
-    call_tracker[signature] = {
-        "count": count,
-        "result": result,
-        "cache_marker": cache_marker
-    }
 
+    call_tracker[signature] = {
+        "count": count, "result": result, "cache_marker": cache_marker,
+        "parameters": dict(args) if isinstance(args, dict) else args
+    }
     warning_after = settings["repeat_call_warning_after"]
     if settings["repeat_call_warning"] and count >= warning_after:
         warning = (
-            "Warning: this identical tool call has been executed {} times "
-            "in the current request. Avoid repeating it; use the result "
-            "already provided unless something has changed."
+            "Informational: this exact tool call (same name and parameters) "
+            "has been executed {} times. It was allowed to run."
         ).format(count)
         if isinstance(result, dict):
             result = dict(result)
-            result["warning"] = warning
+            result["repeat_call_warning"] = warning
+            result["repeat_call_parameters"] = dict(args)
         else:
-            result = {"result": result, "warning": warning}
+            result = {"result": result, "repeat_call_warning": warning,
+                      "repeat_call_parameters": dict(args)}
         call_tracker[signature]["result"] = result
 
+    LOGGER.debug(
+        "Tool repeat verification name=%s count=%d signature=%s parameters=%s",
+        name, count, signature, json.dumps(args, sort_keys=True, default=str)
+    )
     return result
+
 
 def _block_text(value):
     """Convert provider content blocks into readable text for recovery."""
@@ -1944,6 +1974,17 @@ def _block_text(value):
     if value is None:
         return ""
     return str(value)
+
+
+def display_tool_call(name, args):
+    """Display tool parameters, including pagination, before execution."""
+    if TOOL_CALL_DISPLAY["show_parameters"]:
+        print("\n" + format_tool_call_for_display(
+            name, args, TOOL_CALL_DISPLAY["max_argument_chars"]
+        ))
+    else:
+        print("\n[Shai tool] " + str(name))
+    sys.stdout.flush()
 
 
 def display_assistant_message_content(message):
@@ -2263,8 +2304,7 @@ def _ask_model_impl(history, user_text):
                 iteration_tool_signatures.append(_tool_call_signature(name, args))
                 total_tool_calls += 1
 
-                print("\n[Shai tool] " + str(name))
-                print(json.dumps(args, ensure_ascii=False)[:500])
+                display_tool_call(name, args)
 
                 if total_tool_calls > AGENT_SAFEGUARDS["max_tool_calls_per_request"]:
                     result = {"error": "Per-request tool-call limit reached; stopping this request."}
@@ -2331,8 +2371,6 @@ def _ask_model_impl(history, user_text):
                 name = function_data.get("name")
                 raw_args = function_data.get("arguments", "{}")
 
-                print("\n[Shai tool] " + str(name))
-
                 call_signature_added = False
                 try:
                     args = json.loads(raw_args)
@@ -2342,7 +2380,7 @@ def _ask_model_impl(history, user_text):
                             "Tool arguments must be an object."
                         )
 
-                    print(json.dumps(args, ensure_ascii=False)[:500])
+                    display_tool_call(name, args)
                     iteration_tool_signatures.append(_tool_call_signature(name, args))
                     call_signature_added = True
                     total_tool_calls += 1
@@ -2364,6 +2402,7 @@ def _ask_model_impl(history, user_text):
                     raise
                 except Exception as error:
                     if not call_signature_added:
+                        display_tool_call(name, {"raw_arguments": raw_args})
                         iteration_tool_signatures.append(
                             _tool_call_signature(name, raw_args)
                         )

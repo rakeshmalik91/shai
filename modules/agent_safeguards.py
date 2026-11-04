@@ -296,12 +296,42 @@ class ToolArgumentFailureTracker:
         count = self.failures.get(tool_name, 0) + 1
         self.failures[tool_name] = count
         self.last_errors[tool_name] = str(error)
-        if count >= self.max_failures:
-            self.disabled.add(tool_name)
-        return count, tool_name in self.disabled
+        # Invalid arguments are rejected, but a tool is never permanently
+        # disabled: the model can correct parameters and continue the task.
+        return count, False
 
     def is_disabled(self, tool_name):
-        return tool_name in self.disabled
+        return False
+
+
+def tool_call_signature(name, args, default_read_file_lines=100):
+    """Exact repeat key based on tool name and every normalized parameter."""
+    normalized_args = copy.deepcopy(args) if isinstance(args, dict) else args
+    if name == "read_file" and isinstance(normalized_args, dict):
+        normalized_args.setdefault("offset", 0)
+        normalized_args.setdefault("limit", int(default_read_file_lines))
+    return json.dumps(
+        {"name": str(name), "args": normalized_args},
+        sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str
+    )
+
+
+def format_tool_call_for_display(name, args, max_chars=2000):
+    """Show the full parameter set (including offset/limit) in the terminal."""
+    try:
+        rendered = json.dumps(
+            args if isinstance(args, dict) else {"raw": args},
+            ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+        )
+    except (TypeError, ValueError):
+        rendered = repr(args)
+    limit = max(200, int(max_chars))
+    if len(rendered) > limit:
+        marker = "...[{} parameter characters omitted]...".format(len(rendered) - limit)
+        head = max(1, (limit - len(marker)) // 2)
+        tail = max(1, limit - len(marker) - head)
+        rendered = rendered[:head] + marker + rendered[-tail:]
+    return "[Shai tool] {}\\nParameters: {}".format(name, rendered)
 
 
 def read_file_cache_marker(path, offset=0, limit=100):
@@ -378,10 +408,12 @@ def update_no_progress(recent_batches, batch_signature, no_progress_count,
                        had_errors, successful_calls):
     """Compatibility helper for callers that keep loop state separately."""
     repeated = batch_signature in recent_batches[-3:]
-    if repeated or (had_errors and successful_calls <= 0):
-        no_progress_count += 1
-    elif successful_calls > 0:
+    # Successful repeated calls still represent work (for example, reading
+    # adjacent chunks or revisiting a file). Only error-only iterations count.
+    if successful_calls > 0:
         no_progress_count = 0
+    elif had_errors:
+        no_progress_count += 1
     else:
         no_progress_count = 0
     recent_batches.append(batch_signature)

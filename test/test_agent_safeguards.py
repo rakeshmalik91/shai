@@ -20,7 +20,8 @@ if _existing_agent is not None:
 import agent
 from modules.agent_safeguards import (
     bound_tool_result, compact_conversation_history, validate_tool_arguments,
-    ToolArgumentFailureTracker, update_no_progress, read_file_cache_marker
+    ToolArgumentFailureTracker, update_no_progress, read_file_cache_marker,
+    tool_call_signature, format_tool_call_for_display
 )
 
 
@@ -155,7 +156,7 @@ class AgentSafeguardModuleTests(unittest.TestCase):
             agent.PROVIDER = original_provider
             agent.AGENT_SAFEGUARDS = original_settings
 
-    def test_repeated_tool_batch_stops_after_configured_no_progress_limit(self):
+    def test_repeated_successful_tool_batch_does_not_stop_progress(self):
         original_provider = agent.PROVIDER
         original_settings = agent.AGENT_SAFEGUARDS
         original_iterations = agent.MAX_ITERATIONS
@@ -188,7 +189,7 @@ class AgentSafeguardModuleTests(unittest.TestCase):
                 spinner.return_value.start.return_value = None
                 spinner.return_value.stop.return_value = None
                 agent._ask_model_impl(history, "inspect project")
-            self.assertEqual(call.call_count, 3)
+            self.assertEqual(call.call_count, 20)
         finally:
             agent.PROVIDER = original_provider
             agent.AGENT_SAFEGUARDS = original_settings
@@ -229,9 +230,9 @@ class AgentSafeguardModuleTests(unittest.TestCase):
             "read_file", {"path": "a.py", "offset": -1}, agent.FUNCTIONS
         ))
 
-    def test_tool_is_disabled_after_two_invalid_argument_attempts(self):
+    def test_invalid_arguments_do_not_permanently_disable_tool(self):
         tracker = ToolArgumentFailureTracker(max_failures=2)
-        with mock.patch.object(agent, "execute_tool") as execute:
+        with mock.patch.object(agent, "execute_tool", return_value={"result": "ok"}) as execute:
             first, abort_first = agent.handle_tool_selection(
                 "read_file", {"path": "x", "query": "unsupported"},
                 {}, {"count": 0}, invalid_args_tracker=tracker
@@ -247,10 +248,10 @@ class AgentSafeguardModuleTests(unittest.TestCase):
         self.assertFalse(abort_first)
         self.assertFalse(abort_second)
         self.assertFalse(abort_third)
-        self.assertIn("attempt 1/2", first["instruction"])
-        self.assertTrue(second["tool_disabled_for_request"])
-        self.assertTrue(third["tool_disabled_for_request"])
-        execute.assert_not_called()
+        self.assertIn("Validation warning 1/2", first["instruction"])
+        self.assertFalse(second["tool_disabled_for_request"])
+        self.assertEqual(third["result"], "ok")
+        execute.assert_called_once()
 
     def test_duplicate_read_file_uses_previous_result_without_repeating_content(self):
         marker = read_file_cache_marker("sample.py", 0, 100)
@@ -266,9 +267,48 @@ class AgentSafeguardModuleTests(unittest.TestCase):
             result = agent.execute_tool_with_safeguards(
                 "read_file", {"path": "sample.py"}, tracker, history=history
             )
-        self.assertTrue(result["duplicate_read_suppressed"])
-        self.assertIn("Reuse that previous", result["result"])
+        self.assertTrue(result["duplicate_read_reused"])
+        self.assertEqual(result["result"], "large file contents")
+        self.assertEqual(result["repeat_verification"]["parameters"], {"path": "sample.py"})
         execute.assert_not_called()
+
+    def test_file_edit_invalidates_cached_read_pages_for_same_path(self):
+        marker = read_file_cache_marker("sample.py", 0, 100)
+        signature = agent._tool_call_signature("read_file", {"path": "sample.py"})
+        tracker = {
+            signature: {
+                "count": 1,
+                "result": {"result": "old content"},
+                "cache_marker": marker,
+                "parameters": {"path": "sample.py"}
+            }
+        }
+        with mock.patch.object(agent, "execute_tool", return_value={"result": "updated"}) as execute:
+            result = agent.execute_tool_with_safeguards(
+                "edit_file", {"path": "sample.py"}, tracker, history=[]
+            )
+        self.assertEqual(result["result"], "updated")
+        self.assertNotIn(signature, tracker)
+        execute.assert_called_once()
+
+    def test_parameterized_signatures_distinguish_read_file_pages(self):
+        first = tool_call_signature(
+            "read_file", {"path": "chat.py", "offset": 0, "limit": 100}
+        )
+        second = tool_call_signature(
+            "read_file", {"path": "chat.py", "offset": 100, "limit": 100}
+        )
+        same_with_default = tool_call_signature("read_file", {"path": "chat.py"})
+        self.assertNotEqual(first, second)
+        self.assertEqual(first, same_with_default)
+
+    def test_tool_call_display_shows_pagination_parameters(self):
+        rendered = format_tool_call_for_display(
+            "read_file", {"path": "chat.py", "offset": 200, "limit": 100}
+        )
+        self.assertIn("read_file", rendered)
+        self.assertIn('"offset":200', rendered)
+        self.assertIn('"limit":100', rendered)
 
     def test_no_progress_distinguishes_failed_argument_variations_from_success(self):
         recent = []
@@ -287,6 +327,14 @@ class AgentSafeguardModuleTests(unittest.TestCase):
         )
         self.assertEqual(count, 0)
         self.assertFalse(repeated)
+
+    def test_repeated_successful_batch_resets_no_progress(self):
+        recent = [("read_file", "page-1")]
+        count, repeated = update_no_progress(
+            recent, ("read_file", "page-1"), 2, False, 1
+        )
+        self.assertTrue(repeated)
+        self.assertEqual(count, 0)
 
     def test_compaction_preserves_summary_of_completed_tool_work(self):
         history = [{"role": "system", "content": "system"},

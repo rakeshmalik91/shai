@@ -380,3 +380,23 @@ Example `agent_safeguards` settings:
 }
 ```
 
+## Tool-call visibility and repeat verification
+
+Shai displays each tool call's parameters in the terminal, including `read_file`
+pagination (`path`, `offset`, and `limit`). Configure this under
+`tool_call_display` in `shai_config.json`:
+
+```json
+"tool_call_display": {
+  "show_parameters": true,
+  "max_argument_chars": 2000
+}
+```
+
+Repeat verification uses the tool name and the complete normalized parameter
+set. Different pages or parameter values are distinct operations. Repeated
+successful calls are allowed; repeat warnings are informational. An identical
+`read_file` page may reuse its cached content while that content remains in
+conversation history. Invalid arguments are rejected with schema guidance, but
+do not permanently disable the tool.
+

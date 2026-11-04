@@ -115,7 +115,7 @@ class ToolSafetyTests(unittest.TestCase):
         self.assertEqual(result["result"], "ok")
         function.assert_called_once_with(value=1)
 
-    def test_duplicate_call_limit_blocks_third_execution(self):
+    def test_identical_calls_are_allowed_and_warn_with_parameters(self):
         function = mock.Mock(return_value="ok")
         agent.TOOL_DISPATCH["test_probe"] = function
         tracker = {}
@@ -129,10 +129,13 @@ class ToolSafetyTests(unittest.TestCase):
             "test_probe", {"value": 1}, tracker
         )
         self.assertEqual(first["result"], "ok")
-        self.assertIn("warning", second)
-        self.assertIn("blocked", third["error"])
-        function.assert_has_calls([mock.call(value=1), mock.call(value=1)])
-        self.assertEqual(function.call_count, 2)
+        self.assertIn("repeat_call_warning", second)
+        self.assertIn("repeat_call_parameters", second)
+        self.assertIn("repeat_call_warning", third)
+        function.assert_has_calls([
+            mock.call(value=1), mock.call(value=1), mock.call(value=1)
+        ])
+        self.assertEqual(function.call_count, 3)
 
     def test_tool_name_resolution_accepts_prefix_and_close_typo(self):
         self.assertEqual(
