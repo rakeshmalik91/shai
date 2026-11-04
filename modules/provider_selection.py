@@ -12,44 +12,73 @@ CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
 
 MODEL_CONTEXT_WINDOWS = {}
 
-PROVIDERS = {
+DEFAULT_PROVIDERS = {
     "openrouter": {
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "models_url": "https://openrouter.ai/api/v1/models",
         "key_env": "OPENROUTER_API_KEY",
         "format": "openai",
+        "auth_type": "bearer",
+        "headers": {"HTTP-Referer": "https://openrouter.ai/", "X-Title": "Shai"},
+        "models_filter": "free_only",
     },
     "gemini": {
         "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         "models_url": "https://generativelanguage.googleapis.com/v1beta/models",
         "key_env": "GEMINI_API_KEY",
         "format": "openai",
+        "auth_type": "query",
+        "auth_query_param": "key",
+        "models_filter": "all",
     },
     "anthropic": {
         "url": "https://api.anthropic.com/v1/messages",
         "models_url": "https://api.anthropic.com/v1/models?limit=1000",
         "key_env": "ANTHROPIC_API_KEY",
         "format": "anthropic",
+        "auth_type": "header",
+        "auth_header": "x-api-key",
+        "headers": {"anthropic-version": "2023-06-01"},
+        "models_filter": "all",
     },
     "openai": {
         "url": "https://api.openai.com/v1/chat/completions",
         "models_url": "https://api.openai.com/v1/models",
         "key_env": "OPENAI_API_KEY",
         "format": "openai",
+        "auth_type": "bearer",
+        "models_filter": "all",
     },
     "kilo": {
         "url": "https://ai-gateway.kilo.ai/api/v1/chat/completions",
         "models_url": "https://ai-gateway.kilo.ai/api/v1/models",
         "key_env": "KILO_API_KEY",
         "format": "openai",
+        "auth_type": "bearer",
+        "models_filter": "exclude_free",
     },
     "kilo-free": {
         "url": "https://ai-gateway.kilo.ai/api/v1/chat/completions",
         "models_url": "https://ai-gateway.kilo.ai/api/v1/models",
         "key_env": "KILO_API_KEY",
         "format": "openai",
+        "auth_type": "bearer",
+        "models_filter": "free_only",
+    },
+    "ollama": {
+        "url": "http://127.0.0.1:11434/v1/chat/completions",
+        "models_url": "http://127.0.0.1:11434/api/tags",
+        "key_env": None,
+        "format": "openai",
+        "auth_type": "none",
+        "models_filter": "ollama",
+        "timeout_seconds": 300,
     },
 }
+
+# Public compatibility mapping; use get_provider_config() for configured values.
+PROVIDERS = DEFAULT_PROVIDERS
+
 
 
 def load_config():
@@ -59,6 +88,82 @@ def load_config():
             return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
         return {}
+
+
+def get_provider_config(provider):
+    """Return defaults merged with shai_config.json's providers.<name> overrides.
+
+    Supported settings include url/chat_url, models_url, key_env,
+    format, auth_type, auth_header, auth_prefix, auth_query_param, headers,
+    models_filter and timeout_seconds. A base_url override derives the
+    conventional OpenAI-compatible endpoints unless explicitly overridden.
+    """
+    if provider not in DEFAULT_PROVIDERS:
+        raise KeyError("Unknown provider: " + str(provider))
+    result = dict(DEFAULT_PROVIDERS[provider])
+    result["headers"] = dict(result.get("headers", {}))
+    config = load_config()
+    overrides = config.get("providers", {})
+    override = overrides.get(provider, {}) if isinstance(overrides, dict) else {}
+    if isinstance(override, dict):
+        result.update({key: value for key, value in override.items()
+                       if key != "headers"})
+        if isinstance(override.get("headers"), dict):
+            result["headers"].update(override["headers"])
+        if override.get("base_url"):
+            base = str(override["base_url"]).rstrip("/")
+            if "chat_url" not in override and "url" not in override:
+                result["url"] = base + "/chat/completions"
+            if "models_url" not in override:
+                result["models_url"] = base + "/models"
+        if "chat_url" in override:
+            result["url"] = override["chat_url"]
+    return result
+
+
+def provider_api_key(provider):
+    """Return configured API key, or None for keyless/local providers."""
+    config = get_provider_config(provider)
+    env_name = config.get("key_env")
+    if not env_name:
+        return None
+    value = os.environ.get(env_name)
+    if not value:
+        raise RuntimeError(str(env_name) + " is not set. Source setup_keys.sh first.")
+    return value
+
+
+def build_provider_url(provider, endpoint="chat", api_key=None):
+    config = get_provider_config(provider)
+    url = config.get("models_url") if endpoint == "models" else config.get("url")
+    if not url:
+        raise RuntimeError("No {} URL configured for provider '{}'.".format(endpoint, provider))
+    if config.get("auth_type") == "query" and api_key:
+        parameter = config.get("auth_query_param", "key")
+        separator = "&" if "?" in url else "?"
+        url += separator + urllib.parse.urlencode({parameter: api_key})
+    return url
+
+
+def build_provider_headers(provider, api_key=None, extra_headers=None):
+    config = get_provider_config(provider)
+    headers = dict(config.get("headers", {}))
+    auth_type = config.get("auth_type", "bearer")
+    if auth_type == "bearer" and api_key:
+        headers["Authorization"] = str(config.get("auth_prefix", "Bearer ")) + api_key
+    elif auth_type == "header" and api_key:
+        headers[config.get("auth_header", "Authorization")] = api_key
+    elif auth_type == "none":
+        pass
+    headers["Content-Type"] = "application/json"
+    if isinstance(extra_headers, dict):
+        headers.update(extra_headers)
+    return headers
+
+
+def provider_timeout(provider, fallback=300):
+    value = get_provider_config(provider).get("timeout_seconds", fallback)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else fallback
 
 
 def save_config(provider, model, context_window_tokens=None):
@@ -88,21 +193,17 @@ def save_config(provider, model, context_window_tokens=None):
     temporary.replace(CONFIG_FILE)
 
 def _get_json(url, key, provider):
-    if provider == "gemini":
+    config = get_provider_config(provider)
+    # Preserve caller-supplied URL for backwards-compatible tests/custom calls.
+    if config.get("auth_type") == "query" and key:
         separator = "&" if "?" in url else "?"
-        url += separator + urllib.parse.urlencode({"key": key})
-        headers = {}
-    elif provider == "anthropic":
-        headers = {
-            "x-api-key": key,
-            "anthropic-version": "2023-06-01",
-        }
-    else:
-        headers = {"Authorization": "Bearer " + key}
-
+        url += separator + urllib.parse.urlencode({
+            config.get("auth_query_param", "key"): key
+        })
+    headers = build_provider_headers(provider, key)
     request = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=provider_timeout(provider)) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")
@@ -142,15 +243,24 @@ def get_saved_context_window(provider, model):
 
 
 def get_available_models(provider):
-    config = PROVIDERS[provider]
-    key = os.environ.get(config["key_env"])
-    if not key:
-        raise RuntimeError(config["key_env"] + " is not set. Source setup_keys.sh first.")
-
-    data = _get_json(config["models_url"], key, provider)
+    config = get_provider_config(provider)
+    key = provider_api_key(provider)
+    url = build_provider_url(provider, "models", key)
+    # _get_json handles auth headers; query-auth URLs are already complete.
+    data = _get_json(url, None if config.get("auth_type") == "query" else key, provider)
     MODEL_CONTEXT_WINDOWS.clear()
 
-    if provider == "gemini":
+    if config.get("models_filter") == "ollama":
+        items = data.get("models", []) if isinstance(data, dict) else []
+        models = []
+        for item in items:
+            name = item.get("name") or item.get("model") if isinstance(item, dict) else ""
+            if name:
+                models.append(name)
+                limit = _model_context_limit(item)
+                if limit:
+                    MODEL_CONTEXT_WINDOWS[name] = limit
+    elif provider == "gemini":
         models = []
         for item in data.get("models", []):
             if "generateContent" not in item.get("supportedGenerationMethods", []):
@@ -173,9 +283,11 @@ def get_available_models(provider):
                 if limit:
                     MODEL_CONTEXT_WINDOWS[model_name] = limit
 
-    if provider in ("openrouter", "kilo-free"):
+    filter_mode = config.get("models_filter", "all")
+    if filter_mode == "free_only":
         models = [model for model in models if model.endswith(":free")]
-
+    elif filter_mode == "exclude_free":
+        models = [model for model in models if not model.endswith(":free")]
     return sorted(set(model for model in models if model))
 
 
@@ -245,9 +357,12 @@ def initialize_provider(auto_select=False):
     else:
         print("  0. Last used: (not configured)")
     for number, name in enumerate(names, 1):
-        label = "Kilo Gateway (all models)" if name == "kilo" else name
-        if name == "kilo-free":
-            label = "Kilo Gateway (free models only)"
+        labels = {
+            "kilo": "Kilo Gateway (paid/non-free models)",
+            "kilo-free": "Kilo Gateway (free models only)",
+            "ollama": "Ollama (local)",
+        }
+        label = labels.get(name, name)
         print("{:3}. {}".format(number, label))
 
     while True:

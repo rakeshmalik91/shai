@@ -34,6 +34,59 @@ class ProviderSelectionTests(unittest.TestCase):
                 models = selection.get_available_models("kilo-free")
         self.assertEqual(models, ["provider/model-a:free", "provider/model-c:free"])
 
+    def test_kilo_hides_free_models_but_kilo_free_keeps_them(self):
+        payload = {"data": [
+            {"id": "vendor/paid-model"},
+            {"id": "vendor/free-model:free"},
+        ]}
+        with mock.patch.dict("os.environ", {"KILO_API_KEY": "test-key"}):
+            with mock.patch.object(selection, "_get_json", return_value=payload):
+                regular = selection.get_available_models("kilo")
+            with mock.patch.object(selection, "_get_json", return_value=payload):
+                free = selection.get_available_models("kilo-free")
+        self.assertEqual(regular, ["vendor/paid-model"])
+        self.assertEqual(free, ["vendor/free-model:free"])
+
+    def test_ollama_is_keyless_and_reads_local_tags(self):
+        with mock.patch.object(selection, "_get_json", return_value={
+            "models": [{"name": "llama3.2:latest"}, {"name": "qwen2.5:7b"}]
+        }) as get_json:
+            models = selection.get_available_models("ollama")
+        self.assertEqual(models, ["llama3.2:latest", "qwen2.5:7b"])
+        self.assertEqual(get_json.call_args.args[0],
+                         "http://127.0.0.1:11434/api/tags")
+        self.assertIsNone(get_json.call_args.args[1])
+
+    def test_provider_endpoints_and_auth_are_configurable(self):
+        selection.CONFIG_FILE.write_text(json.dumps({
+            "providers": {
+                "ollama": {
+                    "base_url": "http://192.168.1.20:11434/v1",
+                    "models_url": "http://192.168.1.20:11434/api/tags",
+                    "auth_type": "none",
+                    "key_env": None,
+                    "headers": {"X-Test": "configured"},
+                }
+            }
+        }), encoding="utf-8")
+        config = selection.get_provider_config("ollama")
+        self.assertEqual(config["url"],
+                         "http://192.168.1.20:11434/v1/chat/completions")
+        self.assertEqual(selection.build_provider_url("ollama", "models"),
+                         "http://192.168.1.20:11434/api/tags")
+        headers = selection.build_provider_headers("ollama", None)
+        self.assertEqual(headers["X-Test"], "configured")
+        self.assertNotIn("Authorization", headers)
+
+    def test_query_auth_url_is_configurable(self):
+        selection.CONFIG_FILE.write_text(json.dumps({
+            "providers": {"gemini": {"auth_query_param": "token"}}
+        }), encoding="utf-8")
+        self.assertEqual(
+            selection.build_provider_url("gemini", "chat", "abc"),
+            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions?token=abc"
+        )
+
     def test_model_context_window_metadata_is_captured_and_saved(self):
         with mock.patch.dict("os.environ", {"KILO_API_KEY": "test-key"}):
             with mock.patch.object(selection, "_get_json", return_value={

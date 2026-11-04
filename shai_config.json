@@ -110,5 +110,70 @@
     "openrouter::liquid/lfm-2.5-2.6b:free": 65536,
     "openrouter::nvidia/nemotron-3-ultra-550b-a55b:free": 1000000
   },
-  "context_window_tokens": 1000000
+  "context_window_tokens": 1000000,
+  "providers": {
+    "openrouter": {
+      "url": "https://openrouter.ai/api/v1/chat/completions",
+      "models_url": "https://openrouter.ai/api/v1/models",
+      "key_env": "OPENROUTER_API_KEY",
+      "format": "openai",
+      "auth_type": "bearer",
+      "headers": {
+        "HTTP-Referer": "https://openrouter.ai/",
+        "X-Title": "Shai"
+      }
+    },
+    "gemini": {
+      "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "models_url": "https://generativelanguage.googleapis.com/v1beta/models",
+      "key_env": "GEMINI_API_KEY",
+      "format": "openai",
+      "auth_type": "query",
+      "auth_query_param": "key"
+    },
+    "anthropic": {
+      "url": "https://api.anthropic.com/v1/messages",
+      "models_url": "https://api.anthropic.com/v1/models?limit=1000",
+      "key_env": "ANTHROPIC_API_KEY",
+      "format": "anthropic",
+      "auth_type": "header",
+      "auth_header": "x-api-key",
+      "headers": {
+        "anthropic-version": "2023-06-01"
+      }
+    },
+    "openai": {
+      "url": "https://api.openai.com/v1/chat/completions",
+      "models_url": "https://api.openai.com/v1/models",
+      "key_env": "OPENAI_API_KEY",
+      "format": "openai",
+      "auth_type": "bearer"
+    },
+    "kilo": {
+      "url": "https://ai-gateway.kilo.ai/api/v1/chat/completions",
+      "models_url": "https://ai-gateway.kilo.ai/api/v1/models",
+      "key_env": "KILO_API_KEY",
+      "format": "openai",
+      "auth_type": "bearer",
+      "models_filter": "exclude_free"
+    },
+    "kilo-free": {
+      "url": "https://ai-gateway.kilo.ai/api/v1/chat/completions",
+      "models_url": "https://ai-gateway.kilo.ai/api/v1/models",
+      "key_env": "KILO_API_KEY",
+      "format": "openai",
+      "auth_type": "bearer",
+      "models_filter": "free_only"
+    },
+    "ollama": {
+      "base_url": "http://127.0.0.1:11434/v1",
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "models_url": "http://127.0.0.1:11434/api/tags",
+      "format": "openai",
+      "auth_type": "none",
+      "key_env": null,
+      "models_filter": "ollama",
+      "timeout_seconds": 300
+    }
+  }
 }

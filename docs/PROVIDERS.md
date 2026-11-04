@@ -1,206 +1,155 @@
 # Supported Providers
 
-Shai supports the following LLM providers. Each requires an API key set as an environment variable.
+Shai supports cloud APIs and local Ollama. Provider endpoints, authentication,
+headers, model-list filtering and request timeouts are configurable in
+`shai_config.json`; the built-in values below are defaults.
 
----
+## Provider comparison
 
-## Quick Comparison
-
-| Provider | Key Env Var | Format | Free Tier | Notes |
-|----------|-------------|--------|-----------|-------|
-| **OpenRouter** | `OPENROUTER_API_KEY` | OpenAI-compatible | ✅ Many free models | Access 100+ models via single API |
-| **Gemini** | `GEMINI_API_KEY` | OpenAI-compatible | ✅ Generous free tier | Google's models (Gemini 1.5, 2.0, etc.) |
-| **Anthropic** | `ANTHROPIC_API_KEY` | Anthropic native | ❌ Paid only | Claude 3.5 Sonnet, Opus, Haiku |
-| **OpenAI** | `OPENAI_API_KEY` | OpenAI native | ❌ Paid only | GPT-4o, GPT-4o-mini, o1, etc. |
-| **Kilo Gateway** | `KILO_API_KEY` | OpenAI-compatible | ✅ Free models available | Enterprise gateway with free tier |
-| **Kilo Gateway (Free Only)** | `KILO_API_KEY` | OpenAI-compatible | ✅ Free models only | Filters to `:free` models only |
-
----
+| Provider | Authentication | Model list | Notes |
+|---|---|---|---|
+| OpenRouter | `OPENROUTER_API_KEY` | All `:free` models | Free-only filter by default |
+| Gemini | `GEMINI_API_KEY` | Models supporting generation | Google OpenAI-compatible endpoint |
+| Anthropic | `ANTHROPIC_API_KEY` | Anthropic Models API | Native Messages API |
+| OpenAI | `OPENAI_API_KEY` | OpenAI Models API | Chat Completions API |
+| Kilo | `KILO_API_KEY` | Non-free models only | Free models deliberately hidden |
+| Kilo-free | `KILO_API_KEY` | `:free` models only | Separate free-only selection |
+| Ollama | None by default | Locally installed models | Local OpenAI-compatible chat endpoint |
 
 ## Setup
 
-1. Copy the sample keys file:
-   ```sh
-   cp setup_keys.sample.sh setup_keys.sh
-   ```
+Install requirements and configure any required API keys:
 
-2. Edit `setup_keys.sh` and uncomment/fill in **one** provider's API key:
-   ```sh
-   # Example for OpenRouter
-   export OPENROUTER_API_KEY="sk-or-v1-xxxxxxxxxxxxx"
-   ```
-
-3. Source it in your shell:
-   ```sh
-   . ./setup_keys.sh
-   ```
-
-> **Security:** `setup_keys.sh` is gitignored. Never commit it or share it publicly.
-
----
-
-## Provider Details
-
-### OpenRouter
-- **API Base:** `https://openrouter.ai/api/v1`
-- **Models Endpoint:** `/models`
-- **Chat Endpoint:** `/chat/completions`
-- **Format:** OpenAI-compatible
-- **Key:** `OPENROUTER_API_KEY`
-- **Free Models:** Many (filter: `:free` suffix)
-- **Website:** https://openrouter.ai
-
-> OpenRouter aggregates models from multiple providers. Free models have `:free` suffix (e.g., `meta-llama/llama-3.1-8b-instruct:free`). Shai automatically filters to free models when you select the "OpenRouter" provider.
-
-### Gemini (Google)
-- **API Base:** `https://generativelanguage.googleapis.com/v1beta/openai`
-- **Models Endpoint:** `/models`
-- **Chat Endpoint:** `/chat/completions`
-- **Format:** OpenAI-compatible (via Google's OpenAI compatibility layer)
-- **Key:** `GEMINI_API_KEY`
-- **Free Tier:** Yes, generous limits
-- **Website:** https://ai.google.dev
-
-> Uses Google's OpenAI-compatible endpoint. Supports Gemini 1.5 Pro/Flash, 2.0 Flash, etc. API key passed as query parameter `?key=...`.
-
-### Anthropic
-- **API Base:** `https://api.anthropic.com/v1`
-- **Models Endpoint:** `/models?limit=1000`
-- **Chat Endpoint:** `/messages`
-- **Format:** Anthropic native (messages API)
-- **Key:** `ANTHROPIC_API_KEY`
-- **Free Tier:** No
-- **Website:** https://console.anthropic.com
-
-> Uses Anthropic's native Messages API format. Requires `anthropic-version: 2023-06-01` header. Models include Claude 3.5 Sonnet, Opus, Haiku.
-
-### OpenAI
-- **API Base:** `https://api.openai.com/v1`
-- **Models Endpoint:** `/models`
-- **Chat Endpoint:** `/chat/completions`
-- **Format:** OpenAI native
-- **Key:** `OPENAI_API_KEY`
-- **Free Tier:** No (trial credits only)
-- **Website:** https://platform.openai.com
-
-> Standard OpenAI Chat Completions API. Supports GPT-4o, GPT-4o-mini, o1-preview, o1-mini, etc.
-
-### Kilo Gateway
-- **API Base:** `https://ai-gateway.kilo.ai/api/v1`
-- **Models Endpoint:** `/models`
-- **Chat Endpoint:** `/chat/completions`
-- **Format:** OpenAI-compatible
-- **Key:** `KILO_API_KEY`
-- **Free Tier:** Yes (select models)
-- **Website:** https://kilo.ai
-
-> Enterprise AI gateway. Two provider entries:
-> - **Kilo Gateway** — All available models
-> - **Kilo Gateway (Free Only)** — Filters to `:free` models only
-
----
-
-## Model Selection
-
-When you run `agent.py` or `chat.py`, Shai will:
-
-1. **Prompt for provider** (shows last used as option 0)
-2. **Fetch available models** from the provider's `/models` endpoint
-3. **Prompt for model** (shows last used as default)
-4. **Save selection** to `shai_config.json`
-5. **Display context window** if provider reports it
-
-### Auto-Selection
-On subsequent runs, Shai can auto-select the last used provider/model if valid:
-```python
-# In code: initialize_provider(auto_select=True)
+```sh
+python3 -m pip install -r requirements.txt
+cp setup_keys.sample.sh setup_keys.sh
+# Edit setup_keys.sh, then:
+. ./setup_keys.sh
 ```
 
----
+`setup_keys.sh` is gitignored. Do not commit API keys. Ollama does not need an
+API key by default.
 
-## Context Window Handling
+## Provider configuration
 
-Shai tracks model context windows from three sources (in priority order):
+Copy `shai_config.sample.json` to `shai_config.json` (or add the `providers`
+section to your existing file). Existing settings are preserved when Shai
+saves the selected provider/model.
 
-1. **Provider-reported** — Fetched from `/models` endpoint (e.g., `context_length`, `input_token_limit`)
-2. **User-configured** — Set in `shai_config.json` under `model_context_windows["provider::model"]`
-3. **Fallback** — `context_window_tokens` in config (legacy single-model setting)
-
-If unknown, Shai displays "unknown" and you can manually configure it:
 ```json
 {
-  "model_context_windows": {
-    "openrouter::meta-llama/llama-3.1-8b-instruct:free": 131072,
-    "anthropic::claude-3-5-sonnet-20241022": 200000
+  "provider": "ollama",
+  "model": "llama3.2",
+  "api_timeout_seconds": 300,
+  "providers": {
+    "ollama": {
+      "base_url": "http://127.0.0.1:11434/v1",
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "models_url": "http://127.0.0.1:11434/api/tags",
+      "format": "openai",
+      "auth_type": "none",
+      "key_env": null,
+      "models_filter": "ollama",
+      "timeout_seconds": 300
+    },
+    "openrouter": {
+      "url": "https://openrouter.ai/api/v1/chat/completions",
+      "models_url": "https://openrouter.ai/api/v1/models",
+      "key_env": "OPENROUTER_API_KEY",
+      "format": "openai",
+      "auth_type": "bearer",
+      "headers": {
+        "HTTP-Referer": "https://openrouter.ai/",
+        "X-Title": "Shai"
+      }
+    }
   }
 }
 ```
 
----
+### Supported settings per provider
 
-## Configuration File (`shai_config.json`)
+| Setting | Meaning |
+|---|---|
+| `base_url` | Convenience base URL; derives `/chat/completions` and `/models` unless explicitly overridden |
+| `url` / `chat_url` | Exact chat-completions or Messages endpoint |
+| `models_url` | Exact model discovery endpoint |
+| `key_env` | Environment variable containing the API key; set to `null` for keyless local providers |
+| `format` | `openai` or `anthropic`; controls request/response serialization |
+| `auth_type` | `bearer`, `header`, `query`, or `none` |
+| `auth_header` | Header name when `auth_type` is `header` |
+| `auth_prefix` | Bearer prefix; defaults to `Bearer ` |
+| `auth_query_param` | Query parameter when `auth_type` is `query` |
+| `headers` | Additional static HTTP headers |
+| `models_filter` | `all`, `free_only`, `exclude_free`, or `ollama` |
+| `timeout_seconds` | Provider-specific HTTP timeout |
 
-Relevant provider/model settings:
+Provider overrides are merged with built-in defaults. You only need to specify
+values you want to change. Do not put API key values directly in this file;
+use environment variables and `key_env`.
+
+## Ollama
+
+1. Install and start Ollama on the machine running the Ollama server.
+2. Pull at least one model, for example:
+
+   ```sh
+   ollama pull llama3.2
+   ollama list
+   ```
+
+3. Ensure Shai can reach the server. On the same machine use
+   `http://127.0.0.1:11434`; on another device, set the server's reachable LAN
+   address, for example `http://192.168.1.20:11434`.
+4. Select **Ollama (local)** in Shai. Shai reads installed models from
+   `/api/tags` and sends chat/tool requests to `/v1/chat/completions`.
+
+The Ollama provider uses the OpenAI-compatible endpoint and enables tool
+calling when supported by the installed Ollama version/model. On iSH, localhost
+means the iSH environment itself; if Ollama runs on another computer, configure
+that computer's LAN address and ensure its server accepts LAN connections.
+
+## Kilo model visibility
+
+- **Kilo** excludes IDs ending in `:free`, so the regular Kilo list contains
+  non-free models only.
+- **Kilo-free** shows only IDs ending in `:free`.
+- OpenRouter retains its existing free-only model filter.
+
+## Switching providers and models
+
+Use `/model` (or `/switch`, `/switch-model`) in Chat or Agent mode. Shai fetches
+the selected provider's model list, lets you choose a model, and persists the
+selection in `shai_config.json`.
+
+## Context windows
+
+Context limits are captured from model metadata where available. You can
+override them with:
 
 ```json
 {
-  "provider": "openrouter",
-  "model": "meta-llama/llama-3.1-8b-instruct:free",
-  "context_window_tokens": 131072,
   "model_context_windows": {
-    "openrouter::meta-llama/llama-3.1-8b-instruct:free": 131072,
-    "anthropic::claude-3-5-sonnet-20241022": 200000
+    "ollama::llama3.2": 131072,
+    "openrouter::provider/model:free": 131072
   }
 }
 ```
-
----
-
-## Switching Providers/Models
-
-Inside Shai, use `/model` (or `/switch`, `/switch-model`):
-- Prompts for new provider
-- Fetches models for that provider
-- Prompts for model
-- Clears tool-call history for provider compatibility
-- Retains text conversation context
-
----
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| `"KEY_ENV is not set"` | Source `setup_keys.sh` in your shell: `. ./setup_keys.sh` |
-| `"No models are currently available"` | Check API key validity and network connectivity |
-| `"Saved model not available"` | Model may be deprecated; select a different one |
-| `401 Unauthorized` | Invalid or expired API key |
-| `429 Rate Limited` | Wait and retry; check provider quota |
+| Symptom | Check |
+|---|---|
+| `KEY_ENV is not set` | Source `setup_keys.sh`; verify `key_env` |
+| No models returned | Check endpoint, authentication and network access |
+| Ollama connection refused | Confirm Ollama is running and reachable from Shai's device |
+| Ollama model missing | Run `ollama pull <model>` on the Ollama host |
+| 401/403 | Verify key, auth type and custom headers |
+| Kilo free model appears in regular Kilo | Confirm `models_filter` is `exclude_free` |
+| Saved model unavailable | Model may have been removed or filtered; select another |
 
----
+## Related documentation
 
-## Adding Custom Providers
-
-To add a custom OpenAI-compatible provider, edit `modules/provider_selection.py`:
-
-```python
-PROVIDERS = {
-    # ... existing providers ...
-    "my-provider": {
-        "url": "https://api.my-provider.com/v1/chat/completions",
-        "models_url": "https://api.my-provider.com/v1/models",
-        "key_env": "MY_PROVIDER_API_KEY",
-        "format": "openai",
-    },
-}
-```
-
-Then add the key to `setup_keys.sample.sh` and your `setup_keys.sh`.
-
----
-
-## Related Documentation
-
-- [Commands Reference](COMMANDS.md) — `/model` command usage
-- [Tools Reference](TOOLS.md) — Model-callable tools
-- [Architecture](ARCHITECTURE.md) — Provider integration details
+- [Commands Reference](COMMANDS.md)
+- [Tools Reference](TOOLS.md)
+- [Architecture](ARCHITECTURE.md)

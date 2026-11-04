@@ -5,7 +5,7 @@ Shai is a lightweight terminal AI assistant with two modes:
 - **Agent** works with files in a selected project, inspects Git changes, edits code and runs checks.
 - **Chat** provides a regular conversation without local project tools.
 
-Shai supports OpenRouter, Gemini, Anthropic, OpenAI and Kilo Gateway.
+Shai supports OpenRouter, Gemini, Anthropic, OpenAI, Kilo Gateway (all/non-free and free-only lists), and local Ollama.
 
 ## Setup
 
@@ -14,7 +14,7 @@ Requirements: Python 3.9 or newer, and an API key for one supported provider. Gi
 ```sh
 python3 -m pip install -r requirements.txt
 cp setup_keys.sample.sh setup_keys.sh
-```
+cp shai_config.sample.json shai_config.json  # optional provider defaults/overrides\n```
 
 Edit `setup_keys.sh`, add your provider key, then load it in the current shell:
 
@@ -44,7 +44,7 @@ Start chat mode:
 python3 chat.py
 ```
 
-Choose a provider/model when prompted. Shai remembers the last selection. During requests, it shows an estimated context size and, when available, the model context percentage; after a response it shows provider-reported token usage. Use `/help` inside either mode for available commands; `/model` switches provider/model and `/exit` quits.
+Choose a provider/model when prompted. Provider endpoints, authentication, headers and timeouts are configurable in `shai_config.json`; see [Provider configuration](docs/PROVIDERS.md). Shai remembers the last selection. During requests, it shows an estimated context size and, when available, the model context percentage; after a response it shows provider-reported token usage. Use `/help` inside either mode for available commands; `/model` switches provider/model and `/exit` quits.
 
 ## Tests
 

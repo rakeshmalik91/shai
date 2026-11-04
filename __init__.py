@@ -19,7 +19,11 @@ import tty
 import _thread
 
 from chat import Spinner, extract_anthropic_response
-from modules.provider_selection import PROVIDERS, initialize_provider
+from modules.provider_selection import (
+    PROVIDERS, initialize_provider, get_provider_config,
+    provider_api_key, build_provider_url, build_provider_headers,
+    provider_timeout,
+)
 from modules.logging_config import init_default_logging, get_logger
 
 # -------------------------------------------------------------------
@@ -1221,14 +1225,9 @@ def sanitize_openai_compatible_history(messages):
 
 
 def api_request(messages):
-    key = os.environ.get(PROVIDERS[PROVIDER]["key_env"])
+    key = provider_api_key(PROVIDER)
 
-    if not key:
-        raise RuntimeError(
-            PROVIDERS[PROVIDER]["key_env"] + " is not set."
-        )
-
-    if PROVIDERS[PROVIDER]["format"] == "anthropic":
+    if get_provider_config(PROVIDER)["format"] == "anthropic":
         anthropic_tools = []
 
         for item in FUNCTIONS:
@@ -1254,11 +1253,7 @@ def api_request(messages):
             "tools": anthropic_tools
         }
 
-        headers = {
-            "x-api-key": key,
-            "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json"
-        }
+        headers = build_provider_headers(PROVIDER, key)
     else:
         body = {
             "model": MODEL,
@@ -1273,14 +1268,7 @@ def api_request(messages):
             body["temperature"] = 0.2
             body["max_tokens"] = 8192
 
-        headers = {
-            "Authorization": "Bearer " + key,
-            "Content-Type": "application/json"
-        }
-
-        if PROVIDER == "openrouter":
-            headers["HTTP-Referer"] = "https://openrouter.ai/"
-            headers["X-Title"] = "Shai Coding Agent"
+        headers = build_provider_headers(PROVIDER, key)
 
     request_data = json.dumps(body).encode("utf-8")
     LOGGER.debug(
@@ -1289,14 +1277,14 @@ def api_request(messages):
         API_TIMEOUT_SECONDS
     )
     request = urllib.request.Request(
-        PROVIDERS[PROVIDER]["url"],
+        build_provider_url(PROVIDER, "chat", key),
         data=request_data,
         headers=headers,
         method="POST"
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=API_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(request, timeout=provider_timeout(PROVIDER, API_TIMEOUT_SECONDS)) as response:
             raw = response.read().decode("utf-8")
         LOGGER.debug("API response received provider=%s status=%s bytes=%d",
                      PROVIDER, getattr(response, "status", "unknown"), len(raw))
@@ -1703,7 +1691,7 @@ def _ask_model_impl(history, user_text):
         finally:
             spinner.stop()
 
-        if PROVIDERS[PROVIDER]["format"] == "anthropic":
+        if get_provider_config(PROVIDER)["format"] == "anthropic":
             text, tool_uses = extract_anthropic_response(response)
             assistant_content = response.get("content", [])
 

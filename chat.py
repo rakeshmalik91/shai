@@ -21,7 +21,11 @@ import urllib.parse
 import urllib.request
 
 from modules.terminal_style import colorize
-from modules.provider_selection import PROVIDERS, initialize_provider
+from modules.provider_selection import (
+    PROVIDERS, initialize_provider, get_provider_config,
+    provider_api_key, build_provider_url, build_provider_headers,
+    provider_timeout, get_available_models as shared_get_available_models,
+)
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
 from modules.conversation_history import ConversationHistory, input_with_history
@@ -136,26 +140,18 @@ def extract_anthropic_response(response):
 
 
 def request_json(url, key, provider, body=None):
-    if provider == "gemini":
-        headers = {}
+    config = get_provider_config(provider)
+    if config.get("auth_type") == "query" and key:
         separator = "&" if "?" in url else "?"
-        url += separator + urllib.parse.urlencode({"key": key})
-    elif provider == "anthropic":
-        headers = {
-            "x-api-key": key,
-            "anthropic-version": "2023-06-01",
-        }
-    else:
-        headers = {"Authorization": "Bearer " + key}
+        url += separator + urllib.parse.urlencode({
+            config.get("auth_query_param", "key"): key
+        })
+    headers = build_provider_headers(provider, key)
 
     data = None
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         headers["Content-Type"] = "application/json"
-
-    if provider == "openrouter" and body is not None:
-        headers["HTTP-Referer"] = "https://openrouter.ai/"
-        headers["X-Title"] = "Shai Chat"
 
     request = urllib.request.Request(
         url, data=data, headers=headers,
@@ -169,7 +165,7 @@ def request_json(url, key, provider, body=None):
                  provider, request.get_method(), payload_bytes, API_TIMEOUT_SECONDS)
     started = time.monotonic()
     try:
-        with urllib.request.urlopen(request, timeout=API_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(request, timeout=provider_timeout(provider, API_TIMEOUT_SECONDS)) as response:
             raw = response.read().decode("utf-8")
             LOGGER.debug("HTTP response received provider=%s status=%s bytes=%d elapsed=%.3fs",
                          provider, getattr(response, "status", "unknown"),
@@ -195,41 +191,8 @@ def request_json(url, key, provider, body=None):
 
 
 def get_available_models(provider):
-    key_name = PROVIDERS[provider]["key_env"]
-    key = os.environ.get(key_name)
-    if not key:
-        raise RuntimeError(key_name + " is not set. Source setup_keys.sh first.")
-
-    data = request_json(
-        PROVIDERS[provider]["models_url"], key, provider
-    )
-
-    if provider == "openrouter":
-        models = [
-            item.get("id", "")
-            for item in data.get("data", [])
-            if item.get("id", "").endswith(":free")
-        ]
-    elif provider == "gemini":
-        models = []
-        for item in data.get("models", []):
-            if "generateContent" not in item.get(
-                "supportedGenerationMethods", []
-            ):
-                continue
-            name = item.get("name", "")
-            if name.startswith("models/"):
-                name = name[len("models/"):]
-            if name:
-                models.append(name)
-    else:
-        models = [
-            item.get("id", "")
-            for item in data.get("data", [])
-            if item.get("id")
-        ]
-
-    return sorted(set(model for model in models if model))
+    """Use the shared provider registry/configuration for model discovery."""
+    return shared_get_available_models(provider)
 
 
 def choose_model(models, preferred=None):
@@ -266,15 +229,12 @@ def choose_model(models, preferred=None):
 def api_request(history, provider, model):
     LOGGER.debug("Chat API request provider=%s model=%s history_messages=%d",
                  provider, model, len(history))
-    key_name = PROVIDERS[provider]["key_env"]
-    key = os.environ.get(key_name)
-    if not key:
-        raise RuntimeError(key_name + " is not set.")
+    key = provider_api_key(provider)
 
     # Determine if provider supports tools
-    supports_tools = PROVIDERS[provider]["format"] in ("openai", "anthropic")
+    supports_tools = get_provider_config(provider)["format"] in ("openai", "anthropic")
 
-    if PROVIDERS[provider]["format"] == "anthropic":
+    if get_provider_config(provider)["format"] == "anthropic":
         messages = [
             item for item in history
             if item.get("role") != "system"
@@ -301,12 +261,12 @@ def api_request(history, provider, model):
             body["tools"] = FUNCTIONS_READ_ONLY
 
     return request_json(
-        PROVIDERS[provider]["url"], key, provider, body
+        build_provider_url(provider, "chat"), key, provider, body
     )
 
 
 def response_text(response, provider):
-    if PROVIDERS[provider]["format"] == "anthropic":
+    if get_provider_config(provider)["format"] == "anthropic":
         text, tool_uses = extract_anthropic_response(response)
         if tool_uses:
             # Convert Anthropic tool_uses to OpenAI-compatible format
@@ -480,7 +440,7 @@ def main():
         try:
             response = api_request(history, provider, model)
             log_and_display_usage(
-                LOGGER, response, PROVIDERS[provider]["format"],
+                LOGGER, response, get_provider_config(provider)["format"],
                 estimated_prompt_tokens, context_limit
             )
             display_reasoning_summary(provider, response)
@@ -498,7 +458,7 @@ def main():
         # Handle tool calls if any
         if tool_calls:
             # Add assistant message with tool calls to history
-            if PROVIDERS[provider]["format"] == "anthropic":
+            if get_provider_config(provider)["format"] == "anthropic":
                 # For Anthropic, we need to format differently
                 content = []
                 if answer:
@@ -565,7 +525,7 @@ def main():
             try:
                 response = api_request(history, provider, model)
                 log_and_display_usage(
-                    LOGGER, response, PROVIDERS[provider]["format"],
+                    LOGGER, response, get_provider_config(provider)["format"],
                     estimated_prompt_tokens, context_limit
                 )
                 display_reasoning_summary(provider, response)
@@ -582,7 +542,7 @@ def main():
         if answer:
             LOGGER.info("Chat turn completed answer_chars=%d", len(answer))
             print("\n" + colorize(answer, "assistant"))
-            if PROVIDERS[provider]["format"] == "anthropic":
+            if get_provider_config(provider)["format"] == "anthropic":
                 history.append({
                     "role": "assistant",
                     "content": [{"type": "text", "text": answer}],

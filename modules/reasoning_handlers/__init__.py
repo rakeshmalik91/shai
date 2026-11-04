@@ -13,6 +13,7 @@ HANDLERS = {
     "openrouter": openrouter,
     "kilo": kilo,
     "kilo-free": kilo,
+    "ollama": openai,
 }
 MAX_DISPLAY_CHARS = 6000
 CONFIG_FILE = pathlib.Path(__file__).resolve().parents[2] / "shai_config.json"

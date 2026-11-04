@@ -29,7 +29,11 @@ from modules.tools import (
     configure_root as configure_tools_root,
     FUNCTIONS_READ_ONLY, TOOL_DISPATCH_READ_ONLY,
 )
-from modules.provider_selection import PROVIDERS, initialize_provider, get_available_models
+from modules.provider_selection import (
+    PROVIDERS, initialize_provider, get_available_models,
+    get_provider_config, provider_api_key, build_provider_url,
+    build_provider_headers, provider_timeout,
+)
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
 from modules.conversation_history import ConversationHistory, input_with_history
@@ -1439,27 +1443,17 @@ def generate_commit_message_llm(changes_summary, diff_content=""):
         
         # We need to call the API directly with the commit message provider/model
         # Let's use a simpler approach - call the provider's API directly
-        key = os.environ.get(PROVIDERS[commit_provider]["key_env"])
-        if not key:
-            LOGGER.warning(
-                "API key not set for commit message provider '%s'; falling back to pattern-based generation.",
-                commit_provider
-            )
-            return None
+        key = provider_api_key(commit_provider)
         
         # Build request body based on provider format
-        if PROVIDERS[commit_provider]["format"] == "anthropic":
+        if get_provider_config(commit_provider)["format"] == "anthropic":
             body = {
                 "model": commit_model,
                 "max_tokens": 500,
                 "system": DEFAULT_COMMIT_SYSTEM_PROMPT,
                 "messages": [{"role": "user", "content": prompt}]
             }
-            headers = {
-                "x-api-key": key,
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json"
-            }
+            headers = build_provider_headers(commit_provider, key)
         else:
             body = {
                 "model": commit_model,
@@ -1467,31 +1461,25 @@ def generate_commit_message_llm(changes_summary, diff_content=""):
                 "temperature": 0.2,
                 "max_tokens": 500
             }
-            headers = {
-                "Authorization": "Bearer " + key,
-                "Content-Type": "application/json"
-            }
+            headers = build_provider_headers(commit_provider, key)
             if commit_provider == "openai":
                 body["max_completion_tokens"] = 500
-            if commit_provider == "openrouter":
-                headers["HTTP-Referer"] = "https://openrouter.ai/"
-                headers["X-Title"] = "Shai Coding Agent"
         
         request_data = json.dumps(body).encode("utf-8")
         request = urllib.request.Request(
-            PROVIDERS[commit_provider]["url"],
+            build_provider_url(commit_provider, "chat", key),
             data=request_data,
             headers=headers,
             method="POST"
         )
         
-        with urllib.request.urlopen(request, timeout=API_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(request, timeout=provider_timeout(commit_provider, API_TIMEOUT_SECONDS)) as response:
             raw = response.read().decode("utf-8")
         
         parsed = json.loads(raw)
         
         # Extract the response text based on provider format
-        if PROVIDERS[commit_provider]["format"] == "anthropic":
+        if get_provider_config(commit_provider)["format"] == "anthropic":
             content = parsed.get("content", [])
             if content and isinstance(content, list):
                 for block in content:
@@ -2442,14 +2430,9 @@ def build_kilo_tools():
 
 
 def api_request(messages):
-    key = os.environ.get(PROVIDERS[PROVIDER]["key_env"])
+    key = provider_api_key(PROVIDER)
 
-    if not key:
-        raise RuntimeError(
-            PROVIDERS[PROVIDER]["key_env"] + " is not set."
-        )
-
-    if PROVIDERS[PROVIDER]["format"] == "anthropic":
+    if get_provider_config(PROVIDER)["format"] == "anthropic":
         anthropic_tools = []
 
         for item in FUNCTIONS:
@@ -2475,11 +2458,7 @@ def api_request(messages):
             "tools": anthropic_tools
         }
 
-        headers = {
-            "x-api-key": key,
-            "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json"
-        }
+        headers = build_provider_headers(PROVIDER, key)
     else:
         tools_payload = (
             build_kilo_tools()
@@ -2499,14 +2478,7 @@ def api_request(messages):
             body["temperature"] = 0.2
             body["max_tokens"] = 8192
 
-        headers = {
-            "Authorization": "Bearer " + key,
-            "Content-Type": "application/json"
-        }
-
-        if PROVIDER == "openrouter":
-            headers["HTTP-Referer"] = "https://openrouter.ai/"
-            headers["X-Title"] = "Shai Coding Agent"
+        headers = build_provider_headers(PROVIDER, key)
 
     log_api_payload(LOGGER, "API REQUEST", body)
     request_data = json.dumps(body).encode("utf-8")
@@ -2516,14 +2488,14 @@ def api_request(messages):
         API_TIMEOUT_SECONDS
     )
     request = urllib.request.Request(
-        PROVIDERS[PROVIDER]["url"],
+        build_provider_url(PROVIDER, "chat", key),
         data=request_data,
         headers=headers,
         method="POST"
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=API_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(request, timeout=provider_timeout(PROVIDER, API_TIMEOUT_SECONDS)) as response:
             raw = response.read().decode("utf-8")
         LOGGER.debug("API response received provider=%s status=%s bytes=%d",
                      PROVIDER, getattr(response, "status", "unknown"), len(raw))
@@ -3139,7 +3111,7 @@ def _ask_model_impl(history, user_text):
         context_limit = get_context_window(PROVIDER, MODEL, load_config())
         estimated_prompt_tokens = estimate_messages_tokens(
             history, tools=FUNCTIONS,
-            system_text=SYSTEM_PROMPT if PROVIDERS[PROVIDER]["format"] == "anthropic" else None
+            system_text=SYSTEM_PROMPT if get_provider_config(PROVIDER)["format"] == "anthropic" else None
         )
         context_status = format_context_status(
             estimated_prompt_tokens, context_limit
@@ -3214,14 +3186,14 @@ def _ask_model_impl(history, user_text):
             spinner.stop()
 
         log_and_display_usage(
-            LOGGER, response, PROVIDERS[PROVIDER]["format"],
+            LOGGER, response, get_provider_config(PROVIDER)["format"],
             estimated_prompt_tokens, context_limit
         )
         display_reasoning_summary(PROVIDER, response)
 
         # A length/max-token finish means the response may be incomplete.
         # Never execute partial tool arguments or accept partial file content.
-        provider_format = PROVIDERS[PROVIDER]["format"]
+        provider_format = get_provider_config(PROVIDER)["format"]
         if provider_format == "anthropic":
             stop_reason = response.get("stop_reason")
             if stop_reason in ("max_tokens", "model_context_window_exceeded"):
@@ -3797,7 +3769,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                     try:
                         response = api_request(history)
                         log_and_display_usage(
-                            LOGGER, response, PROVIDERS[PROVIDER]["format"],
+                            LOGGER, response, get_provider_config(PROVIDER)["format"],
                             estimated_prompt_tokens, context_limit
                         )
                         display_reasoning_summary(PROVIDER, response)
@@ -3853,7 +3825,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                         # Use api_request with read-only tools
                         response = api_request(history, PROVIDER, MODEL)
                         log_and_display_usage(
-                            LOGGER, response, PROVIDERS[PROVIDER]["format"],
+                            LOGGER, response, get_provider_config(PROVIDER)["format"],
                             estimated_prompt_tokens, context_limit
                         )
                         display_reasoning_summary(PROVIDER, response)
@@ -3871,7 +3843,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                     # Handle tool calls if any
                     if tool_calls:
                         # Add assistant message with tool calls to history
-                        if PROVIDERS[PROVIDER]["format"] == "anthropic":
+                        if get_provider_config(PROVIDER)["format"] == "anthropic":
                             content = []
                             if answer:
                                 content.append({"type": "text", "text": answer})
@@ -3935,7 +3907,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                         try:
                             response = api_request(history, PROVIDER, MODEL)
                             log_and_display_usage(
-                                LOGGER, response, PROVIDERS[PROVIDER]["format"],
+                                LOGGER, response, get_provider_config(PROVIDER)["format"],
                                 estimated_prompt_tokens, context_limit
                             )
                             display_reasoning_summary(PROVIDER, response)
@@ -3952,7 +3924,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                     if answer:
                         LOGGER.info("Read-only mode turn completed answer_chars=%d", len(answer))
                         print("\n" + answer)
-                        if PROVIDERS[PROVIDER]["format"] == "anthropic":
+                        if get_provider_config(PROVIDER)["format"] == "anthropic":
                             history.append({
                                 "role": "assistant",
                                 "content": [{"type": "text", "text": answer}],

@@ -33,8 +33,10 @@ class LiveStatusTests(unittest.TestCase):
         output = stream.getvalue()
         self.assertEqual(output.count("\r\033[2K"), 6)
         self.assertEqual(output.count("\n"), 1)
-        self.assertNotIn("\033[1;", output)  # no reserved/frozen screen region
-        self.assertIn("Tools 3/3: edit_file", output)
+        self.assertIn("\033[1;35m", output)  # magenta tool label
+        self.assertIn("\033[1;33m", output)  # yellow batch counter
+        plain_output = __import__("re").sub(r"\x1b\[[0-9;]*m", "", output)
+        self.assertIn("Tools 3/3: edit_file", plain_output)
         self.assertEqual(panel.tool_count, 3)
 
     def test_context_and_task_updates_do_not_interrupt_chat_output(self):
