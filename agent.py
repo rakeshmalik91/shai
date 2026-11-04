@@ -1268,6 +1268,156 @@ def update_task_plan(steps):
         ) for item in TASK_PLAN
     )
 
+
+# -------------------------------------------------------------------
+# Git commit/push helpers
+# -------------------------------------------------------------------
+
+DEFAULT_COMMIT_MESSAGE_PATTERN = "{type}: {summary} {changes}"
+
+COMMIT_TYPES = ("feat", "fix", "docs", "test", "chore", "refactor", "style", "perf", "ci", "build")
+
+
+def load_commit_message_pattern():
+    """Load the commit message pattern from shai_config.json."""
+    config = load_config()
+    pattern = config.get("commit_message_pattern", DEFAULT_COMMIT_MESSAGE_PATTERN)
+    if not isinstance(pattern, str) or not pattern.strip():
+        LOGGER.warning(
+            "Invalid commit_message_pattern in shai_config.json; using default."
+        )
+        return DEFAULT_COMMIT_MESSAGE_PATTERN
+    return pattern
+
+
+def generate_commit_message():
+    """Generate a commit message based on git status and the configured pattern."""
+    # Get staged and unstaged changes
+    result = run_interruptible_command(
+        ["git", "status", "--porcelain"], ROOT, 15
+    )
+    if result["timed_out"] or result["returncode"] != 0:
+        return None
+
+    changes = []
+    for line in result["stdout"].strip().split("\n"):
+        if not line:
+            continue
+        status = line[:2]
+        filepath = line[3:]
+        changes.append((status, filepath))
+
+    if not changes:
+        return None
+
+    # Categorize changes
+    added = [f for s, f in changes if s[0] in ("A", "?")]
+    modified = [f for s, f in changes if s[0] == "M" or s[1] == "M"]
+    deleted = [f for s, f in changes if s[0] == "D" or s[1] == "D"]
+    renamed = [f for s, f in changes if s[0] == "R"]
+
+    # Determine commit type based on changes
+    commit_type = "chore"
+    if added:
+        commit_type = "feat"
+    elif modified:
+        commit_type = "fix"
+    elif deleted:
+        commit_type = "chore"
+    elif renamed:
+        commit_type = "refactor"
+
+    # Build summary
+    parts = []
+    if added:
+        parts.append("add {}".format(", ".join(added[:3])))
+    if modified:
+        parts.append("update {}".format(", ".join(modified[:3])))
+    if deleted:
+        parts.append("remove {}".format(", ".join(deleted[:3])))
+    if renamed:
+        parts.append("rename {}".format(", ".join(renamed[:3])))
+
+    summary = "; ".join(parts)
+
+    # Build changes list for + delimiter
+    all_files = [f for _, f in changes]
+    changes_str = " + ".join(all_files)
+
+    pattern = load_commit_message_pattern()
+    message = pattern.format(
+        type=commit_type,
+        summary=summary,
+        changes=changes_str,
+        added=", ".join(added) if added else "",
+        modified=", ".join(modified) if modified else "",
+        deleted=", ".join(deleted) if deleted else "",
+        renamed=", ".join(renamed) if renamed else "",
+    )
+    return message
+
+
+def git_commit(message=None):
+    """Commit staged changes with the given or generated message.
+    If nothing is staged, stage all changes first."""
+    if message is None:
+        message = generate_commit_message()
+        if message is None:
+            return "No changes to commit."
+
+    # Check if there are staged changes
+    LOGGER.debug("Checking for staged changes cwd=%s", ROOT)
+    result = run_interruptible_command(
+        ["git", "diff", "--cached", "--name-only"], ROOT, 10
+    )
+    staged_files = result["stdout"].strip()
+    if not staged_files:
+        # Nothing staged, stage all changes
+        LOGGER.debug("No staged changes, staging all cwd=%s", ROOT)
+        result = run_interruptible_command(
+            ["git", "add", "-A"], ROOT, 10
+        )
+        output = result["stdout"] + result["stderr"]
+        if result["timed_out"]:
+            return "Git add timed out after 10 seconds.\n{}".format(output)
+        if result["returncode"] != 0:
+            return "Git add failed:\n{}".format(output)
+
+    LOGGER.debug("Running git commit cwd=%s", ROOT)
+    result = run_interruptible_command(
+        ["git", "commit", "-m", message], ROOT, 30
+    )
+    output = result["stdout"] + result["stderr"]
+    if result["timed_out"]:
+        return "Git commit timed out after 30 seconds.\n{}".format(output)
+    if result["returncode"] != 0:
+        return "Git commit failed:\n{}".format(output)
+    return "Committed: {}".format(message)
+
+
+def git_push():
+    """Push commits to remote."""
+    LOGGER.debug("Running git push cwd=%s", ROOT)
+    result = run_interruptible_command(
+        ["git", "push"], ROOT, 30
+    )
+    output = result["stdout"] + result["stderr"]
+    if result["timed_out"]:
+        return "Git push timed out after 30 seconds.\n{}".format(output)
+    if result["returncode"] != 0:
+        return "Git push failed:\n{}".format(output)
+    return "Pushed successfully."
+
+
+def git_commit_push(message=None):
+    """Commit and push in one command."""
+    commit_result = git_commit(message)
+    if commit_result.startswith("Git commit failed") or commit_result.startswith("Git commit timed out"):
+        return commit_result
+    push_result = git_push()
+    return "{}\n{}".format(commit_result, push_result)
+
+
 def git_status():
     LOGGER.debug("Running git status cwd=%s timeout=%ss",
                  ROOT, TOOL_SAFEGUARDS["git_status_timeout_seconds"])
@@ -3107,7 +3257,7 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("Commands: /help /model /status /files /diff /reset /ask /code /exit")
+    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
 
     # Mode: "agent" (with tools) or "ask" (chat only, no tools)
@@ -3166,6 +3316,11 @@ Commands:
   /reset   - Clear conversation history
   /ask     - Switch to ask mode (chat only, no tools)
   /code    - Switch to code mode (agent with tools)
+  /todo    - Show current task plan
+  /task    - Alias for /todo
+  /commit  - Commit staged changes with generated message
+  /push    - Push commits to remote
+  /commit-push - Commit and push in one command
   /exit    - Exit Shai
 
 Press Ctrl+D while Shai is processing to cancel the current iteration
@@ -3222,6 +3377,37 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                 else:
                     mode = "agent"
                     print("[Shai] Switched to code mode (agent with tools).")
+                continue
+
+            if user_text in ("/todo", "/task"):
+                if not TASK_PLAN:
+                    print("[Shai] No tasks in the current plan.")
+                else:
+                    print("Task plan:")
+                    for item in TASK_PLAN:
+                        status_char = {"pending": " ", "in_progress": "~", "completed": "x", "blocked": "!"}[item["status"]]
+                        print("  [{}] {}".format(status_char, item["title"]))
+                continue
+
+            if user_text == "/commit":
+                try:
+                    print(git_commit())
+                except IterationInterrupted:
+                    print("\n[Shai] Command interrupted.")
+                continue
+
+            if user_text == "/push":
+                try:
+                    print(git_push())
+                except IterationInterrupted:
+                    print("\n[Shai] Command interrupted.")
+                continue
+
+            if user_text == "/commit-push":
+                try:
+                    print(git_commit_push())
+                except IterationInterrupted:
+                    print("\n[Shai] Command interrupted.")
                 continue
 
             try:
