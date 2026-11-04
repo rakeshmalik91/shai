@@ -10,54 +10,44 @@ Standard-library only.
 import json
 import os
 import pathlib
+import socket
 import sys
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
-
+from modules.provider_selection import PROVIDERS, initialize_provider
+from modules.logging_config import init_default_logging, get_logger, log_api_payload
+from modules.reasoning_handlers import display_reasoning_summary
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
+LOGGER = get_logger("shai.chat")
+DEFAULT_API_TIMEOUT_SECONDS = 300
 
-DEFAULT_PROVIDER = "openrouter"
-DEFAULT_OPENROUTER_MODEL = "cohere/north-mini-code:free"
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
-DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5"
-DEFAULT_OPENAI_MODEL = "gpt-5-mini"
 
-PROVIDERS = {
-    "openrouter": {
-        "url": "https://openrouter.ai/api/v1/chat/completions",
-        "models_url": "https://openrouter.ai/api/v1/models",
-        "key_env": "OPENROUTER_API_KEY",
-        "format": "openai",
-    },
-    "gemini": {
-        "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-        "models_url": "https://generativelanguage.googleapis.com/v1beta/models",
-        "key_env": "GEMINI_API_KEY",
-        "format": "openai",
-    },
-    "anthropic": {
-        "url": "https://api.anthropic.com/v1/messages",
-        "models_url": "https://api.anthropic.com/v1/models?limit=1000",
-        "key_env": "ANTHROPIC_API_KEY",
-        "format": "anthropic",
-    },
-    "openai": {
-        "url": "https://api.openai.com/v1/chat/completions",
-        "models_url": "https://api.openai.com/v1/models",
-        "key_env": "OPENAI_API_KEY",
-        "format": "openai",
-    },
-    "kilo": {
-        "url": "https://ai-gateway.kilo.ai/api/v1/chat/completions",
-        "models_url": "https://ai-gateway.kilo.ai/api/v1/models",
-        "key_env": "KILO_API_KEY",
-        "format": "openai",
-    },
-}
+def load_config():
+    try:
+        with CONFIG_FILE.open("r", encoding="utf-8") as handle:
+            value = json.load(handle)
+        return value if isinstance(value, dict) else {}
+    except (OSError, ValueError, TypeError):
+        LOGGER.exception("Could not load Shai configuration; using defaults")
+        return {}
+
+
+def load_api_timeout_seconds():
+    value = load_config().get("api_timeout_seconds", DEFAULT_API_TIMEOUT_SECONDS)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        LOGGER.warning("Invalid api_timeout_seconds=%r; using %s seconds.",
+                       value, DEFAULT_API_TIMEOUT_SECONDS)
+        return DEFAULT_API_TIMEOUT_SECONDS
+    return value
+
+
+API_TIMEOUT_SECONDS = load_api_timeout_seconds()
+
 
 SYSTEM_PROMPT = (
     "You are Shai, a helpful AI assistant. Be accurate, concise, and "
@@ -121,22 +111,6 @@ def extract_anthropic_response(response):
     return "\n".join(text_parts), tool_uses
 
 
-def load_config():
-    try:
-        with CONFIG_FILE.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-            return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
-        return {}
-
-
-def save_config(provider, model):
-    temporary = CONFIG_FILE.with_suffix(".tmp")
-    with temporary.open("w", encoding="utf-8") as handle:
-        json.dump({"provider": provider, "model": model}, handle, indent=2)
-    temporary.replace(CONFIG_FILE)
-
-
 def request_json(url, key, provider, body=None):
     if provider == "gemini":
         headers = {}
@@ -164,15 +138,35 @@ def request_json(url, key, provider, body=None):
         method="POST" if data is not None else "GET"
     )
 
+    payload_bytes = len(data) if data is not None else 0
+    if body is not None:
+        log_api_payload(LOGGER, "API REQUEST", body)
+    LOGGER.debug("HTTP request start provider=%s method=%s payload_bytes=%d timeout=%ss",
+                 provider, request.get_method(), payload_bytes, API_TIMEOUT_SECONDS)
+    started = time.monotonic()
     try:
-        with urllib.request.urlopen(request, timeout=120) as response:
-            return json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(request, timeout=API_TIMEOUT_SECONDS) as response:
+            raw = response.read().decode("utf-8")
+            LOGGER.debug("HTTP response received provider=%s status=%s bytes=%d elapsed=%.3fs",
+                         provider, getattr(response, "status", "unknown"),
+                         len(raw), time.monotonic() - started)
+            parsed_response = json.loads(raw)
+            log_api_payload(LOGGER, "API RESPONSE", parsed_response)
+            return parsed_response
+    except (TimeoutError, socket.timeout):
+        LOGGER.exception("HTTP request timed out provider=%s after %ss",
+                         provider, API_TIMEOUT_SECONDS)
+        raise
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")
+        log_api_payload(LOGGER, "API ERROR RESPONSE", detail)
+        LOGGER.warning("HTTP API error provider=%s status=%s body=%s",
+                       provider, error.code, detail[:1000])
         raise RuntimeError(
             "API error {}: {}".format(error.code, detail[:2000])
         )
     except urllib.error.URLError as error:
+        LOGGER.exception("Network error provider=%s", provider)
         raise RuntimeError("Network error: " + str(error))
 
 
@@ -245,47 +239,9 @@ def choose_model(models, preferred=None):
         print("Invalid selection. Enter a number from the list.")
 
 
-def initialize_provider():
-    config = load_config()
-    requested_provider = sys.argv[1].lower() if len(sys.argv) > 1 else None
-    provider = requested_provider or config.get("provider", DEFAULT_PROVIDER)
-
-    if provider not in PROVIDERS:
-        raise ValueError(
-            "Invalid provider. Use: openrouter, gemini, anthropic, openai or kilo"
-        )
-
-    print("Provider:", provider)
-    spinner = Spinner("Loading available models")
-    spinner.start()
-    try:
-        models = get_available_models(provider)
-    finally:
-        spinner.stop()
-
-    if not models:
-        raise RuntimeError("No models are currently available for " + provider)
-
-    saved_provider = config.get("provider")
-    saved_model = config.get("model")
-
-    # Same rule as agent.py: reuse only a valid saved model for this provider.
-    if saved_provider == provider and saved_model in models:
-        model = saved_model
-        print("Using saved model:", model)
-    else:
-        if saved_model and saved_provider == provider:
-            print("Previously selected model is unavailable:", saved_model)
-        else:
-            print("First-time setup: choose a model.")
-        model = choose_model(models)
-
-    save_config(provider, model)
-    print("Selected model:", model)
-    return provider, model
-
-
 def api_request(history, provider, model):
+    LOGGER.debug("Chat API request provider=%s model=%s history_messages=%d",
+                 provider, model, len(history))
     key_name = PROVIDERS[provider]["key_env"]
     key = os.environ.get(key_name)
     if not key:
@@ -349,7 +305,31 @@ def response_text(response, provider):
     return str(content) if content else ""
 
 
+def history_for_new_provider(history):
+    """Retain plain-text conversation context across provider changes."""
+    cleaned = []
+    for item in history:
+        role = item.get("role")
+        if role == "system":
+            cleaned.append(item)
+        elif role in ("user", "assistant"):
+            content = item.get("content")
+            if isinstance(content, list):
+                text_parts = [
+                    block.get("text", "") for block in content
+                    if isinstance(block, dict) and block.get("type") == "text"
+                ]
+                content = "\n".join(part for part in text_parts if part)
+            if content:
+                cleaned.append({"role": role, "content": content})
+    if not cleaned or cleaned[0].get("role") != "system":
+        cleaned.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
+    return cleaned
+
+
 def main():
+    init_default_logging(load_config())
+    LOGGER.info("Starting Shai chat api_timeout=%ss", API_TIMEOUT_SECONDS)
     try:
         provider, model = initialize_provider()
     except (KeyboardInterrupt, EOFError):
@@ -359,12 +339,13 @@ def main():
         print("\nStartup error:", error)
         return
 
+    LOGGER.info("Selected provider=%s model=%s", provider, model)
     history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     print("\nShai - Chat")
     print("Provider:", provider)
     print("Model:", model)
-    print("Commands: /help /reset /status /exit")
+    print("Commands: /help /model /status /reset /exit")
 
     while True:
         try:
@@ -378,9 +359,30 @@ def main():
         if user_text == "/exit":
             print("Goodbye.")
             break
+        if user_text in ("/model", "/switch", "/switch-model"):
+            old_provider, old_model = provider, model
+            try:
+                provider, model = initialize_provider()
+                LOGGER.info("Provider/model switched provider=%s model=%s",
+                            provider, model)
+            except (KeyboardInterrupt, EOFError):
+                provider, model = old_provider, old_model
+                print("\nModel switch cancelled; keeping {} / {}.".format(
+                    provider, model
+                ))
+                continue
+            except Exception as error:
+                provider, model = old_provider, old_model
+                print("\nCould not switch model: {}".format(error))
+                continue
+            history = history_for_new_provider(history)
+            LOGGER.debug("Provider switch retained history_messages=%d", len(history))
+            print("\nSwitched to: {} / {}".format(provider, model))
+            continue
         if user_text == "/help":
             print(
                 "\nChat with Shai normally.\n"
+                "/model  - Switch provider and model\n"
                 "/reset  - Clear conversation history\n"
                 "/status - Show provider and model\n"
                 "/exit   - Exit Shai"
@@ -391,6 +393,7 @@ def main():
             print("Model:", model)
             continue
         if user_text == "/reset":
+            LOGGER.info("Conversation history reset")
             history = [{"role": "system", "content": SYSTEM_PROMPT}]
             print("Conversation history cleared.")
             continue
@@ -398,16 +401,22 @@ def main():
         history.append({"role": "user", "content": user_text})
         spinner = Spinner("Shai is thinking")
         spinner.start()
+        LOGGER.info("Chat turn started provider=%s model=%s user_chars=%d history_messages=%d",
+                    provider, model, len(user_text), len(history))
         try:
             response = api_request(history, provider, model)
+            display_reasoning_summary(provider, response)
             answer = response_text(response, provider)
+            LOGGER.debug("Chat response parsed answer_chars=%d", len(answer or ""))
         except Exception as error:
+            LOGGER.exception("Chat turn failed provider=%s model=%s", provider, model)
             answer = None
             print("\nError:", error)
         finally:
             spinner.stop()
 
         if answer:
+            LOGGER.info("Chat turn completed answer_chars=%d", len(answer))
             print("\n" + answer)
             if PROVIDERS[provider]["format"] == "anthropic":
                 history.append({

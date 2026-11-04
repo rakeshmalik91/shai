@@ -1,154 +1,317 @@
-# Shai - Autonomous Coding Assistant
+# Shai — terminal coding assistant and chat
 
-Shai is a local, terminal-based coding assistant that works directly with your project files. It can explore your codebase, make edits, run tests, and help you understand and modify your code.
+Shai is a lightweight, terminal-based coding assistant for working with a local project. It can inspect files, search source, review Git state, propose edits, and run project checks. A separate chat mode provides general conversation without project tools.
+
+The code is designed for Python 3.8+ and uses the Python standard library. `pytest` is optional; the built-in `unittest` runner is sufficient.
 
 ## Features
 
-- **Project-aware**: Reads and understands your local project structure
-- **File operations**: List, read, search, and edit files with your approval
-- **Git integration**: View status and diffs
-- **Test execution**: Run pytest, unittest, or compileall checks
-- **Multi-provider support**: Works with OpenRouter (free models) and Google Gemini
-- **Safety first**: All file edits and command executions require explicit user approval
-- **No external dependencies**: Pure Python standard library (except API calls)
+- **Two modes:** `agent.py` for project-aware coding and `chat.py` for general chat.
+- **Interactive provider/model selection:** provider first, then model, on every startup.
+- **Remember last selection:** provider option `0` reuses the saved provider/model pair.
+- **Providers:** OpenRouter, Gemini, Anthropic, OpenAI, Kilo Gateway (all listed models), and Kilo Gateway (free models only).
+- **In-session model switching:** `/model`, `/switch`, or `/switch-model` in both modes.
+- **Project tools:** list/read/search files, Git status/diff, edit files, and run checks.
+- **Approval control:** approve individual actions or choose `a` / `all` to persist `yes_to_all`.
+- **Iteration controls:** configurable maximum tool-call iterations and Ctrl+D/Ctrl+C interruption in agent mode.
+- **Loop protection:** duplicate tool-call detection, repeat-call warnings, and bounded recovery from invalid tool names.
+- **API retry policy in agent mode:** configurable retry count, exponential backoff, jitter, network/HTTP retry conditions, and invalid-JSON retries. HTTP 400 is never blindly retried.
+- **Invalid provider tool-call recovery:** detects provider errors such as `invalid tool call provided`, repairs OpenAI/Anthropic tool history, preserves user requests and tool results, and regenerates within a separate recovery limit.
+- **Command timeouts:** configurable limits for test commands and Git status/diff.
 
-## Quick Start
+## Requirements
 
-### Prerequisites
+- Python 3.8 or newer.
+- An API key for the provider you want to use.
+- A POSIX-compatible shell for `run_all_tests.sh` (the script uses `#!/bin/sh`, so Bash is not required).
 
-- Python 3.8+
-- An API key for either:
-  - **OpenRouter** (free models available) - set `OPENROUTER_API_KEY`
-  - **Google Gemini** - set `GEMINI_API_KEY`
+No `pip install` is required to run Shai. `pytest` is optional and is only used by the test script if already installed.
 
-### Installation
+## Installation and layout
 
-```bash
-# Clone or copy the project files
-# No pip install needed - uses only standard library
+Keep these files and folders together:
+
+```text
+shai/
+├── agent.py
+├── chat.py
+├── shai_config.json
+├── modules/
+│   ├── __init__.py
+│   └── provider_selection.py
+├── test/
+│   ├── test_agent.py
+│   ├── test_chat.py
+│   └── test_provider_selection.py
+├── run_all_tests.sh
+└── README.md
 ```
 
-### Configuration
+`agent.py` and `chat.py` both import `modules/provider_selection.py`. Do not move that module away from the `modules` directory.
 
-Set your API key as an environment variable:
+## API keys
 
-```bash
-# For OpenRouter (recommended - has free models)
-export OPENROUTER_API_KEY="your-key-here"
+Export the key for the provider you plan to use in the current shell. For example:
 
-# Or for Gemini
-export GEMINI_API_KEY="your-key-here"
+```sh
+export OPENROUTER_API_KEY='your-key'
+export GEMINI_API_KEY='your-key'
+export ANTHROPIC_API_KEY='your-key'
+export OPENAI_API_KEY='your-key'
+export KILO_API_KEY='your-key'
 ```
 
-### Running Shai
+You only need to set the key for the provider you select. Avoid putting real keys in `shai_config.json` or committing them to Git. If you use a `setup_keys.sh` helper, source it so its exported variables remain in the current shell:
 
-```bash
-# Run in current directory
-python3 shai.py
-
-# Run in a specific project directory
-python3 shai.py /path/to/project
-
-# Specify provider explicitly (openrouter or gemini)
-python3 shai.py . openrouter
-python3 shai.py . gemini
+```sh
+. ./setup_keys.sh
 ```
 
-On first run, Shai will fetch available models and ask you to choose one. Your selection is saved in `shai_config.json` for future runs.
+Provider key pages:
 
-## Usage
+- OpenRouter: <https://openrouter.ai/keys>
+- Gemini: <https://aistudio.google.com/apikey>
+- Anthropic: <https://console.anthropic.com/settings/keys>
+- OpenAI: <https://platform.openai.com/api-keys>
+- Kilo Gateway: <https://app.kilo.ai>
 
-### Interactive Commands
+## Run Shai
 
-| Command | Description |
-|---------|-------------|
-| `/help` | Show help and examples |
+From the Shai directory:
+
+```sh
+# Project-aware coding agent, using the current directory as the project
+python3 agent.py
+
+# Project-aware coding agent for a different project directory
+python3 agent.py /path/to/project
+
+# General conversation, without local project tools
+python3 chat.py
+```
+
+On every startup, Shai asks you to select a provider and then a model. The provider menu includes:
+
+- `0` — use the last saved provider and model (no second model prompt)
+- OpenRouter
+- Gemini
+- Anthropic
+- OpenAI
+- Kilo Gateway — all models returned by its model catalogue
+- Kilo Gateway — only model IDs ending in `:free`
+
+The selected provider and model are saved in `shai_config.json`. The API key is read from the corresponding environment variable.
+
+### Switch model without restarting
+
+In either agent or chat mode, enter:
+
+```text
+/model
+```
+
+Aliases:
+
+```text
+/switch
+/switch-model
+```
+
+Shai asks for a provider, then a model. It saves the new selection and continues. Readable text conversation history is retained; provider-specific tool-call records are discarded when switching in agent mode.
+
+### Agent commands
+
+| Command | Action |
+|---|---|
+| `/help` | Show commands and usage |
+| `/model` | Switch provider and model |
+| `/switch`, `/switch-model` | Aliases for `/model` |
 | `/status` | Show Git status |
 | `/files` | List project files |
-| `/diff` | Show unstaged Git changes |
+| `/diff` | Show Git diff |
 | `/reset` | Clear conversation history |
 | `/exit` | Exit Shai |
 
-### Natural Language Requests
+### Chat commands
 
-Just type what you want in plain English:
+| Command | Action |
+|---|---|
+| `/help` | Show chat commands |
+| `/model` | Switch provider and model |
+| `/switch`, `/switch-model` | Aliases for `/model` |
+| `/status` | Show current provider and model |
+| `/reset` | Clear conversation history |
+| `/exit` | Exit Shai |
 
-```
-You: Explain the project structure.
-You: Find where the login screen is implemented.
-You: Fix the bug in main.py where it crashes on empty input.
-You: Add error handling to the API client.
-You: Review my current Git changes.
-You: Run the Python tests.
-```
+### Interrupt an agent iteration
 
-### How It Works
+While the agent is processing a request, press **Ctrl+D** to cancel the current iteration and return to the `You:` prompt. **Ctrl+C** also interrupts the current iteration. If a test/check subprocess is running, Shai terminates that subprocess. An API request already sent to the provider may still finish remotely, but Shai stops waiting for it.
 
-1. **You ask** - Type a request or question
-2. **Shai explores** - Uses tools to read files, search code, check git status
-3. **Shai proposes** - Shows you a diff for any file changes
-4. **You approve** - Type `y` to apply changes, `n` to reject
-5. **Shai verifies** - Can run tests to confirm changes work
+At the normal input prompt, Ctrl+D/EOF exits the program.
 
-## Safety & Privacy
+## Configuration
 
-- **No file access outside project directory** - Path traversal is blocked
-- **No secrets exposure** - `.env`, `credentials.json`, `secrets.json` are blocked
-- **No auto-execution** - All edits and commands require your explicit approval
-- **Local first** - Your code never leaves your machine except for API calls to the LLM provider
-
-## Configuration File
-
-`shai_config.json` stores your preferred provider and model:
+`shai_config.json` stores provider/model selection and agent behaviour. A representative configuration is:
 
 ```json
 {
-  "provider": "openrouter",
-  "model": "nvidia/nemotron-3-ultra-550b-a55b:free"
+  "provider": "kilo-free",
+  "model": "cohere/north-mini-code:free",
+  "max_tool_call_iterations": 100,
+  "yes_to_all": true,
+  "tool_safeguards": {
+    "duplicate_call_detection": true,
+    "duplicate_call_limit": 2,
+    "repeat_call_warning": true,
+    "repeat_call_warning_after": 2,
+    "run_checks_timeout_seconds": 120,
+    "git_status_timeout_seconds": 15,
+    "git_diff_timeout_seconds": 15
+  },
+  "retry": {
+    "enabled": true,
+    "max_retries": 3,
+    "initial_backoff_seconds": 1.0,
+    "backoff_multiplier": 2.0,
+    "max_backoff_seconds": 20.0,
+    "jitter": true,
+    "jitter_fraction": 0.2,
+    "retry_network_errors": true,
+    "retry_http_statuses": [408, 425, 429, 500, 502, 503, 504],
+    "retry_invalid_json": true,
+    "invalid_tool_selection_enabled": true,
+    "invalid_tool_selection_max_attempts": 3,
+    "invalid_tool_call_recovery": {
+      "enabled": true,
+      "max_recovery_attempts": 2,
+      "repair_conversation_history": true,
+      "preserve_user_request": true,
+      "stop_on_repeated_failure": true,
+      "max_tool_result_chars": 12000
+    }
+  }
 }
 ```
 
-Delete this file to re-run the model selection.
+### Main settings
 
-## Project Structure
+| Setting | Meaning |
+|---|---|
+| `provider` | Last selected provider ID |
+| `model` | Last selected model ID |
+| `max_tool_call_iterations` | Maximum model/tool rounds for one agent request; must be a positive integer |
+| `yes_to_all` | Whether approval prompts are automatically accepted after choosing `a` / `all` |
 
+### `tool_safeguards`
+
+| Setting | Meaning |
+|---|---|
+| `duplicate_call_detection` | Block repeated identical tool calls when enabled |
+| `duplicate_call_limit` | Number of identical executions allowed per request before blocking the next one |
+| `repeat_call_warning` | Attach a warning to repeated-call results |
+| `repeat_call_warning_after` | Execution count at which the warning begins |
+| `run_checks_timeout_seconds` | Maximum runtime for test/compile checks |
+| `git_status_timeout_seconds` | Git status timeout |
+| `git_diff_timeout_seconds` | Git diff timeout |
+
+### `retry` (agent mode)
+
+| Setting | Meaning |
+|---|---|
+| `enabled` | Master switch for API retries |
+| `max_retries` | Retries after the initial failed API request; `0` disables retries |
+| `initial_backoff_seconds` | Delay before the first retry |
+| `backoff_multiplier` | Exponential multiplier for each subsequent retry; values below `1` are clamped to `1` |
+| `max_backoff_seconds` | Upper bound for the calculated backoff |
+| `jitter` | Add a random delay to the calculated backoff |
+| `jitter_fraction` | Maximum jitter as a fraction of the calculated delay, from `0` to `1` |
+| `retry_network_errors` | Retry network/URL errors |
+| `retry_http_statuses` | HTTP status codes eligible for retry. HTTP 400 is always excluded, even if listed here. |
+| `retry_invalid_json` | Retry responses that cannot be decoded as JSON |
+| `invalid_tool_selection_enabled` | Stop an agent request after repeated invalid tool selections |
+| `invalid_tool_selection_max_attempts` | Invalid tool selection attempts allowed before recovery stops the request |
+| `invalid_tool_call_recovery` | Separate recovery policy for provider errors rejecting tool calls |
+
+With the default retry values, the backoff grows exponentially, capped by `max_backoff_seconds`, plus optional jitter. Actual waits may vary slightly when jitter is enabled.
+
+#### `retry.invalid_tool_call_recovery`
+
+A provider error such as `invalid tool call provided` is not treated as a transient API failure. Shai immediately skips normal HTTP retries and starts a separate recovery path:
+
+1. Detect the provider's invalid-tool-call error (including nested gateway error details).
+2. Remove provider-specific tool protocol records from conversation history. OpenAI `assistant.tool_calls` / `tool` messages and Anthropic `tool_use` / `tool_result` blocks are converted to ordinary text so the malformed exchange is not resubmitted.
+3. Preserve the original user requests and previous tool results (tool-result text is bounded by `max_tool_result_chars`).
+4. Add a recovery instruction listing the exact available tools and regenerate the response.
+5. Stop after the configured recovery attempts, or earlier if another failure occurs without any further history that can be repaired.
+
+| Setting | Meaning |
+|---|---|
+| `enabled` | Enable provider-side invalid tool-call recovery |
+| `max_recovery_attempts` | Maximum regenerated requests after an invalid tool-call error; separate from normal API retries |
+| `repair_conversation_history` | Convert/remove provider-specific tool protocol records before regenerating |
+| `preserve_user_request` | Reserved safety preference; original user requests are always retained |
+| `stop_on_repeated_failure` | Stop if a repeated rejection occurs and no additional malformed history can be repaired |
+| `max_tool_result_chars` | Maximum characters retained per previous tool result during repair |
+
+**HTTP 400 is never retried**, even if a user adds it to `retry_http_statuses`. For the specific `invalid tool call provided` error, Shai attempts history repair instead. Other HTTP 400 errors are reported immediately because repeating the same request is unlikely to help.
+
+If recovery is exhausted, Shai returns to the prompt, retains the original user request, and leaves a concise assistant note explaining that recovery failed. Use `/model` to switch provider/model or rephrase the request.
+
+Changing provider/model updates only those two keys and preserves the rest of the configuration.
+
+## Safety boundaries
+
+- File tools resolve paths under the selected project root and reject paths outside it.
+- Access to `.git`, `.env*`, `credentials.json`, and `secrets.json` is blocked by the path guard.
+- File edits display a proposed diff and require approval unless `yes_to_all` is enabled.
+- Test/check commands require approval unless `yes_to_all` is enabled.
+- Test/check commands run with a timeout; Ctrl+D can interrupt them in agent mode.
+- Duplicate tool-call detection is scoped to one user request.
+
+## Tests
+
+The project includes tests for configuration persistence/validation, transient retries, HTTP 400 non-retry behaviour, provider invalid-tool-call detection, OpenAI/Anthropic history repair, recovery regeneration, tool-name validation, duplicate-call protection, provider/model selection, Kilo free-model filtering, provider-switch history handling, and Anthropic response parsing.
+
+Run the complete suite from the project directory:
+
+```sh
+sh ./run_all_tests.sh
 ```
-.
-├── shai.py           # Main agent (entry point)
-├── shai-chat.py      # Simpler Gemini chat alternative
-├── shai_config.json  # Saved provider/model preferences
-├── models.json       # Model metadata (if present)
-├── setup_keys.sh     # Helper script for API key setup
-├── gemini_test.py    # Test script for Gemini API
-└── README.md         # This file
+
+If the executable bit is preserved, this also works:
+
+```sh
+./run_all_tests.sh
 ```
 
-## Providers & Models
+The script is POSIX `sh` compatible and runs:
 
-### OpenRouter (Default)
-- Access to many free models (look for `:free` suffix)
-- Models: `cohere/north-mini-code:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`, etc.
-- Get a key at: https://openrouter.ai/keys
+1. `unittest` tests from `test/test_*.py` (required; standard library).
+2. `pytest` tests if pytest is already installed (optional, so tests are run a second way).
+3. Python syntax compilation for the agent, chat client, modules, and tests.
 
-### Google Gemini
-- Models: `gemini-2.5-flash`, `gemini-2.5-pro`, etc.
-- Get a key at: https://aistudio.google.com/apikey
+Run only the built-in unit tests:
+
+```sh
+python3 -m unittest discover -s test -p 'test_*.py' -v
+```
 
 ## Troubleshooting
 
-**"API key not set"**
-- Ensure `OPENROUTER_API_KEY` or `GEMINI_API_KEY` is exported in your shell
+**`API key is not set`** — export the matching provider key in the shell from which you launch Shai. If using a setup script, source it with `. ./setup_keys.sh`.
 
-**"No models available"**
-- Check your API key is valid and has access to models
-- For OpenRouter, ensure you have credits or are using free models
+**No models are listed** — check the key and provider account access. Kilo Free filters the returned model catalogue to IDs ending in `:free`.
 
-**"Path is outside the project directory"**
-- Shai only works within the project root you specified
+**`/model` is not recognized** — make sure you are running the updated `agent.py` or `chat.py` together with `modules/provider_selection.py`.
 
-**Permission denied on edit**
-- Ensure you have write permissions to the project files
+**Tests fail to import `modules`** — run the test script from the project copy, and keep the `modules/` directory beside `agent.py` and `chat.py`.
+
+**A check times out** — increase the corresponding timeout under `tool_safeguards`, or reduce the scope of the check.
+
+**The provider reports `invalid tool call provided`** — Shai skips HTTP retries and attempts to repair the conversation history. If recovery is exhausted, switch model with `/model` or rephrase the request. `retry.invalid_tool_call_recovery.max_recovery_attempts` controls regeneration attempts.
+
+**HTTP 400 repeats** — HTTP 400 is intentionally excluded from automatic retries. Check the displayed error; only recognized invalid-tool-call errors use automatic history repair.
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License. Add or retain the project's `LICENSE` file when distributing the source.

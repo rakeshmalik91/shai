@@ -1,0 +1,69 @@
+{
+  "provider": "kilo-free",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "max_tool_call_iterations": 500,
+  "yes_to_all": true,
+  "api_timeout_seconds": 300,
+  "tool_safeguards": {
+    "duplicate_call_detection": true,
+    "duplicate_call_limit": 2,
+    "repeat_call_warning": true,
+    "repeat_call_warning_after": 2,
+    "run_checks_timeout_seconds": 120,
+    "git_status_timeout_seconds": 15,
+    "git_diff_timeout_seconds": 15
+  },
+  "retry": {
+    "enabled": true,
+    "max_retries": 10,
+    "initial_backoff_seconds": 5.0,
+    "backoff_multiplier": 2.0,
+    "max_backoff_seconds": 600.0,
+    "jitter": true,
+    "jitter_fraction": 0.2,
+    "retry_network_errors": true,
+    "retry_http_statuses": [
+      408,
+      425,
+      429,
+      500,
+      502,
+      503,
+      504
+    ],
+    "retry_invalid_json": true,
+    "invalid_tool_selection_enabled": true,
+    "invalid_tool_selection_max_attempts": 3,
+    "invalid_tool_call_recovery": {
+      "enabled": true,
+      "max_recovery_attempts": 2,
+      "repair_conversation_history": true,
+      "preserve_user_request": true,
+      "stop_on_repeated_failure": true,
+      "max_tool_result_chars": 12000
+    }
+  },
+  "test_execution": {
+    "timeout_seconds": 120,
+    "max_output_bytes": 65536,
+    "max_stdout_bytes": 49152,
+    "max_stderr_bytes": 16384,
+    "preserve_output_head_bytes": 4096,
+    "preserve_output_tail_bytes": 8192,
+    "terminate_child_processes": true
+  },
+  "logging": {
+    "enabled": true,
+    "log_dir": "logs",
+    "log_file": "shai.log",
+    "max_bytes": 5242880,
+    "backup_count": 5,
+    "log_level": "DEBUG",
+    "console_level": "INFO",
+    "enable_console": true
+  },
+  "reasoning_display": {
+    "enabled": true,
+    "max_chars": 6000
+  }
+}

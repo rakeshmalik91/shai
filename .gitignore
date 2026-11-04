@@ -222,10 +222,13 @@ __marimo__/
 
 
 
-
-
-
-
+#------------------------------
+# shai specific files
+#------------------------------
 
 .setup_keys.sh
-shai_config.json
+.shai
+
+logs
+log
+*.log
