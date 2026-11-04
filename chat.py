@@ -357,7 +357,6 @@ def main():
     print("\nShai - Chat")
     print("Provider:", provider)
     print("Model:", model)
-    print("History:", history_store.path)
     print("Commands: /help /model /status /reset /exit")
 
     while True:

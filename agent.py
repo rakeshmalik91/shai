@@ -3107,9 +3107,6 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("Max tool-call iterations:", MAX_ITERATIONS)
-    print("History:", history_store.path)
-    print("\nProvider and model are selected interactively at startup.")
     print("Commands: /help /model /status /files /diff /reset /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
 
