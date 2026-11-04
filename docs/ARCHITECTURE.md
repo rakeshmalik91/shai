@@ -29,6 +29,7 @@ Shai is a Python command-line assistant with two entry points. Agent mode combin
 
 - **`agent.py`** manages the coding-agent loop, tool schemas, local tool execution, approvals, safeguards and verification.
 - **`chat.py`** provides conversational mode without local file, Git or command-execution tools.
+- **`modules/tools.py`** owns the shared read-only project-inspection tool implementations, schemas and dispatch used by chat mode and imported by agent mode. It receives the active project root through `configure_root()`; agent-only mutating and verification tools remain registered in `agent.py` because they depend on approval and bounded-execution policies.
 
 The project root is the first command-line argument to `agent.py`; if omitted, the current working directory is used.
 
@@ -52,7 +53,9 @@ Edits are previewed, approved according to configuration, validated where suppor
 
 `run_checks` runs a selected check. `verify_changes` combines Python compilation with an optional test suite. `inspect_test_failure` extracts likely failure details from supplied test output. Command execution is bounded by configured timeout and output limits.
 
-### Task progress
+### Task progress and continuation
+
+When a model returns a text-only response while the task plan still has pending or in-progress items, the agent now sends a bounded continuation instruction (at most two times) rather than silently treating the narration as task completion. The model must complete or explicitly block the remaining plan items. Completion and stop reasons are recorded in the log. The configured iteration count is capped at 80 to prevent pathological long-running requests.
 
 `update_task_plan` maintains a lightweight in-memory checklist for the current agent session. The model can mark steps pending, in progress, completed or blocked. The checklist is session-local and is not persisted after exit.
 
@@ -67,6 +70,7 @@ Edits are previewed, approved according to configuration, validated where suppor
 | `modules/file_change_display.py` | Bounded diff previews. |
 | `modules/reasoning_handlers/` | Provider-specific extraction and display of supported reasoning summaries. |
 | `modules/context_meter.py` | Prompt-token estimation, provider usage normalization and context-window percentage formatting. |
+| `modules/tools.py` | Shared read-only project tools, schemas, dispatch and project-root configuration. |
 
 ## Provider integration
 

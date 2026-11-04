@@ -69,6 +69,10 @@ These are internal capabilities rather than model-callable tools:
 - Provider-specific reasoning-summary extraction.
 - Run-based diagnostic logs with sensitive API payload fields redacted.
 
+## Tool module organization
+
+Shared read-only tools (project listing/reading/search, Git inspection, AST/code navigation, project/test maps and test-failure inspection) live in `modules/tools.py`. Both entry points use the same schemas and dispatch registry. The coding agent keeps write, commit, push, test execution and task-plan actions in `agent.py`, where approval, backups, timeouts and execution safeguards are enforced.
+
 ## Configuration
 
 `shai_config.json` controls provider/model selection, approval behaviour, safeguards, test execution, logging, history limits and display settings. API keys belong in environment variables, not this file.

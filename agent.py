@@ -23,7 +23,11 @@ import math
 import tty
 import _thread
 
-from chat import Spinner, extract_anthropic_response, response_text, FUNCTIONS_READ_ONLY, TOOL_DISPATCH_READ_ONLY
+from chat import Spinner, extract_anthropic_response, response_text
+from modules.tools import (
+    configure_root as configure_tools_root,
+    FUNCTIONS_READ_ONLY, TOOL_DISPATCH_READ_ONLY,
+)
 from modules.provider_selection import PROVIDERS, initialize_provider, get_available_models
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
@@ -47,12 +51,15 @@ SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 ROOT = pathlib.Path(
     sys.argv[1] if __name__ == "__main__" and len(sys.argv) > 1 else "."
 ).expanduser().resolve()
+configure_tools_root(ROOT)
 
 # In-memory task checklist for the current agent session/request.
 TASK_PLAN = []
 
 MAX_FILE_SIZE = 200_000
-DEFAULT_MAX_TOOL_CALL_ITERATIONS = 12
+DEFAULT_MAX_TOOL_CALL_ITERATIONS = 80
+HARD_MAX_TOOL_CALL_ITERATIONS = 80
+MAX_PLAN_CONTINUATIONS = 2
 CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
 LOGGER = get_logger("shai.agent")
 # Set by main() after provider selection; defaults keep helpers import-testable.
@@ -585,6 +592,12 @@ def load_max_tool_call_iterations():
         # bool is a subclass of int, so reject it explicitly.
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             raise ValueError
+        if value > HARD_MAX_TOOL_CALL_ITERATIONS:
+            LOGGER.warning(
+                "Configured max_tool_call_iterations=%d exceeds safety cap=%d; clamping.",
+                value, HARD_MAX_TOOL_CALL_ITERATIONS
+            )
+            return HARD_MAX_TOOL_CALL_ITERATIONS
         return value
     except FileNotFoundError:
         return DEFAULT_MAX_TOOL_CALL_ITERATIONS
@@ -3012,7 +3025,47 @@ def _invalid_tool_call_recovery_note(attempt, maximum):
     ).format(attempt, maximum, ", ".join(sorted(TOOL_DISPATCH)))
 
 
+def _pending_task_plan_items():
+    """Return unfinished task titles from the current visible task plan."""
+    return [
+        item.get("title", "(untitled task)")
+        for item in TASK_PLAN
+        if isinstance(item, dict)
+        and item.get("status") in ("pending", "in_progress")
+    ]
+
+
+def _continue_incomplete_plan(history, continuation_count, finish_reason):
+    """Ask the model to continue when it emits narration but leaves planned work.
+
+    This is deliberately bounded: it repairs the common 'I'll do that next'
+    text-only response without allowing an unbounded self-prompting loop.
+    """
+    pending = _pending_task_plan_items()
+    if not pending or continuation_count >= MAX_PLAN_CONTINUATIONS:
+        return False
+    LOGGER.warning(
+        "Model returned without tool calls while task plan is incomplete; "
+        "continuing %d/%d finish_reason=%s pending=%r",
+        continuation_count + 1, MAX_PLAN_CONTINUATIONS, finish_reason, pending
+    )
+    history.append({
+        "role": "user",
+        "content": (
+            "Continue executing the existing task plan now. Do not merely describe "
+            "what you intend to do. Use the available tools to complete the pending "
+            "items, verify the results, and mark each task completed or blocked. "
+            "If you genuinely cannot proceed, explain the blocker. Pending items: "
+            + "; ".join(pending)
+        )
+    })
+    return True
+
+
 def _ask_model_impl(history, user_text):
+    global TASK_PLAN
+    TASK_PLAN = []
+    plan_continuation_count = 0
     call_tracker = {}
     invalid_tool_counter = {"count": 0}
     invalid_args_tracker = ToolArgumentFailureTracker(
@@ -3191,9 +3244,25 @@ def _ask_model_impl(history, user_text):
             if text:
                 print("\n" + text)
 
+            LOGGER.info(
+                "Model response received provider_format=anthropic stop_reason=%s "
+                "tool_calls=%d assistant_text=%s",
+                response.get("stop_reason"), len(tool_uses), bool(text)
+            )
             if not tool_uses:
                 if not text:
                     print("\nNo text response returned.")
+                if _continue_incomplete_plan(
+                    history, plan_continuation_count,
+                    response.get("stop_reason", "stop")
+                ):
+                    plan_continuation_count += 1
+                    continue
+                LOGGER.info(
+                    "Agent request finished provider_format=anthropic "
+                    "reason=no_tool_calls pending_tasks=%d continuations=%d",
+                    len(_pending_task_plan_items()), plan_continuation_count
+                )
                 return
 
             tool_results = []
@@ -3268,10 +3337,27 @@ def _ask_model_impl(history, user_text):
             # the tool activity.
             has_assistant_text = display_assistant_message_content(message)
             tool_calls = message.get("tool_calls", [])
+            LOGGER.info(
+                "Model response received finish_reason=%s tool_calls=%d assistant_text=%s",
+                choices[0].get("finish_reason"), len(tool_calls), bool(has_assistant_text)
+            )
 
             if not tool_calls:
                 if not has_assistant_text:
                     print("\nNo text response returned.")
+                finish_reason = choices[0].get("finish_reason")
+                if _continue_incomplete_plan(
+                    history, plan_continuation_count, finish_reason or "stop"
+                ):
+                    plan_continuation_count += 1
+                    continue
+                LOGGER.info(
+                    "Agent request finished provider_format=openai_compatible "
+                    "reason=no_tool_calls finish_reason=%s pending_tasks=%d "
+                    "continuations=%d",
+                    finish_reason, len(_pending_task_plan_items()),
+                    plan_continuation_count
+                )
                 return
 
             abort_for_invalid_tool = False
@@ -3293,6 +3379,8 @@ def _ask_model_impl(history, user_text):
                     name, args, compatibility_note = normalize_tool_call(name, args)
                     if compatibility_note:
                         print("\n[Shai] {}".format(compatibility_note))
+                    LOGGER.info("Tool dispatch started iteration=%d tool=%s call_id=%s",
+                                iteration + 1, name, call_id)
                     display_tool_call(name, args)
                     iteration_tool_signatures.append(_tool_call_signature(name, args))
                     call_signature_added = True
@@ -3328,6 +3416,9 @@ def _ask_model_impl(history, user_text):
                     iteration_tool_errors = True
                     result = {"error": str(error)}
 
+                LOGGER.info("Tool dispatch completed iteration=%d tool=%s call_id=%s error=%s",
+                            iteration + 1, name, call_id,
+                            bool(isinstance(result, dict) and result.get("error")))
                 history.append({
                     "role": "tool",
                     "tool_call_id": call_id,

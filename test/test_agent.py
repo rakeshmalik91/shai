@@ -39,6 +39,10 @@ class ConfigTests(unittest.TestCase):
         self.write_config({"max_tool_call_iterations": 77})
         self.assertEqual(agent.load_max_tool_call_iterations(), 77)
 
+    def test_iteration_limit_is_capped_to_prevent_unbounded_requests(self):
+        self.write_config({"max_tool_call_iterations": 500})
+        self.assertEqual(agent.load_max_tool_call_iterations(), 80)
+
     def test_invalid_iteration_limit_uses_default(self):
         self.write_config({"max_tool_call_iterations": True})
         with mock.patch("builtins.print"):
@@ -87,6 +91,36 @@ class ConfigTests(unittest.TestCase):
         settings = agent.load_tool_safeguards()
         self.assertEqual(settings["duplicate_call_limit"], 4)
         self.assertEqual(settings["run_checks_timeout_seconds"], 45)
+
+
+class PlanContinuationTests(unittest.TestCase):
+    def setUp(self):
+        self.original_plan = agent.TASK_PLAN
+        agent.TASK_PLAN = [
+            {"title": "Implement change", "status": "in_progress"},
+            {"title": "Run tests", "status": "pending"},
+        ]
+
+    def tearDown(self):
+        agent.TASK_PLAN = self.original_plan
+
+    def test_text_only_response_continues_when_plan_is_incomplete(self):
+        history = []
+        self.assertTrue(agent._continue_incomplete_plan(history, 0, "stop"))
+        self.assertEqual(history[-1]["role"], "user")
+        self.assertIn("Implement change", history[-1]["content"])
+        self.assertIn("Run tests", history[-1]["content"])
+
+    def test_continuation_is_bounded(self):
+        history = []
+        self.assertFalse(agent._continue_incomplete_plan(
+            history, agent.MAX_PLAN_CONTINUATIONS, "stop"
+        ))
+        self.assertEqual(history, [])
+
+    def test_completed_plan_does_not_continue(self):
+        agent.TASK_PLAN = [{"title": "Done", "status": "completed"}]
+        self.assertFalse(agent._continue_incomplete_plan([], 0, "stop"))
 
 
 class ToolSafetyTests(unittest.TestCase):
