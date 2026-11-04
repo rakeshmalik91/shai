@@ -7,10 +7,12 @@ Uses the same shai_config.json and provider/model selection behaviour as agent.p
 Standard-library only.
 """
 
+import ast
 import json
 import os
 import pathlib
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -28,9 +30,23 @@ from modules.context_meter import (
     log_and_display_usage
 )
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
+ROOT = pathlib.Path(
+    sys.argv[1] if __name__ == "__main__" and len(sys.argv) > 1 else "."
+).expanduser().resolve()
 CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
 LOGGER = get_logger("shai.chat")
 DEFAULT_API_TIMEOUT_SECONDS = 300
+MAX_FILE_SIZE = 200_000
+
+
+def safe_path(path):
+    """Resolve a path relative to ROOT and ensure it stays within ROOT."""
+    target = (ROOT / path).resolve()
+    try:
+        target.relative_to(ROOT)
+    except ValueError:
+        raise ValueError("Path escapes project root.")
+    return target
 
 
 def load_config():
@@ -55,10 +71,446 @@ def load_api_timeout_seconds():
 API_TIMEOUT_SECONDS = load_api_timeout_seconds()
 
 
+# -------------------------------------------------------------------
+# Read-only tool definitions (shared with agent.py)
+# -------------------------------------------------------------------
+
+def list_files(path):
+    """List project files under a directory."""
+    target = safe_path(path)
+    if not target.is_dir():
+        return "Not a directory."
+    entries = []
+    for entry in sorted(target.iterdir()):
+        rel = entry.relative_to(ROOT)
+        if entry.is_dir():
+            entries.append(str(rel) + "/")
+        else:
+            entries.append(str(rel))
+    return "\n".join(entries) if entries else "(empty)"
+
+
+def read_file(path, offset=0, limit=100):
+    """Read a project file in line-based chunks using path, offset, and limit."""
+    target = safe_path(path)
+    if not target.is_file():
+        return "File does not exist."
+    try:
+        size = target.stat().st_size
+    except OSError:
+        return "Unable to read file."
+    if size > MAX_FILE_SIZE:
+        return "File is too large."
+    try:
+        text = target.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return "File is not UTF-8 text."
+    except OSError as error:
+        return "Unable to read file: " + str(error)
+    lines = text.splitlines()
+    total = len(lines)
+    if offset < 0 or offset >= total:
+        return "Invalid offset: {} (file has {} lines).".format(offset, total)
+    if limit <= 0:
+        return "Invalid limit: must be positive."
+    end = min(offset + limit, total)
+    chunk = lines[offset:end]
+    header = "Lines {}-{} of {}:".format(offset + 1, end, total)
+    return header + "\n" + "\n".join(chunk)
+
+
+def search_files(query, path="."):
+    """Search a project file or directory."""
+    target = safe_path(path)
+    if not target.exists():
+        return "Path does not exist."
+    results = []
+    if target.is_file():
+        files = [target]
+    else:
+        files = [f for f in target.rglob("*") if f.is_file()]
+    for file_path in files:
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            if query.lower() in line.lower():
+                rel = file_path.relative_to(ROOT)
+                results.append("{}:{}: {}".format(rel, i, line.strip()))
+                if len(results) >= 100:
+                    return "\n".join(results) + "\n... (truncated at 100 results)"
+    return "\n".join(results) if results else "No matches found."
+
+
+def git_status():
+    """Show current Git status."""
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return "Git status failed: " + result.stderr.strip()
+        return result.stdout.strip() or "(clean)"
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return "Git status error: " + str(error)
+
+
+def git_diff():
+    """Inspect Git changes."""
+    try:
+        result = subprocess.run(
+            ["git", "diff"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return "Git diff failed: " + result.stderr.strip()
+        return result.stdout.strip() or "(no changes)"
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return "Git diff error: " + str(error)
+
+
+def get_file_outline(path):
+    """Return top-level imports, classes, functions and methods with line ranges."""
+    target = safe_path(path)
+    if not target.is_file():
+        return "Expected a Python source file."
+    try:
+        text = target.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError) as error:
+        return "Unable to read file: " + str(error)
+    if len(text) > MAX_FILE_SIZE:
+        return "Python file exceeds maximum size."
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as error:
+        return "Invalid Python syntax: " + str(error)
+    lines = text.splitlines()
+    outline = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                outline.append("import {} at line {}".format(alias.name, node.lineno))
+        elif isinstance(node, ast.ClassDef):
+            outline.append("class {} at line {}".format(node.name, node.lineno))
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef):
+                    outline.append("  def {} at line {}".format(item.name, item.lineno))
+        elif isinstance(node, ast.FunctionDef):
+            # Only top-level functions
+            if isinstance(node.parent, ast.Module) if hasattr(node, 'parent') else True:
+                outline.append("def {} at line {}".format(node.name, node.lineno))
+    return "\n".join(outline) if outline else "(no imports, classes, or functions found)"
+
+
+def find_symbol(symbol, path="."):
+    """Find Python definitions of a class, function, method or assignment by exact name."""
+    if not symbol or not isinstance(symbol, str):
+        return "symbol must be a non-empty string."
+    target = safe_path(path)
+    if not target.exists():
+        return "Path does not exist."
+    results = []
+    files = [target] if target.is_file() else [f for f in target.rglob("*.py") if f.is_file()]
+    for file_path in files:
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        if len(text) > MAX_FILE_SIZE:
+            continue
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name == symbol:
+                    rel = file_path.relative_to(ROOT)
+                    results.append("{} at line {} in {}".format(node.name, node.lineno, rel))
+            elif isinstance(node, ast.Assign):
+                for target_node in node.targets:
+                    if isinstance(target_node, ast.Name) and target_node.id == symbol:
+                        rel = file_path.relative_to(ROOT)
+                        results.append("{} = ... at line {} in {}".format(symbol, node.lineno, rel))
+    return "\n".join(results) if results else "No definitions found for '{}'.".format(symbol)
+
+
+def find_references(symbol, path="."):
+    """Search project text files for usages of a symbol."""
+    if not symbol or not isinstance(symbol, str):
+        return "symbol must be a non-empty string."
+    target = safe_path(path)
+    if not target.exists():
+        return "Path does not exist."
+    results = []
+    files = [target] if target.is_file() else [f for f in target.rglob("*.py") if f.is_file()]
+    for file_path in files:
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            if symbol in line:
+                rel = file_path.relative_to(ROOT)
+                results.append("{}:{}: {}".format(rel, i, line.strip()))
+                if len(results) >= 100:
+                    return "\n".join(results) + "\n... (truncated at 100 results)"
+    return "\n".join(results) if results else "No references found for '{}'.".format(symbol)
+
+
+def get_project_map(path="."):
+    """Summarize project directories, file types and likely Python entry points."""
+    target = safe_path(path)
+    if not target.is_dir():
+        return "Project map path must be a directory."
+    summary = []
+    py_files = 0
+    total_files = 0
+    for entry in target.rglob("*"):
+        if entry.is_file():
+            total_files += 1
+            if entry.suffix == ".py":
+                py_files += 1
+    summary.append("Project root: {}".format(target))
+    summary.append("Total files: {}".format(total_files))
+    summary.append("Python files: {}".format(py_files))
+    # Find likely entry points
+    entry_points = []
+    for entry in target.rglob("*.py"):
+        if entry.is_file():
+            try:
+                text = entry.read_text(encoding="utf-8")
+                if "if __name__ == \"__main__\":" in text or "def main(" in text:
+                    entry_points.append(str(entry.relative_to(ROOT)))
+            except (UnicodeDecodeError, OSError):
+                pass
+    if entry_points:
+        summary.append("Likely entry points:")
+        for ep in entry_points[:10]:
+            summary.append("  " + ep)
+    return "\n".join(summary)
+
+
+def get_test_map(path="."):
+    """List test files and heuristically map their names to likely source modules."""
+    target = safe_path(path)
+    if not target.is_dir():
+        return "Test map path must be a directory."
+    test_files = []
+    for entry in target.rglob("test_*.py"):
+        if entry.is_file():
+            test_files.append(str(entry.relative_to(ROOT)))
+    for entry in target.rglob("*_test.py"):
+        if entry.is_file():
+            test_files.append(str(entry.relative_to(ROOT)))
+    if not test_files:
+        return "No test files found (looking for test_*.py or *_test.py)."
+    result = ["Test files found:"]
+    for tf in sorted(test_files):
+        result.append("  " + tf)
+    return "\n".join(result)
+
+
+def inspect_test_failure(output):
+    """Extract likely failing test names, assertion errors, tracebacks and relevant context from supplied test output."""
+    if not isinstance(output, str):
+        return "output must be a string"
+    lines = output.splitlines()
+    failures = []
+    current_test = None
+    for i, line in enumerate(lines):
+        # Look for pytest/unittest failure patterns
+        if "FAILED" in line or "FAIL:" in line or "ERROR:" in line:
+            current_test = line.strip()
+            failures.append(current_test)
+        elif current_test and ("AssertionError" in line or "assert " in line or "Traceback" in line):
+            failures.append("  " + line.strip())
+    return "\n".join(failures) if failures else "No clear test failures detected in output."
+
+
+# Tool dispatch for read-only tools
+TOOL_DISPATCH_READ_ONLY = {
+    "list_files": list_files,
+    "read_file": read_file,
+    "search_files": search_files,
+    "git_status": git_status,
+    "git_diff": git_diff,
+    "get_file_outline": get_file_outline,
+    "find_symbol": find_symbol,
+    "find_references": find_references,
+    "get_project_map": get_project_map,
+    "get_test_map": get_test_map,
+    "inspect_test_failure": inspect_test_failure,
+}
+
+# OpenAI-compatible function declarations for read-only tools
+FUNCTIONS_READ_ONLY = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_files",
+            "description": "List project files under a directory.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Directory path to list"}
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read a project file in line-based chunks using path, offset, and limit.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path to read"},
+                    "offset": {"type": "integer", "description": "Zero-based line offset", "default": 0},
+                    "limit": {"type": "integer", "description": "Number of lines to read", "default": 100}
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_files",
+            "description": "Search a project file or directory.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query"},
+                    "path": {"type": "string", "description": "File or directory to search", "default": "."}
+                },
+                "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_status",
+            "description": "Show current Git status.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_diff",
+            "description": "Inspect Git changes.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_file_outline",
+            "description": "Return top-level imports, classes, functions and methods with line ranges.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Python file path"}
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_symbol",
+            "description": "Find Python definitions of a class, function, method or assignment by exact name.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "Symbol name to find"},
+                    "path": {"type": "string", "description": "File or directory to search", "default": "."}
+                },
+                "required": ["symbol"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_references",
+            "description": "Search project text files for usages of a symbol.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "Symbol name to find references for"},
+                    "path": {"type": "string", "description": "File or directory to search", "default": "."}
+                },
+                "required": ["symbol"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_project_map",
+            "description": "Summarize project directories, file types and likely Python entry points.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Project directory path", "default": "."}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_test_map",
+            "description": "List test files and heuristically map their names to likely source modules.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Project directory path", "default": "."}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "inspect_test_failure",
+            "description": "Extract likely failing test names, assertion errors, tracebacks and relevant context from supplied test output.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "output": {"type": "string", "description": "Test output to analyze"}
+                },
+                "required": ["output"]
+            }
+        }
+    },
+]
+
+
 SYSTEM_PROMPT = (
     "You are Shai, a helpful AI assistant. Be accurate, concise, and "
-    "honest. If you are unsure, say so. You are in chat mode and do not "
-    "have tools to inspect or modify local files."
+    "honest. If you are unsure, say so. You are in chat mode and have "
+    "access to read-only tools to inspect the local project."
 )
 
 
@@ -253,6 +705,9 @@ def api_request(history, provider, model):
     if not key:
         raise RuntimeError(key_name + " is not set.")
 
+    # Determine if provider supports tools
+    supports_tools = PROVIDERS[provider]["format"] in ("openai", "anthropic")
+
     if PROVIDERS[provider]["format"] == "anthropic":
         messages = [
             item for item in history
@@ -264,6 +719,8 @@ def api_request(history, provider, model):
             "system": SYSTEM_PROMPT,
             "messages": messages,
         }
+        if supports_tools:
+            body["tools"] = FUNCTIONS_READ_ONLY
     else:
         body = {
             "model": model,
@@ -274,6 +731,8 @@ def api_request(history, provider, model):
         else:
             body["temperature"] = 0.2
             body["max_tokens"] = 8192
+        if supports_tools:
+            body["tools"] = FUNCTIONS_READ_ONLY
 
     return request_json(
         PROVIDERS[provider]["url"], key, provider, body
@@ -284,11 +743,19 @@ def response_text(response, provider):
     if PROVIDERS[provider]["format"] == "anthropic":
         text, tool_uses = extract_anthropic_response(response)
         if tool_uses:
-            raise RuntimeError(
-                "The selected Anthropic response requested tool use, "
-                "but chat mode does not provide tools."
-            )
-        return text
+            # Convert Anthropic tool_uses to OpenAI-compatible format
+            tool_calls = []
+            for tu in tool_uses:
+                tool_calls.append({
+                    "id": tu.get("id", "call_" + str(hash(str(tu)))),
+                    "type": "function",
+                    "function": {
+                        "name": tu.get("name"),
+                        "arguments": json.dumps(tu.get("input", {}))
+                    }
+                })
+            return text, tool_calls
+        return text, []
 
     choices = response.get("choices", [])
     if not choices:
@@ -296,9 +763,10 @@ def response_text(response, provider):
 
     message = choices[0].get("message", {})
     content = message.get("content", "")
+    tool_calls = message.get("tool_calls", [])
 
     if isinstance(content, str):
-        return content
+        return content, tool_calls
 
     # Some OpenAI-compatible providers return an array of text blocks.
     if isinstance(content, list):
@@ -306,9 +774,9 @@ def response_text(response, provider):
         for block in content:
             if isinstance(block, dict) and block.get("type") == "text":
                 pieces.append(block.get("text", ""))
-        return "\n".join(piece for piece in pieces if piece)
+        return "\n".join(piece for piece in pieces if piece), tool_calls
 
-    return str(content) if content else ""
+    return str(content) if content else "", tool_calls
 
 
 def history_for_new_provider(history):
@@ -450,14 +918,100 @@ def main():
                 estimated_prompt_tokens, context_limit
             )
             display_reasoning_summary(provider, response)
-            answer = response_text(response, provider)
-            LOGGER.debug("Chat response parsed answer_chars=%d", len(answer or ""))
+            answer, tool_calls = response_text(response, provider)
+            LOGGER.debug("Chat response parsed answer_chars=%d tool_calls=%d",
+                         len(answer or ""), len(tool_calls))
         except Exception as error:
             LOGGER.exception("Chat turn failed provider=%s model=%s", provider, model)
             answer = None
+            tool_calls = []
             print("\nError:", error)
         finally:
             spinner.stop()
+
+        # Handle tool calls if any
+        if tool_calls:
+            # Add assistant message with tool calls to history
+            if PROVIDERS[provider]["format"] == "anthropic":
+                # For Anthropic, we need to format differently
+                content = []
+                if answer:
+                    content.append({"type": "text", "text": answer})
+                for tc in tool_calls:
+                    content.append({
+                        "type": "tool_use",
+                        "id": tc["id"],
+                        "name": tc["function"]["name"],
+                        "input": json.loads(tc["function"]["arguments"])
+                    })
+                history.append({"role": "assistant", "content": content})
+            else:
+                # OpenAI-compatible format
+                message = {"role": "assistant", "content": answer or ""}
+                if tool_calls:
+                    message["tool_calls"] = tool_calls
+                history.append(message)
+            history_store.save(history, provider=provider, model=model)
+
+            # Execute tool calls
+            tool_results = []
+            for tc in tool_calls:
+                call_id = tc["id"]
+                function_data = tc["function"]
+                name = function_data.get("name")
+                raw_args = function_data.get("arguments", "{}")
+
+                try:
+                    args = json.loads(raw_args)
+                    if not isinstance(args, dict):
+                        raise ValueError("Tool arguments must be an object.")
+                except (json.JSONDecodeError, ValueError) as e:
+                    result = {"error": "Invalid tool arguments: " + str(e)}
+                else:
+                    if name in TOOL_DISPATCH_READ_ONLY:
+                        try:
+                            result = TOOL_DISPATCH_READ_ONLY[name](**args)
+                        except Exception as e:
+                            result = {"error": str(e)}
+                    else:
+                        result = {"error": "Unknown tool: " + name}
+
+                # Format tool result
+                if isinstance(result, dict) and "error" in result:
+                    tool_content = "Error: " + result["error"]
+                else:
+                    tool_content = str(result)
+
+                tool_results.append({
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "content": tool_content
+                })
+
+            # Add tool results to history
+            history.extend(tool_results)
+            history_store.save(history, provider=provider, model=model)
+
+            # Continue the conversation to get the final answer
+            # Make another API call with the tool results
+            spinner = Spinner("Shai is thinking | " + context_status)
+            spinner.start()
+            try:
+                response = api_request(history, provider, model)
+                log_and_display_usage(
+                    LOGGER, response, PROVIDERS[provider]["format"],
+                    estimated_prompt_tokens, context_limit
+                )
+                display_reasoning_summary(provider, response)
+                answer, tool_calls = response_text(response, provider)
+                LOGGER.debug("Chat response parsed answer_chars=%d tool_calls=%d",
+                             len(answer or ""), len(tool_calls))
+            except Exception as error:
+                LOGGER.exception("Chat turn failed provider=%s model=%s", provider, model)
+                answer = None
+                print("\nError:", error)
+            finally:
+                spinner.stop()
 
         if answer:
             LOGGER.info("Chat turn completed answer_chars=%d", len(answer))

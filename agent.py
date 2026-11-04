@@ -23,7 +23,7 @@ import math
 import tty
 import _thread
 
-from chat import Spinner, extract_anthropic_response, response_text
+from chat import Spinner, extract_anthropic_response, response_text, FUNCTIONS_READ_ONLY, TOOL_DISPATCH_READ_ONLY
 from modules.provider_selection import PROVIDERS, initialize_provider, get_available_models
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
@@ -3513,6 +3513,8 @@ Commands:
   /diff    - Show Git diff
   /reset   - Clear conversation history
   /ask     - Switch to ask mode (chat only, no tools)
+  /read-only - Switch to read-only mode (chat with read-only tools)
+  /ro      - Alias for /read-only
   /code    - Switch to code mode (agent with tools)
   /todo    - Show current task plan
   /task    - Alias for /todo
@@ -3567,6 +3569,14 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                 else:
                     mode = "ask"
                     print("[Shai] Switched to ask mode (chat only, no tools).")
+                continue
+
+            if user_text in ("/read-only", "/ro"):
+                if mode == "read-only":
+                    print("[Shai] Already in read-only mode.")
+                else:
+                    mode = "read-only"
+                    print("[Shai] Switched to read-only mode (chat with read-only tools).")
                 continue
 
             if user_text == "/code":
@@ -3665,6 +3675,159 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                         print("\n" + answer)
                         history.append({"role": "assistant", "content": answer})
                         history_store.save(history, provider=PROVIDER, model=MODEL)
+
+                elif mode == "read-only":
+                    # Read-only mode: chat with read-only tools
+                    history.append({"role": "user", "content": user_text})
+                    safeguards = load_config().get("agent_safeguards", {})
+                    if safeguards.get("enabled", True) is not False:
+                        def history_limit(key, default):
+                            value = safeguards.get(key, default)
+                            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                                return default
+                            return value
+                        history = compact_conversation_history(
+                            history,
+                            max_chars=history_limit("max_history_chars", 90000),
+                            max_tool_result_chars=history_limit("max_tool_result_chars", 8000),
+                            keep_recent_turns=history_limit("keep_recent_turns", 4),
+                            max_recent_tool_cycles=history_limit("max_recent_tool_cycles", 6)
+                        )
+                    history_store.save(history, provider=PROVIDER, model=MODEL)
+                    context_limit = get_context_window(PROVIDER, MODEL, load_config())
+                    estimated_prompt_tokens = estimate_messages_tokens(history)
+                    context_status = format_context_status(
+                        estimated_prompt_tokens, context_limit
+                    )
+                    LOGGER.debug(
+                        "Read-only mode context estimate provider=%s model=%s estimated_prompt_tokens=%d "
+                        "context_limit=%s history_messages=%d",
+                        PROVIDER, MODEL, estimated_prompt_tokens, context_limit, len(history)
+                    )
+                    print("\n[Shai] {}".format(context_status))
+                    spinner = Spinner("Shai is thinking | " + context_status)
+                    spinner.start()
+                    LOGGER.info("Read-only mode turn started provider=%s model=%s user_chars=%d history_messages=%d",
+                                PROVIDER, MODEL, len(user_text), len(history))
+                    try:
+                        # Use api_request with read-only tools
+                        response = api_request(history, PROVIDER, MODEL)
+                        log_and_display_usage(
+                            LOGGER, response, PROVIDERS[PROVIDER]["format"],
+                            estimated_prompt_tokens, context_limit
+                        )
+                        display_reasoning_summary(PROVIDER, response)
+                        answer, tool_calls = response_text(response, PROVIDER)
+                        LOGGER.debug("Read-only mode response parsed answer_chars=%d tool_calls=%d",
+                                     len(answer or ""), len(tool_calls))
+                    except Exception as error:
+                        LOGGER.exception("Read-only mode turn failed provider=%s model=%s", PROVIDER, MODEL)
+                        answer = None
+                        tool_calls = []
+                        print("\nError:", error)
+                    finally:
+                        spinner.stop()
+
+                    # Handle tool calls if any
+                    if tool_calls:
+                        # Add assistant message with tool calls to history
+                        if PROVIDERS[PROVIDER]["format"] == "anthropic":
+                            content = []
+                            if answer:
+                                content.append({"type": "text", "text": answer})
+                            for tc in tool_calls:
+                                content.append({
+                                    "type": "tool_use",
+                                    "id": tc["id"],
+                                    "name": tc["function"]["name"],
+                                    "input": json.loads(tc["function"]["arguments"])
+                                })
+                            history.append({"role": "assistant", "content": content})
+                        else:
+                            message = {"role": "assistant", "content": answer or ""}
+                            if tool_calls:
+                                message["tool_calls"] = tool_calls
+                            history.append(message)
+                        history_store.save(history, provider=PROVIDER, model=MODEL)
+
+                        # Execute tool calls
+                        tool_results = []
+                        for tc in tool_calls:
+                            call_id = tc["id"]
+                            function_data = tc["function"]
+                            name = function_data.get("name")
+                            raw_args = function_data.get("arguments", "{}")
+
+                            try:
+                                args = json.loads(raw_args)
+                                if not isinstance(args, dict):
+                                    raise ValueError("Tool arguments must be an object.")
+                            except (json.JSONDecodeError, ValueError) as e:
+                                result = {"error": "Invalid tool arguments: " + str(e)}
+                            else:
+                                if name in TOOL_DISPATCH_READ_ONLY:
+                                    try:
+                                        result = TOOL_DISPATCH_READ_ONLY[name](**args)
+                                    except Exception as e:
+                                        result = {"error": str(e)}
+                                else:
+                                    result = {"error": "Unknown tool: " + name}
+
+                            # Format tool result
+                            if isinstance(result, dict) and "error" in result:
+                                tool_content = "Error: " + result["error"]
+                            else:
+                                tool_content = str(result)
+
+                            tool_results.append({
+                                "role": "tool",
+                                "tool_call_id": call_id,
+                                "content": tool_content
+                            })
+
+                        # Add tool results to history
+                        history.extend(tool_results)
+                        history_store.save(history, provider=PROVIDER, model=MODEL)
+
+                        # Continue the conversation to get the final answer
+                        spinner = Spinner("Shai is thinking | " + context_status)
+                        spinner.start()
+                        try:
+                            response = api_request(history, PROVIDER, MODEL)
+                            log_and_display_usage(
+                                LOGGER, response, PROVIDERS[PROVIDER]["format"],
+                                estimated_prompt_tokens, context_limit
+                            )
+                            display_reasoning_summary(PROVIDER, response)
+                            answer, tool_calls = response_text(response, PROVIDER)
+                            LOGGER.debug("Read-only mode response parsed answer_chars=%d tool_calls=%d",
+                                         len(answer or ""), len(tool_calls))
+                        except Exception as error:
+                            LOGGER.exception("Read-only mode turn failed provider=%s model=%s", PROVIDER, MODEL)
+                            answer = None
+                            print("\nError:", error)
+                        finally:
+                            spinner.stop()
+
+                    if answer:
+                        LOGGER.info("Read-only mode turn completed answer_chars=%d", len(answer))
+                        print("\n" + answer)
+                        if PROVIDERS[PROVIDER]["format"] == "anthropic":
+                            history.append({
+                                "role": "assistant",
+                                "content": [{"type": "text", "text": answer}],
+                            })
+                        else:
+                            history.append({"role": "assistant", "content": answer})
+                        history_store.save(history, provider=PROVIDER, model=MODEL)
+                    elif answer == "":
+                        print("\nNo text response returned.")
+                        history.pop()
+                        history_store.save(history, provider=PROVIDER, model=MODEL)
+                    else:
+                        history.pop()
+                        history_store.save(history, provider=PROVIDER, model=MODEL)
+
                 else:
                     # Agent mode: full ask_model with tools
                     ask_model(history, user_text)

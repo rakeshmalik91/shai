@@ -30,7 +30,7 @@ class ChatTests(unittest.TestCase):
     def test_model_command_switches_provider_without_api_call(self):
         choices = iter([("kilo-free", "free-model:free"), ("openai", "gpt-test")])
         user_inputs = iter(["/model", "/status", "/exit"])
-        with mock.patch.object(chat, "initialize_provider", side_effect=lambda: next(choices)), \
+        with mock.patch.object(chat, "initialize_provider", side_effect=lambda *args, **kwargs: next(choices)), \
              mock.patch("builtins.input", side_effect=lambda _prompt="": next(user_inputs)), \
              mock.patch("builtins.print") as printed:
             chat.main()
