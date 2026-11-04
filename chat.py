@@ -20,6 +20,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from modules.terminal_style import colorize
 from modules.provider_selection import PROVIDERS, initialize_provider
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
@@ -387,14 +388,14 @@ def main():
         print("[Shai] Previous provider changed; retained text history.")
     history_store.save(history, provider=provider, model=model)
 
-    print("\nShai - Chat")
+    print("\n" + colorize("Shai - Chat", "heading"))
     print("Provider:", provider)
     print("Model:", model)
     print("Commands: /help /model /status /reset /exit")
 
     while True:
         try:
-            user_text = input_with_history("\nYou: ", history_store).strip()
+            user_text = input_with_history("\n" + colorize("You: ", "user"), history_store).strip()
         except (KeyboardInterrupt, EOFError):
             print("\nGoodbye.")
             break
@@ -490,7 +491,7 @@ def main():
             LOGGER.exception("Chat turn failed provider=%s model=%s", provider, model)
             answer = None
             tool_calls = []
-            print("\nError:", error)
+            print("\n" + colorize("Error:", "error"), error)
         finally:
             spinner.stop()
 
@@ -574,13 +575,13 @@ def main():
             except Exception as error:
                 LOGGER.exception("Chat turn failed provider=%s model=%s", provider, model)
                 answer = None
-                print("\nError:", error)
+                print("\n" + colorize("Error:", "error"), error)
             finally:
                 spinner.stop()
 
         if answer:
             LOGGER.info("Chat turn completed answer_chars=%d", len(answer))
-            print("\n" + answer)
+            print("\n" + colorize(answer, "assistant"))
             if PROVIDERS[provider]["format"] == "anthropic":
                 history.append({
                     "role": "assistant",
@@ -590,7 +591,7 @@ def main():
                 history.append({"role": "assistant", "content": answer})
             history_store.save(history, provider=provider, model=model)
         elif answer == "":
-            print("\nNo text response returned.")
+            print("\n" + colorize("No text response returned.", "warning"))
             history.pop()
             history_store.save(history, provider=provider, model=model)
         else:

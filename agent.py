@@ -24,6 +24,7 @@ import tty
 import _thread
 
 from chat import Spinner, extract_anthropic_response, response_text
+from modules.terminal_style import colorize
 from modules.tools import (
     configure_root as configure_tools_root,
     FUNCTIONS_READ_ONLY, TOOL_DISPATCH_READ_ONLY,
@@ -2890,7 +2891,7 @@ def display_assistant_message_content(message):
     assistant_text = _block_text(message.get("content", ""))
     if not assistant_text.strip():
         return False
-    print("\n" + assistant_text)
+    print("\n" + colorize(assistant_text, "assistant"))
     sys.stdout.flush()
     return True
 
@@ -3244,7 +3245,7 @@ def _ask_model_impl(history, user_text):
             })
 
             if text:
-                print("\n" + text)
+                print("\n" + colorize(text, "assistant"))
 
             LOGGER.info(
                 "Model response received provider_format=anthropic stop_reason=%s "
@@ -3299,7 +3300,7 @@ def _ask_model_impl(history, user_text):
                 if isinstance(result, dict) and result.get("error"):
                     iteration_tool_errors = True
                 if isinstance(result, dict) and result.get("error"):
-                    print("[Tool error] {}".format(result.get("error")))
+                    print(colorize("[Tool error]", "error") + " {}".format(result.get("error")))
                 if isinstance(result, dict) and result.get("stop_request"):
                     tool_limit_reached = True
                     print("\n[Shai] Repeated tool failure detected. Stopping this request; see the debug log for details.")
@@ -3405,7 +3406,7 @@ def _ask_model_impl(history, user_text):
                     if isinstance(result, dict) and result.get("error"):
                         iteration_tool_errors = True
                     if isinstance(result, dict) and result.get("error"):
-                        print("[Tool error] {}".format(result.get("error")))
+                        print(colorize("[Tool error]", "error") + " {}".format(result.get("error")))
                     if isinstance(result, dict) and result.get("stop_request"):
                         tool_limit_reached = True
                         print("\n[Shai] Repeated tool failure detected. Stopping this request; see the debug log for details.")
@@ -3500,7 +3501,7 @@ def ask_model(history, user_text):
                 "with /model, or continue with a simpler request. Details: {}"
             ).format(error)
         })
-        print("\n[Shai] {}".format(error))
+        print("\n" + colorize("[Shai]", "system") + " {}".format(error))
         print("[Shai] Stopped retrying. The original request is retained and the invalid tool exchange was removed.")
     except ToolSelectionFailure as error:
         # Keep the user's original request, but discard malformed assistant/tool
@@ -3515,7 +3516,7 @@ def ask_model(history, user_text):
                 "without calling a tool."
             ).format(", ".join(sorted(TOOL_DISPATCH)))
         })
-        print("\n[Shai] {}".format(error))
+        print("\n" + colorize("[Shai]", "system") + " {}".format(error))
         print("[Shai] Invalid tool-call history was cleared and a recovery note was retained. You can retry or rephrase.")
     finally:
         STATUS.set_phase("Idle")
@@ -3559,7 +3560,7 @@ def main():
         print("[Shai] Previous provider changed; retained text history and cleared old tool exchanges.")
     history_store.save(history, provider=PROVIDER, model=MODEL)
 
-    print("\nShai - Coding Agent")
+    print("\n" + colorize("Shai - Coding Agent", "heading"))
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
@@ -3571,7 +3572,7 @@ def main():
 
     while True:
         try:
-            user_text = input_with_history("\nYou: ", history_store).strip()
+            user_text = input_with_history("\n" + colorize("You: ", "user"), history_store).strip()
 
             if not user_text:
                 continue
@@ -3757,7 +3758,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                         "context_limit=%s history_messages=%d",
                         PROVIDER, MODEL, estimated_prompt_tokens, context_limit, len(history)
                     )
-                    print("\n[Shai] {}".format(context_status))
+                    print("\n" + colorize("[Shai]", "system") + " {}".format(context_status))
                     spinner = Spinner("Shai is thinking | " + context_status)
                     spinner.start()
                     LOGGER.info("Ask mode turn started provider=%s model=%s user_chars=%d history_messages=%d",
@@ -3774,7 +3775,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                     except Exception as error:
                         LOGGER.exception("Ask mode turn failed provider=%s model=%s", PROVIDER, MODEL)
                         answer = None
-                        print("\nError:", error)
+                        print("\n" + colorize("Error:", "error"), error)
                     finally:
                         spinner.stop()
 
@@ -3812,7 +3813,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                         "context_limit=%s history_messages=%d",
                         PROVIDER, MODEL, estimated_prompt_tokens, context_limit, len(history)
                     )
-                    print("\n[Shai] {}".format(context_status))
+                    print("\n" + colorize("[Shai]", "system") + " {}".format(context_status))
                     spinner = Spinner("Shai is thinking | " + context_status)
                     spinner.start()
                     LOGGER.info("Read-only mode turn started provider=%s model=%s user_chars=%d history_messages=%d",
@@ -3832,7 +3833,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                         LOGGER.exception("Read-only mode turn failed provider=%s model=%s", PROVIDER, MODEL)
                         answer = None
                         tool_calls = []
-                        print("\nError:", error)
+                        print("\n" + colorize("Error:", "error"), error)
                     finally:
                         spinner.stop()
 
@@ -3913,7 +3914,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                         except Exception as error:
                             LOGGER.exception("Read-only mode turn failed provider=%s model=%s", PROVIDER, MODEL)
                             answer = None
-                            print("\nError:", error)
+                            print("\n" + colorize("Error:", "error"), error)
                         finally:
                             spinner.stop()
 
@@ -3941,7 +3942,7 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                     ask_model(history, user_text)
             except Exception as error:
                 LOGGER.exception("Unhandled agent request error")
-                print("\nError:", error)
+                print("\n" + colorize("Error:", "error"), error)
             finally:
                 history_store.save(history, provider=PROVIDER, model=MODEL)
 

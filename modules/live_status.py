@@ -9,6 +9,8 @@ import shutil
 import sys
 import threading
 
+from modules.terminal_style import colorize
+
 
 class LiveStatusPanel:
     def __init__(self, stream=None):
@@ -45,11 +47,27 @@ class LiveStatusPanel:
             return
         size = shutil.get_terminal_size((80, 24))
         total = self.batch_size or "?"
-        text = "[Shai] Tools {}/{}: {} — {}".format(
+        visible = "[Shai] Tools {}/{}: {} — {}".format(
             self.batch_position, total, self.current_tool, state
         )
+        prefix = colorize("[Shai]", "system", self.stream)
+        count = colorize("Tools {}/{}".format(self.batch_position, total),
+                         "tool_count", self.stream)
+        tool_name = self.current_tool
+        status_role = "error" if state == "ERROR" else (
+            "success" if state == "done" else "warning"
+        )
+        status = colorize(state, status_role, self.stream)
+        # Keep the status to one physical terminal row. Reserve room for
+        # the prefix, counter, separators and state label.
+        available_tool_chars = max(8, size.columns - 38)
+        if len(tool_name) > available_tool_chars:
+            tool_name = tool_name[:available_tool_chars - 1] + "…"
+        text = "{} {}: {} — {}".format(
+            prefix, count, colorize(tool_name, "tool", self.stream), status
+        )
         # Carriage return + erase-to-end rewrites this one line only.
-        self.stream.write("\r\033[2K" + text[:max(1, size.columns - 1)])
+        self.stream.write("\r\033[2K" + text)
         self.stream.flush()
         self.line_open = True
 
