@@ -1,51 +1,74 @@
 # Existing Tools
 
-This document describes the tools currently exposed by Shai's coding agent in `agent.py`. Chat mode does not expose local project tools.
+The tools below are available in **Agent mode**. Chat mode does not access the local project.
 
 ## Project discovery and reading
 
-| Tool | Parameters | What it does |
+| Tool | Parameters | Purpose |
 |---|---|---|
-| `list_files` | `path` | Lists project files under a directory. Skips common generated/dependency directories and limits the result to 300 entries. |
-| `read_file` | `path`, `offset`, `limit` | Reads a UTF-8 file in line-based chunks. `offset` is zero-based; `limit` is the number of lines (up to 500). The result indicates the next offset when more content remains. |
-| `search_files` | `query`, `path` | Performs a case-insensitive text search. `path` can be one file or a directory for recursive search. Results are capped at 100 matches. |
+| `list_files` | `path` | List project files under a directory. |
+| `read_file` | `path`, `offset`, `limit` | Read a UTF-8 file in line-based chunks. `offset` is zero-based; use the returned `next_offset` to continue. |
+| `search_files` | `query`, `path` | Case-insensitive text search in one file or recursively in a directory. |
+
+## Code intelligence and project understanding
+
+The eight priority code-understanding and workflow tools are now implemented and available to Agent mode:
+
+| Tool | Parameters | Purpose |
+|---|---|---|
+| `get_file_outline` | `path` | Use Python's AST to list imports, top-level classes/functions and class methods with line ranges. Python files only. |
+| `find_symbol` | `symbol`, `path` | Find Python definitions of classes, functions, methods and simple assignments by exact name. |
+| `find_references` | `symbol`, `path` | Find textual occurrences of a symbol. This is text search, not semantic/LSP reference analysis. |
+| `get_project_map` | `path` | Summarize project directories, file types and likely Python entry points. |
+| `get_test_map` | `path` | List test files and heuristically suggest matching source modules. Mapping is approximate. |
+| `update_task_plan` | `steps` | Set the in-memory task checklist. Each step has a `title` and a status: `pending`, `in_progress`, `completed` or `blocked`. |
+
+The eight priority tools are `get_file_outline`, `find_symbol`, `find_references`, `verify_changes`, `inspect_test_failure`, `get_project_map`, `get_test_map` and `update_task_plan`. `replace_lines` is an additional editing tool.
 
 ## Editing
 
-| Tool | Parameters | What it does |
+| Tool | Parameters | Purpose |
 |---|---|---|
-| `edit_file` | `path`, `content` | Proposes replacing a file's contents. Shai validates the path/content and shows a change preview. Approval behaviour is controlled by the agent configuration. |
-| `patch_file` | `path`, `old_text`, `new_text` | Replaces one exact, unique text block in a file. Intended for targeted edits rather than rewriting an entire file. |
+| `edit_file` | `path`, `content` | Propose a whole-file replacement with a diff preview. |
+| `patch_file` | `path`, `old_text`, `new_text` | Replace one exact text block, only when it matches exactly once. |
+| `replace_lines` | `path`, `start_line`, `end_line`, `new_text` | Replace a 1-based inclusive line range. Useful when exact matching fails because of indentation or whitespace. |
+
+File modifications are previewed and require approval according to the configured approval settings. Risky changes require explicit approval. Original files are backed up before atomic replacement.
+
+**Editing guidance:** read the current file before editing. If `patch_file` reports zero or multiple matches, do not repeat the same patch. Re-read the relevant lines and use `replace_lines` with the current line numbers.
 
 ## Git inspection
 
-| Tool | Parameters | What it does |
+| Tool | Parameters | Purpose |
 |---|---|---|
-| `git_status` | none | Shows the current branch and short Git working-tree status. |
-| `git_diff` | none | Shows unstaged changes. |
+| `git_status` | none | Show current branch and short working-tree status. |
+| `git_diff` | none | Show unstaged changes. |
 
-These tools inspect repository state; they do not commit, push, or alter Git history.
+These tools do not commit, push or rewrite Git history.
 
-## Checks
+## Verification and debugging
 
-| Tool | Parameters | What it does |
+| Tool | Parameters | Purpose |
 |---|---|---|
-| `run_checks` | `check`, `path` | Runs one of the supported checks in the selected directory: `pytest`, `unittest`, or `compileall`. Execution is bounded by configured timeout/output limits and requires approval unless approval has been pre-authorized in configuration. |
+| `run_checks` | `check`, `path` | Run `pytest`, `unittest` or `compileall` with configured timeout/output bounds. |
+| `verify_changes` | `path`, `test_check` | Run Python compilation and optionally `unittest` or `pytest` as a combined verification pass. |
+| `inspect_test_failure` | `output` | Extract likely failing tests, assertions, exception types and traceback context from supplied output. It does not run tests. |
 
-## Agent safeguards and supporting capabilities
+Verification and command execution require approval unless the configured session approval setting permits them. Execution is bounded by configured timeout and output limits.
 
-The following are internal agent capabilities, not separate model-callable tools:
+## Safeguards and supporting capabilities
 
-- **Argument validation:** validates tool names and arguments against the declared tool schemas.
-- **Repeat/no-progress tracking:** records tool-call signatures and detects repeated error patterns; legitimate calls with different parameters remain distinct.
-- **Bounded tool output and history:** limits oversized tool results and compacts older conversation history.
-- **File access boundaries:** resolves paths within the selected project root and applies file-size limits.
-- **Bounded command execution:** applies timeouts, output caps, interruption handling, and child-process termination to supported checks.
-- **Change previews:** displays bounded diffs before file changes.
-- **Conversation history:** stores agent and chat histories separately in `.shai/history.json`.
-- **Provider reasoning summaries:** extracts supported provider-supplied summaries for display and debugging.
-- **Logging:** writes configurable run logs, including diagnostic details. API payload logging redacts configured sensitive fields.
+These are internal capabilities rather than model-callable tools:
+
+- Project-root path validation and protection for sensitive paths.
+- Tool argument validation and parameter-aware repeat detection.
+- Detection of repeated identical failed calls.
+- Bounded tool output and conversation-history compaction.
+- Bounded test-process execution, timeout and interruption handling.
+- File-change previews and backups.
+- Provider-specific reasoning-summary extraction.
+- Run-based diagnostic logs with sensitive API payload fields redacted.
 
 ## Configuration
 
-`shai_config.json` controls the selected provider/model, tool safeguards, retry behaviour, test execution limits, logging, change previews, and reasoning display. Keep API keys in environment variables rather than in this configuration file.
+`shai_config.json` controls provider/model selection, approval behaviour, safeguards, test execution, logging, history limits and display settings. API keys belong in environment variables, not this file.

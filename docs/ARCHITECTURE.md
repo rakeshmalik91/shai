@@ -2,83 +2,84 @@
 
 ## Overview
 
-Shai is a small Python command-line application with two entry points that share provider selection, conversation storage, logging, and reasoning-summary support.
+Shai is a Python command-line assistant with two entry points. Agent mode combines a language model with local project tools; chat mode provides conversation without local project access.
 
 ```text
-                     User
-                      |
-             +--------+--------+
-             |                 |
-          agent.py           chat.py
-       Coding-agent mode    Chat-only mode
-             |                 |
-      Local project tools      |
-             |                 |
-             +--------+--------+
-                      |
-                Shared modules
-                      |
-          Provider / Model selection
-                      |
-          Provider-specific HTTP API
-                      |
-             Remote language model
+                         User
+                          |
+                +---------+---------+
+                |                   |
+             agent.py             chat.py
+          Coding-agent mode      Chat mode
+                |
+        Tool schemas and loop
+                |
+      +---------+---------------------+
+      |         |          |          |
+   Discovery  Reading   Editing   Verification
+      |         |          |          |
+      +---------+----------+----------+
+                          |
+                   Project directory
+                          |
+                Provider / model API
 ```
 
-## Main entry points
+## Entry points
 
-### `agent.py`
+- **`agent.py`** manages the coding-agent loop, tool schemas, local tool execution, approvals, safeguards and verification.
+- **`chat.py`** provides conversational mode without local file, Git or command-execution tools.
 
-The coding-agent loop. It sends the conversation and tool definitions to the selected model, displays available reasoning summaries and tool activity, executes local tools within the project root and applicable safeguards, appends tool results to the conversation, and continues until the model responds or a safeguard stops the request.
+The project root is the first command-line argument to `agent.py`; if omitted, the current working directory is used.
 
-The project root is the directory passed as the first command-line argument; if omitted, the current working directory is used.
+## Agent tool groups
 
-### `chat.py`
+### Discovery and code intelligence
 
-A conversational mode without local file, Git, or command-execution tools. It shares provider/model selection and persistent conversation handling with agent mode.
+`list_files`, `search_files`, `get_file_outline`, `find_symbol`, `find_references`, `get_project_map` and `get_test_map` help the model navigate a project. Python structure inspection uses the standard-library `ast` module. Reference search and test mapping are heuristic/textual, not compiler-grade semantic analysis.
+
+### Reading
+
+`read_file` returns bounded line chunks. Its `offset` and `limit` parameters allow the model to continue reading without repeating earlier chunks.
+
+### Editing
+
+`patch_file` performs an exact unique text replacement. A zero-match or multi-match result is surfaced as a tool error and recommends `replace_lines`; it is not counted as a successful operation. `replace_lines` replaces a 1-based inclusive line range and is the fallback when exact text matching is brittle. Three consecutive identical failed tool calls stop the current request instead of letting the model retry indefinitely. `edit_file` handles whole-file replacement.
+
+Edits are previewed, approved according to configuration, validated where supported, backed up and atomically written.
+
+### Verification
+
+`run_checks` runs a selected check. `verify_changes` combines Python compilation with an optional test suite. `inspect_test_failure` extracts likely failure details from supplied test output. Command execution is bounded by configured timeout and output limits.
+
+### Task progress
+
+`update_task_plan` maintains a lightweight in-memory checklist for the current agent session. The model can mark steps pending, in progress, completed or blocked. The checklist is session-local and is not persisted after exit.
 
 ## Shared modules
 
 | Module | Responsibility |
 |---|---|
-| `modules/provider_selection.py` | Provider endpoints, API-key environment variable names, model discovery, interactive selection, and persistence of the last provider/model. |
-| `modules/conversation_history.py` | Separate agent/chat message histories, prompt history, readline navigation, and atomic history-file writes. |
-| `modules/agent_safeguards.py` | Tool-argument validation helpers, repeat signatures, no-progress tracking, tool-result bounding, and conversation-history compaction. |
-| `modules/logging_config.py` | Run-based file logging, log retention, optional console logging, and API payload redaction. |
-| `modules/file_change_display.py` | Bounded file-change previews. |
+| `modules/provider_selection.py` | Provider definitions, API-key environment variable names, model discovery, selection and persistence. |
+| `modules/conversation_history.py` | Agent/chat history, prompt history and input navigation. |
+| `modules/agent_safeguards.py` | Argument validation, repeat signatures, no-progress detection, result bounding and history compaction. |
+| `modules/logging_config.py` | Run-based logs, retention, console settings and API payload redaction. |
+| `modules/file_change_display.py` | Bounded diff previews. |
 | `modules/reasoning_handlers/` | Provider-specific extraction and display of supported reasoning summaries. |
-
-## Agent tool flow
-
-1. The user enters a request in agent mode.
-2. Shai sends the conversation and declared tool schemas to the selected provider.
-3. If the model requests a tool, Shai validates the tool name and arguments.
-4. Shai displays the tool call and its parameters.
-5. The local tool runs within the selected project root and applicable safeguards.
-6. The result is bounded, logged, and added to the conversation.
-7. Shai asks the model to continue with the updated conversation.
-
-The currently exposed tools are documented in [TOOLS.md](TOOLS.md).
 
 ## Provider integration
 
-Provider and model selection is shared by both modes. API requests are made using Python's standard-library HTTP facilities. The supported provider entries are OpenRouter, Gemini, Anthropic, OpenAI, Kilo Gateway, and Kilo Gateway's free-model filter.
+Provider selection is shared by both modes. API requests use Python's standard-library HTTP facilities. OpenRouter, OpenAI, Gemini and Kilo use compatible chat/tool payloads where supported; Anthropic uses its Messages API format.
 
-Most providers use an OpenAI-compatible chat-completions interface. Anthropic uses its Messages API format. `modules/reasoning_handlers/` normalizes supported provider-specific reasoning-summary fields for display.
+Reasoning handlers expose provider-supplied summaries when available. They do not expose hidden private chain-of-thought.
 
-## Persistent files
+## Persistent data
 
-| Path | Purpose |
-|---|---|
-| `shai_config.json` | User-adjustable provider/model and runtime settings. |
-| `setup_keys.sh` | User-created shell file containing API-key environment variables; do not commit it. |
-| `.shai/history.json` | Separate saved conversations for agent and chat, plus prompt history. |
-| `logs/` | Diagnostic log files when file logging is enabled. |
-
-Conversation history is project-local. Agent mode stores it under the selected project root; chat mode stores it under the current working directory.
+- `shai_config.json`: runtime configuration and last-used provider/model.
+- `.shai/history.json`: conversation history in the selected working project.
+- `logs/`: diagnostic logs when file logging is enabled.
+- `setup_keys.sh`: optional user-created shell file for API-key environment variables; keep it private and do not commit it.
 
 ## Tests
 
-`test/` contains unit tests for the agent, chat, provider selection, safeguards, bounded execution, conversation history, logging, file-change display, and reasoning handlers.
-
-`run_all_tests.sh` runs `unittest`, runs `pytest` when installed, and compiles the source and test modules.
+`test/` contains unit tests for the agent, chat, providers, safeguards, bounded execution, history, logging, reasoning handlers and tool functionality. `run_all_tests.sh` runs `unittest`, optionally runs `pytest`, and compiles source and test files.

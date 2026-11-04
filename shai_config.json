@@ -1,8 +1,8 @@
 {
   "provider": "kilo-free",
-  "model": "cohere/north-mini-code:free",
+  "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "max_tool_call_iterations": 500,
-  "yes_to_all": true,
+  "yes_to_all": false,
   "tool_safeguards": {
     "duplicate_call_detection": true,
     "duplicate_call_limit": 2,

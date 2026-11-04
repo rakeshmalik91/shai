@@ -1,53 +1,38 @@
 # Shai
 
-Shai is a lightweight, terminal-based AI assistant with two modes:
+Shai is a lightweight terminal AI assistant with two modes:
 
-- **Agent** — explores and edits a local project, works with Git, and runs checks.
-- **Chat** — a conversational assistant without local project tools.
+- **Agent** works with files in a selected project, inspects Git changes, edits code and runs checks.
+- **Chat** provides a regular conversation without local project tools.
 
-It supports OpenRouter, Gemini, Anthropic, OpenAI, and Kilo Gateway.
-
-## Requirements
-
-- Python 3.9 or newer
-- Git (recommended for project status and diff tools)
-- An API key for at least one supported provider
-
-Runtime code uses the Python standard library. `pytest` is optional and is used by the extended test run.
+Shai supports OpenRouter, Gemini, Anthropic, OpenAI and Kilo Gateway.
 
 ## Setup
 
-1. Install Python and Git.
-2. Install the optional test dependency:
+Requirements: Python 3.9 or newer, and an API key for one supported provider. Git is recommended for repository tools.
 
-   ```sh
-   python3 -m pip install -r requirements.txt
-   ```
+```sh
+python3 -m pip install -r requirements.txt
+cp setup_keys.sample.sh setup_keys.sh
+```
 
-3. Create your local API-key file:
+Edit `setup_keys.sh`, add your provider key, then load it in the current shell:
 
-   ```sh
-   cp setup_keys.sample.sh setup_keys.sh
-   ```
+```sh
+. ./setup_keys.sh
+```
 
-4. Edit `setup_keys.sh` and add the key for your provider.
-5. Load the keys in your shell:
-
-   ```sh
-   . ./setup_keys.sh
-   ```
-
-Keep `setup_keys.sh` private; do not commit it.
+Keep `setup_keys.sh` private; it is ignored by Git.
 
 ## Run
 
-Start the coding agent in the current directory:
+Start the agent in the current directory:
 
 ```sh
 python3 agent.py
 ```
 
-Or point it at a project directory:
+Or select a project directory:
 
 ```sh
 python3 agent.py /path/to/project
@@ -59,22 +44,18 @@ Start chat mode:
 python3 chat.py
 ```
 
-At startup, choose a provider and model. Shai saves the selection for the next launch.
-
-In either mode, use `/help` for commands, `/model` to change provider/model, `/status` to inspect the selection, `/reset` to clear the current conversation, and `/exit` to quit. Agent mode also provides `/files` and `/diff`.
+Choose a provider/model when prompted. Shai remembers the last selection. Use `/help` inside either mode for available commands; `/model` switches provider/model and `/exit` quits.
 
 ## Tests
-
-Run the full test and syntax-check script:
 
 ```sh
 sh ./run_all_tests.sh
 ```
 
-The required test suite uses `unittest`. If `pytest` is installed, the script also runs the pytest suite.
+`unittest` is the required test runner. `pytest` is optional and is run when installed.
 
 ## Documentation
 
-- [Existing tools](TOOLS.md)
-- [Project architecture](ARCHITECTURE.md)
-- [Future roadmap](ROADMAP.md)
+- [Existing tools](docs/TOOLS.md)
+- [Project architecture](docs/ARCHITECTURE.md)
+- [Future tools roadmap](docs/roadmap/TOOLS_ROADMAP.md)

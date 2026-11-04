@@ -1,6 +1,10 @@
 import os
 import sys
 import json
+import ast
+import re
+import importlib.util
+import platform
 import urllib.request
 import urllib.error
 import pathlib
@@ -39,6 +43,9 @@ SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 ROOT = pathlib.Path(
     sys.argv[1] if __name__ == "__main__" and len(sys.argv) > 1 else "."
 ).expanduser().resolve()
+
+# In-memory task checklist for the current agent session/request.
+TASK_PLAN = []
 
 MAX_FILE_SIZE = 200_000
 DEFAULT_MAX_TOOL_CALL_ITERATIONS = 12
@@ -631,7 +638,10 @@ Rules:
 - Use tools to explore the project rather than guessing.
 - Read existing code and follow its conventions.
 - Make focused, minimal changes.
-- Prefer patch_file for section-level changes; it requires one exact unique match.
+- Use get_file_outline, find_symbol, and find_references before broad source reads when useful.
+- Prefer patch_file for exact unique text matches. If it fails due to whitespace, indentation, or a missing exact match, read the current line range and use replace_lines instead of repeating the same patch.
+- Use update_task_plan for multi-step work and keep statuses current.
+- Use verify_changes after meaningful code edits; report the checks actually run.
 - Use edit_file only when the user explicitly requests a whole-file replacement or a new file.
 - Never claim a file was changed unless the edit tool succeeded.
 - Never claim tests passed unless run_checks confirms it.
@@ -977,6 +987,283 @@ def search_files(query, path="."):
     LOGGER.debug("search_files complete query=%r path=%s scanned=%d matches=%d", query, path, scanned, len(results))
     return "\n".join(results) if results else "No matches found in {} ({} file(s) scanned).".format(path, scanned)
 
+
+# -------------------------------------------------------------------
+# Code intelligence and project understanding
+# -------------------------------------------------------------------
+
+IGNORED_PROJECT_DIRS = {
+    ".git", ".shai_backups", ".venv", "venv", "node_modules",
+    "__pycache__", ".pytest_cache", ".mypy_cache", ".idea"
+}
+
+
+def _project_files(path=".", suffixes=None, max_files=2000):
+    """Yield safe project files beneath a file or directory."""
+    target = safe_path(path)
+    if not target.exists():
+        raise ValueError("Path does not exist: {}".format(path))
+    if target.is_file():
+        candidates = [target]
+    elif target.is_dir():
+        candidates = target.rglob("*")
+    else:
+        raise ValueError("Path is not a regular file or directory: {}".format(path))
+
+    yielded = 0
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        if any(part in IGNORED_PROJECT_DIRS for part in candidate.parts):
+            continue
+        if candidate.name.startswith(".env"):
+            continue
+        try:
+            candidate.resolve().relative_to(ROOT)
+        except ValueError:
+            continue
+        if suffixes and candidate.suffix.lower() not in suffixes:
+            continue
+        yield candidate
+        yielded += 1
+        if yielded >= max_files:
+            break
+
+
+def _python_ast(path):
+    file_path = safe_path(path)
+    if not file_path.is_file() or file_path.suffix.lower() != ".py":
+        raise ValueError("Expected a Python source file.")
+    if file_path.stat().st_size > MAX_FILE_SIZE:
+        raise ValueError("Python file exceeds the configured size limit.")
+    content = file_path.read_text(encoding="utf-8")
+    try:
+        return content, ast.parse(content, filename=str(file_path))
+    except SyntaxError as exc:
+        return content, exc
+
+
+def get_file_outline(path):
+    """Return imports, classes, functions and line ranges for a Python file."""
+    content, tree = _python_ast(path)
+    if isinstance(tree, SyntaxError):
+        return "Syntax error at line {}: {}".format(tree.lineno, tree.msg)
+    rows = ["File outline: {}".format(path)]
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            kind = "class" if isinstance(node, ast.ClassDef) else "function"
+            rows.append("{} {} (lines {}-{})".format(
+                kind, node.name, node.lineno,
+                getattr(node, "end_lineno", node.lineno)
+            ))
+            if isinstance(node, ast.ClassDef):
+                for child in node.body:
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        rows.append("  method {} (lines {}-{})".format(
+                            child.name, child.lineno,
+                            getattr(child, "end_lineno", child.lineno)
+                        ))
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            try:
+                text = ast.get_source_segment(content, node) or ""
+            except Exception:
+                text = ""
+            rows.append("import {}".format(text.strip()))
+    return "\n".join(rows) if len(rows) > 1 else "No top-level declarations found."
+
+
+def find_symbol(symbol, path="."):
+    """Find Python class/function/method/assignment definitions by name."""
+    if not isinstance(symbol, str) or not symbol.strip():
+        return "symbol must be a non-empty string."
+    matches = []
+    for file_path in _project_files(path, suffixes={".py"}):
+        try:
+            _, tree = _python_ast(relative_path(file_path))
+        except (OSError, UnicodeDecodeError, ValueError):
+            continue
+        if isinstance(tree, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            name = None
+            kind = None
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                name, kind = node.name, "function"
+            elif isinstance(node, ast.ClassDef):
+                name, kind = node.name, "class"
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                for target in targets:
+                    if isinstance(target, ast.Name) and target.id == symbol:
+                        name, kind = target.id, "assignment"
+                        break
+            if name == symbol:
+                matches.append("{}:{}: {} {}".format(
+                    relative_path(file_path), getattr(node, "lineno", 1),
+                    kind, name
+                ))
+    return "\n".join(matches) if matches else "No Python definition found for {!r}.".format(symbol)
+
+
+def find_references(symbol, path="."):
+    """Find textual references to a symbol in project text files."""
+    if not isinstance(symbol, str) or not symbol.strip():
+        return "symbol must be a non-empty string."
+    return search_files(symbol, path)
+
+
+def get_project_map(path="."):
+    """Summarize project directories, file types and common entry points."""
+    target = safe_path(path)
+    if not target.is_dir():
+        return "Project map path must be a directory."
+    files = list(_project_files(path, max_files=2000))
+    dirs = set()
+    extensions = {}
+    entrypoints = []
+    for file_path in files:
+        rel = pathlib.Path(relative_path(file_path))
+        for parent in rel.parents:
+            if str(parent) != ".":
+                dirs.add(str(parent))
+        ext = file_path.suffix.lower() or "[no extension]"
+        extensions[ext] = extensions.get(ext, 0) + 1
+        if file_path.name in ("main.py", "agent.py", "chat.py", "__main__.py", "app.py"):
+            entrypoints.append(str(rel))
+    rows = [
+        "Project map: {}".format(path),
+        "Files scanned: {}".format(len(files)),
+        "Directories: {}".format(", ".join(sorted(dirs)[:80]) or "(root only)"),
+        "File types: {}".format(", ".join(
+            "{} {}".format(ext, count)
+            for ext, count in sorted(extensions.items(), key=lambda item: (-item[1], item[0]))
+        ) or "(none)"),
+        "Likely entry points: {}".format(", ".join(sorted(entrypoints)) or "(not detected)")
+    ]
+    return "\n".join(rows)
+
+
+def get_test_map(path="."):
+    """Find test files and heuristically map them to source modules."""
+    target = safe_path(path)
+    if not target.is_dir():
+        return "Test map path must be a directory."
+    files = list(_project_files(path, max_files=2000))
+    test_files = [
+        f for f in files
+        if f.name.startswith("test_") or f.name.endswith("_test.py")
+        or "tests" in f.parts or "test" in f.parts
+    ]
+    source_files = [
+        f for f in files if f.suffix.lower() == ".py" and f not in test_files
+    ]
+    rows = ["Test files found: {}".format(len(test_files))]
+    for test_file in sorted(test_files)[:150]:
+        stem = test_file.stem
+        candidate = stem[5:] if stem.startswith("test_") else stem[:-5] if stem.endswith("_test") else ""
+        matches = [
+            relative_path(source) for source in source_files
+            if candidate and (
+                source.stem == candidate or
+                candidate in source.stem or source.stem in candidate
+            )
+        ]
+        rows.append("{} -> {}".format(
+            relative_path(test_file), ", ".join(matches[:5]) or "source mapping not obvious"
+        ))
+    return "\n".join(rows)
+
+
+def inspect_test_failure(output):
+    """Extract likely failing tests, assertions, errors and traceback locations."""
+    if not isinstance(output, str):
+        return "output must be a string containing test output."
+    lines = output.splitlines()
+    patterns = (
+        re.compile(r"^(FAIL|ERROR):\s+(.+)$"),
+        re.compile(r"^FAILED\s+(.+)$"),
+        re.compile(r"^E\s+(.+)$"),
+        re.compile(r"^(.+\.py:\d+):\s*(.+)$"),
+        re.compile(r"^AssertionError:.*$"),
+        re.compile(r"^(?:ImportError|ModuleNotFoundError|SyntaxError|TypeError|ValueError):.*$")
+    )
+    selected = []
+    for index, line in enumerate(lines):
+        if any(pattern.search(line.strip()) for pattern in patterns):
+            start = max(0, index - 2)
+            end = min(len(lines), index + 4)
+            for context_line in lines[start:end]:
+                if context_line not in selected:
+                    selected.append(context_line)
+    if not selected:
+        return "No common test failure markers found. Provide the complete test output or traceback."
+    return "Potential test failure details:\n" + "\n".join(selected[:100])
+
+
+def verify_changes(path=".", test_check="unittest"):
+    """Run Python compilation and a selected test suite with bounded execution."""
+    directory = safe_path(path)
+    if not directory.is_dir():
+        return "Verification path must be a directory."
+    if test_check not in ("unittest", "pytest", "none"):
+        return "test_check must be unittest, pytest, or none."
+    commands = [
+        ("compileall", ["python3", "-m", "compileall", "-q", "."])
+    ]
+    if test_check == "unittest":
+        commands.append(("unittest", [
+            "python3", "-m", "unittest", "discover", "-s", "test", "-p", "test_*.py"
+        ]))
+    elif test_check == "pytest":
+        commands.append(("pytest", ["python3", "-m", "pytest", "-q"]))
+    if not confirm_action(
+        "Run verification ({} ) in {}? [y/N/a=all]: ".format(
+            ", ".join(name for name, _ in commands), path
+        )
+    ):
+        return "User declined verification."
+    reports = []
+    for name, command in commands:
+        result = run_bounded_interruptible_command(
+            command, directory, TEST_EXECUTION["timeout_seconds"], TEST_EXECUTION
+        )
+        status = (
+            "TIMEOUT" if result["timed_out"] else
+            "PASS" if result["returncode"] == 0 else
+            "FAIL (exit {})".format(result["returncode"])
+        )
+        reports.append("{}: {}\n{}".format(
+            name, status, result["stdout"] + result["stderr"]
+        ))
+        if result["timed_out"] or result["returncode"] != 0:
+            break
+    return "\n\n".join(reports)
+
+
+def update_task_plan(steps):
+    """Set the visible in-memory task checklist for the current agent task."""
+    global TASK_PLAN
+    if not isinstance(steps, list) or not steps:
+        return "steps must be a non-empty array of task objects."
+    updated = []
+    for item in steps:
+        if not isinstance(item, dict):
+            return "Each step must be an object with title and status."
+        title = item.get("title")
+        status = item.get("status", "pending")
+        if not isinstance(title, str) or not title.strip():
+            return "Each task step needs a non-empty title."
+        if status not in ("pending", "in_progress", "completed", "blocked"):
+            return "Invalid task status for {!r}.".format(title)
+        updated.append({"title": title.strip(), "status": status})
+    TASK_PLAN = updated
+    return "Task plan updated:\n" + "\n".join(
+        "[{}] {}".format(
+            {"pending": " ", "in_progress": "~", "completed": "x", "blocked": "!"}[item["status"]],
+            item["title"]
+        ) for item in TASK_PLAN
+    )
+
 def git_status():
     LOGGER.debug("Running git status cwd=%s timeout=%ss",
                  ROOT, TOOL_SAFEGUARDS["git_status_timeout_seconds"])
@@ -1121,7 +1408,10 @@ def patch_file(path, old_text, new_text):
         return "old_text must not be empty."
     count = original.count(old_text)
     if count != 1:
-        return "Patch not applied: old_text must match exactly once (found {}).".format(count)
+        return ("Patch not applied: old_text must match exactly once (found {}). "
+                "No file changes were made. Re-read the current file; check indentation, "
+                "whitespace and line endings. For a reliable positional edit, use "
+                "replace_lines with the current 1-based line range.").format(count)
     updated = original.replace(old_text, new_text, 1)
     diff = "".join(difflib.unified_diff(
         original.splitlines(True), updated.splitlines(True),
@@ -1149,6 +1439,74 @@ def patch_file(path, old_text, new_text):
     except Exception as exc:
         return "Patch failed; original file preserved: {}".format(exc)
     return "Successfully patched {}. Backup: {}".format(path, str(backup) if backup else "not needed")
+
+
+def replace_lines(path, start_line, end_line, new_text):
+    """Replace a 1-based inclusive line range, avoiding fragile text matching."""
+    if isinstance(start_line, bool) or not isinstance(start_line, int) or start_line < 1:
+        return "start_line must be a positive 1-based line number."
+    if isinstance(end_line, bool) or not isinstance(end_line, int) or end_line < start_line:
+        return "end_line must be an integer greater than or equal to start_line."
+    if not isinstance(new_text, str):
+        return "new_text must be a string."
+
+    file_path = safe_path(path)
+    if not file_path.is_file():
+        return "Target file does not exist."
+    if file_path.stat().st_size > MAX_FILE_SIZE:
+        return "Existing file is too large."
+    try:
+        original = file_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return "Cannot read target safely: {}".format(exc)
+
+    lines = original.splitlines(True)
+    if end_line > len(lines):
+        return "Line range {}-{} exceeds file length ({} lines).".format(
+            start_line, end_line, len(lines)
+        )
+
+    replacement = new_text
+    if replacement and not replacement.endswith(("\n", "\r")):
+        replacement += "\n"
+    updated = "".join(lines[:start_line - 1]) + replacement + "".join(lines[end_line:])
+    if updated == original:
+        return "No changes: replacement is identical to the selected lines."
+
+    diff = "".join(difflib.unified_diff(
+        original.splitlines(True), updated.splitlines(True),
+        fromfile="before/" + path, tofile="after/" + path
+    ))
+    risk = _file_change_risk(original, updated)
+    print_change_preview(
+        diff, "Line-range replacement",
+        "Replaced lines {}-{}; file lines: {} -> {}; bytes: {} -> {}".format(
+            start_line, end_line, risk["old_lines"], risk["new_lines"],
+            risk["old_bytes"], risk["new_bytes"]
+        ),
+        CONFIG_FILE,
+    )
+    risky = risk["deletion_ratio"] > 0.25 or risk["size_reduction"] > 0.25
+    if risky:
+        print("Risk warning: patch removes {} of {} lines ({:.1%}).".format(
+            risk["removed_lines"], risk["old_lines"], risk["deletion_ratio"]
+        ))
+        approved = _explicit_file_approval(
+            "This is a risky edit. Explicitly approve? [y/N]: "
+        )
+    else:
+        approved = confirm_action("Apply this line-range replacement? [y/N/a=all]: ")
+    if not approved:
+        return "User declined line-range replacement. File was not changed."
+
+    try:
+        backup = _atomic_replace_file(file_path, updated)
+    except Exception as exc:
+        LOGGER.exception("Line-range replacement failed path=%s", path)
+        return "Replacement failed; original preserved: {}".format(exc)
+    return "Successfully replaced lines {}-{} in {}. Backup: {}".format(
+        start_line, end_line, path, str(backup) if backup else "not needed"
+    )
 
 
 def edit_file(path, content):
@@ -1410,6 +1768,103 @@ FUNCTIONS = [
                 "required": ["check", "path"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "replace_lines",
+            "description": "Replace a 1-based inclusive line range in a project file. Prefer this when exact patch text is failing due to indentation or whitespace. Read the file first, use its actual line numbers, and provide the complete replacement text for the selected range. The user must approve the displayed diff.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "start_line": {"type": "integer", "minimum": 1},
+                    "end_line": {"type": "integer", "minimum": 1},
+                    "new_text": {"type": "string"}
+                },
+                "required": ["path", "start_line", "end_line", "new_text"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_file_outline",
+            "description": "For a Python file, return top-level imports, classes, functions and methods with line ranges. Use this before reading a large source file.",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_symbol",
+            "description": "Find Python definitions of a class, function, method or assignment by exact name under a project file or directory.",
+            "parameters": {"type": "object", "properties": {"symbol": {"type": "string"}, "path": {"type": "string"}}, "required": ["symbol", "path"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_references",
+            "description": "Search project text files for usages of a symbol. This is a textual search, not a semantic language-server reference search.",
+            "parameters": {"type": "object", "properties": {"symbol": {"type": "string"}, "path": {"type": "string"}}, "required": ["symbol", "path"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "verify_changes",
+            "description": "Run Python compileall and optionally unittest or pytest in a project directory. Requires user approval and uses configured time/output limits.",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "test_check": {"type": "string", "enum": ["unittest", "pytest", "none"]}}, "required": ["path", "test_check"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "inspect_test_failure",
+            "description": "Extract likely failing test names, assertion errors, tracebacks and relevant context from supplied test output. Does not execute tests.",
+            "parameters": {"type": "object", "properties": {"output": {"type": "string"}}, "required": ["output"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_project_map",
+            "description": "Summarize project directories, file types and likely Python entry points. Skips generated and dependency directories.",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_test_map",
+            "description": "List test files and heuristically map their names to likely source modules. Treat mappings as hints, not proof.",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_task_plan",
+            "description": "Create or update the visible task checklist. Supply the complete current list; statuses are pending, in_progress, completed, or blocked. Update it as work progresses.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "blocked"]}
+                            },
+                            "required": ["title", "status"]
+                        }
+                    }
+                },
+                "required": ["steps"]
+            }
+        }
     }
 ]
 
@@ -1421,7 +1876,16 @@ TOOL_DISPATCH = {
     "git_diff": git_diff,
     "edit_file": edit_file,
     "patch_file": patch_file,
-    "run_checks": run_checks
+    "run_checks": run_checks,
+    "replace_lines": replace_lines,
+    "get_file_outline": get_file_outline,
+    "find_symbol": find_symbol,
+    "find_references": find_references,
+    "verify_changes": verify_changes,
+    "inspect_test_failure": inspect_test_failure,
+    "get_project_map": get_project_map,
+    "get_test_map": get_test_map,
+    "update_task_plan": update_task_plan
 }
 
 
@@ -1819,6 +2283,42 @@ def handle_tool_selection(name, args, call_tracker, invalid_tool_counter,
     return result, False
 
 
+
+def _tool_result_is_error(name, result):
+    """Recognize actionable tool failures returned as human-readable strings."""
+    prefixes = {
+        "list_files": ("Not a directory.",),
+        "read_file": (
+            "File does not exist.", "File is too large", "Invalid offset:",
+            "Invalid limit:", "Requested limit", "Offset ",
+            "File is not UTF-8 text.", "Unable to read file:",
+        ),
+        "patch_file": (
+            "Patch not applied:", "Target file does not exist.",
+            "Cannot read target safely:", "Patch failed;",
+        ),
+        "replace_lines": (
+            "start_line must", "end_line must", "new_text must",
+            "Target file does not exist.", "Existing file is too large.",
+            "Line range ", "Cannot read target safely:", "Replacement failed;",
+        ),
+        "edit_file": (
+            "File content must", "Target is not a regular file.",
+            "Existing file is too large.", "Cannot safely edit",
+            "Validation failed", "File replacement failed;",
+        ),
+        "run_checks": ("Check path is not a directory.", "Unsupported check."),
+        "verify_changes": ("Verification path must", "test_check must"),
+        "get_file_outline": ("Expected a Python source file.", "Python file exceeds"),
+        "find_symbol": ("symbol must be a non-empty string.",),
+        "find_references": ("symbol must be a non-empty string.",),
+        "get_project_map": ("Project map path must be a directory.",),
+        "get_test_map": ("Test map path must be a directory.",),
+        "inspect_test_failure": ("output must be a string",),
+        "update_task_plan": ("steps must be", "Each step must be", "Each task step", "Invalid task status"),
+    }
+    return any(result.startswith(prefix) for prefix in prefixes.get(name, ()))
+
 def execute_tool(name, args):
     function = TOOL_DISPATCH.get(name)
     LOGGER.debug("Tool execution start name=%s argument_keys=%s",
@@ -1834,6 +2334,16 @@ def execute_tool(name, args):
                      name, time.time() - started, type(result).__name__)
         if isinstance(result, dict) and result.get("error"):
             return result
+        if isinstance(result, str) and _tool_result_is_error(name, result):
+            LOGGER.warning("Tool returned failure name=%s details=%s", name, result[:1000])
+            failure = {"error": result}
+            if name == "patch_file" and result.startswith("Patch not applied:"):
+                failure["suggested_tool"] = "replace_lines"
+                failure["instruction"] = (
+                    "Do not repeat this exact patch. Read the current file lines, "
+                    "then use replace_lines with the current 1-based line range."
+                )
+            return failure
         return {"result": result}
     except IterationInterrupted:
         raise
