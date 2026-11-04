@@ -37,3 +37,17 @@ The eight priority tools and `replace_lines` are registered in the model-facing 
 - Detect repeated calls that return the same error or no new information, without blocking legitimate calls with different parameters.
 - Keep user-visible action/status messages and diagnostic logs useful.
 - Report verification only when the checks actually ran.
+
+
+## Planned capability design documents
+
+1. [LLM clarification questions](LLM_CLARIFICATION_QUESTIONS.md) — pause to
+   resolve ambiguity, collect answers and resume the same task.
+2. [Controlled command-line execution](CONTROLLED_COMMAND_EXECUTION.md) —
+   allowlisted `git`, `grep`, `sed`, `python` and related commands in a bounded
+   project environment.
+3. [Project path access control](PROJECT_PATH_ACCESS_CONTROL.md) — independent
+   view, edit, truncate and delete permissions with per-path rules.
+
+These are roadmap specifications only; none of the three capabilities is
+represented as implemented in the current tool registry.

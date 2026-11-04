@@ -62,9 +62,9 @@ sh ./run_all_tests.sh
 - [Future tools roadmap](docs/roadmap/TOOLS_ROADMAP.md)
 
 
-During agent/code requests, Shai keeps a pinned live status area at the bottom
-of interactive terminals. Tool activity, context-window usage, and the task
-checklist update in place while normal conversation output scrolls above it.
+During agent/code requests, Shai keeps a transient tool-activity line in
+interactive terminals. Consecutive tool calls update it in place while normal
+conversation output continues to scroll naturally.
 
 
 ## Terminal colours (iSH / ANSI)
@@ -77,3 +77,6 @@ activity line; ordinary chat continues to scroll normally.
 Colour detection is automatic for TTY output. Disable colours with
 `NO_COLOR=1`, `TERM=dumb`, or `SHAI_COLOR=0`; force-enable on a compatible
 terminal with `SHAI_COLOR=1` when automatic TTY detection is insufficient.
+
+
+See [Tools documentation](docs/TOOLS.md) for granular approval settings and the [tools roadmap](docs/roadmap/TOOLS_ROADMAP.md) for planned capabilities.

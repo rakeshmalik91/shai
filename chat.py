@@ -49,6 +49,11 @@ configure_tools_root(ROOT)
 CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
 DEFAULT_API_TIMEOUT_SECONDS = 300
 
+# Define the logger before loading configuration: API_TIMEOUT_SECONDS is
+# initialized at import time and load_config() may need to report bad JSON.
+LOGGER = get_logger("shai.chat")
+
+
 def load_config():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as handle:
@@ -67,8 +72,6 @@ def load_api_timeout_seconds():
     return value
 
 API_TIMEOUT_SECONDS = load_api_timeout_seconds()
-LOGGER = get_logger("shai.chat")
-DEFAULT_API_TIMEOUT_SECONDS = 300
 MAX_FILE_SIZE = 200_000
 
 

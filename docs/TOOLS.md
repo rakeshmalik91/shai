@@ -33,7 +33,11 @@ The eight priority tools are `get_file_outline`, `find_symbol`, `find_references
 | `patch_file` | `path`, `old_text`, `new_text` | Replace one exact text block, only when it matches exactly once. |
 | `replace_lines` | `path`, `start_line`, `end_line`, `new_text` | Replace a 1-based inclusive line range. Useful when exact matching fails because of indentation or whitespace. |
 
-File modifications are previewed and require approval according to the configured approval settings. Risky changes require explicit approval. Original files are backed up before atomic replacement.
+File modifications are previewed and require approval according to the granular
+`approve` settings in `shai_config.json`. Risky truncations/deletions require an
+explicit category or tool approval (or an interactive confirmation); the global
+`approve.all` setting alone does not bypass high-risk file checks. Original files
+are backed up before atomic replacement.
 
 **Editing guidance:** read the current file before editing. If `patch_file` reports zero or multiple matches, do not repeat the same patch. Re-read the relevant lines and use `replace_lines` with the current line numbers.
 
@@ -54,7 +58,9 @@ These tools do not commit, push or rewrite Git history.
 | `verify_changes` | `path`, `test_check` | Run Python compilation and optionally `unittest` or `pytest` as a combined verification pass. |
 | `inspect_test_failure` | `output` | Extract likely failing tests, assertions, exception types and traceback context from supplied output. It does not run tests. |
 
-Verification and command execution require approval unless the configured session approval setting permits them. Execution is bounded by configured timeout and output limits.
+Verification and command execution require approval unless the `execution`
+category or the specific tool override permits them. Execution is bounded by
+configured timeout and output limits.
 
 ## Safeguards and supporting capabilities
 
@@ -87,7 +93,43 @@ The pre-request estimate is heuristic and should not be treated as tokenizer-exa
 
 ## Live tool activity display
 
-Tool activity is shown in the pinned terminal status dashboard rather than as
-a new block of output for every invocation. Context usage, current/last tool,
-tool count, and task-plan statuses update in place. Normal assistant messages
-and errors remain in the scrolling output area.
+Tool activity is shown on a transient terminal status line. Consecutive calls
+rewrite the same line in place; repeated calls to the same tool are summarized
+with a call count. Tool errors are buffered until the batch line is closed, so
+they cannot collide with the status text. Interactive prompts and file previews
+suspend the transient line before writing ordinary terminal output. Normal
+assistant messages continue to scroll naturally.
+
+
+## Granular approval configuration
+
+```json
+{
+  "approve": {
+    "all": false,
+    "file_edit": false,
+    "file_delete": false,
+    "file_truncate": false,
+    "execution": false,
+    "git_commit": false,
+    "git_push": false,
+    "tools": {
+      "run_checks": true
+    }
+  }
+}
+```
+
+Approval precedence is an explicitly configured `approve.tools.<tool>` entry
+first, then an explicitly configured action category, then `approve.all`, then
+an interactive prompt. Add only the tool overrides you actually want; an
+explicit per-tool or category `false` overrides a broader `true`. For example,
+`"tools": {"run_checks": true}` approves only `run_checks` even if the broader
+`execution` category is false. High-risk truncation/deletion
+ignores `approve.all`; it requires an explicit category/tool `true` or a
+one-time interactive confirmation. The legacy `yes_to_all` key is read for
+backward compatibility and is migrated to `approve.all` when saved.
+
+`file_delete` and Git approval categories are reserved for the corresponding
+operations as they are introduced or wired into commands. Current tools do not
+expose a general-purpose delete-file or arbitrary shell command.

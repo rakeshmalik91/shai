@@ -14,7 +14,7 @@
       "run_checks": true,
       "edit_file": false
     }
-  }
+  },
   "api_timeout_seconds": 300,
   "commit_message": {
     "provider": "",
