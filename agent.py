@@ -23,7 +23,7 @@ import math
 import tty
 import _thread
 
-from chat import Spinner, extract_anthropic_response
+from chat import Spinner, extract_anthropic_response, response_text
 from modules.provider_selection import PROVIDERS, initialize_provider
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
@@ -3107,8 +3107,11 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("Commands: /help /model /status /files /diff /reset /exit")
+    print("Commands: /help /model /status /files /diff /reset /ask /code /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
+
+    # Mode: "agent" (with tools) or "ask" (chat only, no tools)
+    mode = "agent"
 
     while True:
         try:
@@ -3161,6 +3164,8 @@ Commands:
   /files   - List project files
   /diff    - Show Git diff
   /reset   - Clear conversation history
+  /ask     - Switch to ask mode (chat only, no tools)
+  /code    - Switch to code mode (agent with tools)
   /exit    - Exit Shai
 
 Press Ctrl+D while Shai is processing to cancel the current iteration
@@ -3203,8 +3208,80 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                 print("Conversation history cleared.")
                 continue
 
+            if user_text == "/ask":
+                if mode == "ask":
+                    print("[Shai] Already in ask mode.")
+                else:
+                    mode = "ask"
+                    print("[Shai] Switched to ask mode (chat only, no tools).")
+                continue
+
+            if user_text == "/code":
+                if mode == "agent":
+                    print("[Shai] Already in code mode.")
+                else:
+                    mode = "agent"
+                    print("[Shai] Switched to code mode (agent with tools).")
+                continue
+
             try:
-                ask_model(history, user_text)
+                if mode == "ask":
+                    # Chat mode: simple request without tools
+                    history.append({"role": "user", "content": user_text})
+                    safeguards = load_config().get("agent_safeguards", {})
+                    if safeguards.get("enabled", True) is not False:
+                        def history_limit(key, default):
+                            value = safeguards.get(key, default)
+                            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                                return default
+                            return value
+                        history = compact_conversation_history(
+                            history,
+                            max_chars=history_limit("max_history_chars", 90000),
+                            max_tool_result_chars=history_limit("max_tool_result_chars", 8000),
+                            keep_recent_turns=history_limit("keep_recent_turns", 4),
+                            max_recent_tool_cycles=history_limit("max_recent_tool_cycles", 6)
+                        )
+                    history_store.save(history, provider=PROVIDER, model=MODEL)
+                    context_limit = get_context_window(PROVIDER, MODEL, load_config())
+                    estimated_prompt_tokens = estimate_messages_tokens(history)
+                    context_status = format_context_status(
+                        estimated_prompt_tokens, context_limit
+                    )
+                    LOGGER.debug(
+                        "Ask mode context estimate provider=%s model=%s estimated_prompt_tokens=%d "
+                        "context_limit=%s history_messages=%d",
+                        PROVIDER, MODEL, estimated_prompt_tokens, context_limit, len(history)
+                    )
+                    print("\n[Shai] {}".format(context_status))
+                    spinner = Spinner("Shai is thinking | " + context_status)
+                    spinner.start()
+                    LOGGER.info("Ask mode turn started provider=%s model=%s user_chars=%d history_messages=%d",
+                                PROVIDER, MODEL, len(user_text), len(history))
+                    try:
+                        response = api_request(history)
+                        log_and_display_usage(
+                            LOGGER, response, PROVIDERS[PROVIDER]["format"],
+                            estimated_prompt_tokens, context_limit
+                        )
+                        display_reasoning_summary(PROVIDER, response)
+                        answer = response_text(response, PROVIDER)
+                        LOGGER.debug("Ask mode response parsed answer_chars=%d", len(answer or ""))
+                    except Exception as error:
+                        LOGGER.exception("Ask mode turn failed provider=%s model=%s", PROVIDER, MODEL)
+                        answer = None
+                        print("\nError:", error)
+                    finally:
+                        spinner.stop()
+
+                    if answer:
+                        LOGGER.info("Ask mode turn completed answer_chars=%d", len(answer))
+                        print("\n" + answer)
+                        history.append({"role": "assistant", "content": answer})
+                        history_store.save(history, provider=PROVIDER, model=MODEL)
+                else:
+                    # Agent mode: full ask_model with tools
+                    ask_model(history, user_text)
             except Exception as error:
                 LOGGER.exception("Unhandled agent request error")
                 print("\nError:", error)
