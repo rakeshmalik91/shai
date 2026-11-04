@@ -67,5 +67,16 @@
     "max_diff_chars": 16000,
     "preserve_head_lines": 90,
     "preserve_tail_lines": 40
+  },
+  "agent_safeguards": {
+    "enabled": true,
+    "max_history_chars": 90000,
+    "max_tool_result_chars": 8000,
+    "keep_recent_turns": 4,
+    "max_recent_tool_cycles": 6,
+    "max_consecutive_no_progress_iterations": 3,
+    "max_tool_calls_per_request": 80,
+    "validate_tool_arguments": true,
+    "reject_unknown_tool_arguments": true
   }
 }

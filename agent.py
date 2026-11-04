@@ -25,6 +25,9 @@ from modules.logging_config import init_default_logging, get_logger, log_api_pay
 from modules.reasoning_handlers import display_reasoning_summary
 from modules.conversation_history import ConversationHistory, input_with_history
 from modules.file_change_display import print_change_preview
+from modules.agent_safeguards import (
+    bound_tool_result, compact_conversation_history, validate_tool_arguments
+)
 
 # -------------------------------------------------------------------
 # Configuration
@@ -121,6 +124,45 @@ def load_tool_safeguards():
 
 
 TOOL_SAFEGUARDS = load_tool_safeguards()
+
+
+DEFAULT_AGENT_SAFEGUARDS = {
+    "enabled": True,
+    "max_history_chars": 90000,
+    "max_tool_result_chars": 8000,
+    "keep_recent_turns": 4,
+    "max_recent_tool_cycles": 6,
+    "max_consecutive_no_progress_iterations": 3,
+    "max_tool_calls_per_request": 80,
+    "validate_tool_arguments": True,
+    "reject_unknown_tool_arguments": True
+}
+
+
+def load_agent_safeguards():
+    config = load_config()
+    supplied = config.get("agent_safeguards", {})
+    settings = dict(DEFAULT_AGENT_SAFEGUARDS)
+    if isinstance(supplied, dict):
+        settings.update(supplied)
+    settings["enabled"] = settings.get("enabled") is not False
+    for key in (
+        "max_history_chars", "max_tool_result_chars", "keep_recent_turns",
+        "max_recent_tool_cycles", "max_consecutive_no_progress_iterations",
+        "max_tool_calls_per_request"
+    ):
+        value = settings.get(key, DEFAULT_AGENT_SAFEGUARDS[key])
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            value = DEFAULT_AGENT_SAFEGUARDS[key]
+        settings[key] = value
+    for key in (
+        "validate_tool_arguments", "reject_unknown_tool_arguments"
+    ):
+        settings[key] = settings.get(key) is True
+    return settings
+
+
+AGENT_SAFEGUARDS = load_agent_safeguards()
 
 
 DEFAULT_TEST_EXECUTION = {
@@ -1261,6 +1303,7 @@ TOOL_DISPATCH = {
     "git_status": git_status,
     "git_diff": git_diff,
     "edit_file": edit_file,
+    "patch_file": patch_file,
     "run_checks": run_checks
 }
 
@@ -1602,6 +1645,30 @@ def handle_tool_selection(name, args, call_tracker, invalid_tool_counter):
             )
         return result, should_abort
 
+    if AGENT_SAFEGUARDS["validate_tool_arguments"]:
+        validation_error = validate_tool_arguments(
+            resolved_name, args, FUNCTIONS,
+            reject_unknown=AGENT_SAFEGUARDS["reject_unknown_tool_arguments"]
+        )
+        if validation_error:
+            invalid_tool_counter["count"] += 1
+            count = invalid_tool_counter["count"]
+            limit = RETRY_SETTINGS["invalid_tool_selection_max_attempts"]
+            result = {
+                "error": "Invalid arguments for {}: {}".format(
+                    resolved_name, validation_error
+                ),
+                "instruction": (
+                    "Correct the arguments to match the advertised schema. "
+                    "Do not add unsupported parameters. Invalid argument "
+                    "attempt {}/{}."
+                ).format(count, limit)
+            }
+            return result, (
+                RETRY_SETTINGS["invalid_tool_selection_enabled"]
+                and count >= limit
+            )
+
     result = execute_tool_with_safeguards(resolved_name, args, call_tracker)
     if resolved_name != name:
         if isinstance(result, dict):
@@ -1854,6 +1921,9 @@ def _ask_model_impl(history, user_text):
     call_tracker = {}
     invalid_tool_counter = {"count": 0}
     invalid_tool_recovery_attempts = 0
+    no_progress_count = 0
+    recent_tool_batches = []
+    total_tool_calls = 0
     history.append({
         "role": "user",
         "content": user_text
@@ -1862,8 +1932,28 @@ def _ask_model_impl(history, user_text):
     LOGGER.info("Agent request started provider=%s model=%s user_chars=%d history_messages=%d",
                 PROVIDER, MODEL, len(user_text), len(history))
     for iteration in range(MAX_ITERATIONS):
-        LOGGER.debug("Agent iteration %d/%d history_messages=%d",
-                     iteration + 1, MAX_ITERATIONS, len(history))
+        if AGENT_SAFEGUARDS["enabled"]:
+            original_chars = len(json.dumps(history, ensure_ascii=False))
+            compacted = compact_conversation_history(
+                history,
+                max_chars=AGENT_SAFEGUARDS["max_history_chars"],
+                max_tool_result_chars=AGENT_SAFEGUARDS["max_tool_result_chars"],
+                keep_recent_turns=AGENT_SAFEGUARDS["keep_recent_turns"],
+                max_recent_tool_cycles=AGENT_SAFEGUARDS["max_recent_tool_cycles"]
+            )
+            history[:] = compacted
+            compacted_chars = len(json.dumps(history, ensure_ascii=False))
+            if compacted_chars < original_chars:
+                LOGGER.warning(
+                    "Compacted conversation history chars=%d->%d messages=%d",
+                    original_chars, compacted_chars, len(history)
+                )
+        iteration_tool_signatures = []
+        iteration_tool_errors = False
+        tool_limit_reached = False
+        LOGGER.debug("Agent iteration %d/%d history_messages=%d history_chars=%d",
+                     iteration + 1, MAX_ITERATIONS, len(history),
+                     len(json.dumps(history, ensure_ascii=False)))
         spinner = Spinner("Shai is thinking")
         spinner.start()
 
@@ -1932,17 +2022,44 @@ def _ask_model_impl(history, user_text):
         if provider_format == "anthropic":
             stop_reason = response.get("stop_reason")
             if stop_reason in ("max_tokens", "model_context_window_exceeded"):
+                LOGGER.warning("Stopping request because provider response was truncated stop_reason=%s", stop_reason)
                 print("\\n[Shai] Response was truncated by the provider ({}). "
-                      "No tool calls or file edits from this response were applied.".format(stop_reason))
-                continue
+                      "No tool calls or file edits from this response were applied. "
+                      "The request has been stopped to avoid a retry loop; "
+                      "try asking for a smaller change.".format(stop_reason))
+                history.append({
+                    "role": "assistant",
+                    "content": "[Shai stopped because the provider truncated the response; no partial tool calls were executed.]"
+                })
+                return
         else:
             response_choices = response.get("choices", [])
-            finish_reason = (response_choices[0].get("finish_reason")
-                             if response_choices else None)
-            if finish_reason in ("length", "max_tokens"):
+            choice = response_choices[0] if response_choices else {}
+            finish_reason = choice.get("finish_reason")
+            native_finish_reason = choice.get("native_finish_reason")
+            normalized_finish = str(finish_reason or "").lower()
+            normalized_native_finish = str(native_finish_reason or "").lower()
+            truncated_reason = (
+                normalized_finish if normalized_finish in ("length", "max_tokens")
+                else normalized_native_finish
+                if normalized_native_finish in ("length", "max_tokens")
+                else None
+            )
+            if truncated_reason:
+                LOGGER.warning(
+                    "Stopping request because provider response was truncated "
+                    "finish_reason=%s native_finish_reason=%s",
+                    finish_reason, native_finish_reason
+                )
                 print("\\n[Shai] Response was truncated by the provider ({}). "
-                      "No tool calls or file edits from this response were applied.".format(finish_reason))
-                continue
+                      "No tool calls or file edits from this response were applied. "
+                      "The request has been stopped to avoid a retry loop; "
+                      "try asking for a smaller change.".format(truncated_reason))
+                history.append({
+                    "role": "assistant",
+                    "content": "[Shai stopped because the provider truncated the response; no partial tool calls were executed.]"
+                })
+                return
 
         if provider_format == "anthropic":
             text, tool_uses = extract_anthropic_response(response)
@@ -1968,22 +2085,31 @@ def _ask_model_impl(history, user_text):
                 name = tool_use.get("name")
                 args = tool_use.get("input", {})
                 tool_use_id = tool_use.get("id")
+                iteration_tool_signatures.append(_tool_call_signature(name, args))
+                total_tool_calls += 1
 
                 print("\n[Shai tool] " + str(name))
                 print(json.dumps(args, ensure_ascii=False)[:500])
 
-                if not isinstance(args, dict):
+                if total_tool_calls > AGENT_SAFEGUARDS["max_tool_calls_per_request"]:
+                    result = {"error": "Per-request tool-call limit reached; stopping this request."}
+                    tool_limit_reached = True
+                elif not isinstance(args, dict):
                     result = {"error": "Tool arguments must be an object."}
                 else:
                     result, should_abort = handle_tool_selection(
                         name, args, call_tracker, invalid_tool_counter
                     )
                     abort_for_invalid_tool = abort_for_invalid_tool or should_abort
+                if isinstance(result, dict) and result.get("error"):
+                    iteration_tool_errors = True
 
                 tool_result = {
                     "type": "tool_result",
                     "tool_use_id": tool_use_id,
-                    "content": json.dumps(result, ensure_ascii=False)
+                    "content": bound_tool_result(
+                        result, AGENT_SAFEGUARDS["max_tool_result_chars"]
+                    )
                 }
                 if isinstance(result, dict) and "allowed_tools" in result:
                     tool_result["is_error"] = True
@@ -2029,6 +2155,7 @@ def _ask_model_impl(history, user_text):
 
                 print("\n[Shai tool] " + str(name))
 
+                call_signature_added = False
                 try:
                     args = json.loads(raw_args)
 
@@ -2038,26 +2165,68 @@ def _ask_model_impl(history, user_text):
                         )
 
                     print(json.dumps(args, ensure_ascii=False)[:500])
-                    result, should_abort = handle_tool_selection(
-                        name, args, call_tracker, invalid_tool_counter
-                    )
-                    abort_for_invalid_tool = abort_for_invalid_tool or should_abort
+                    iteration_tool_signatures.append(_tool_call_signature(name, args))
+                    call_signature_added = True
+                    total_tool_calls += 1
+                    if total_tool_calls > AGENT_SAFEGUARDS["max_tool_calls_per_request"]:
+                        result = {"error": "Per-request tool-call limit reached; stopping this request."}
+                        tool_limit_reached = True
+                    else:
+                        result, should_abort = handle_tool_selection(
+                            name, args, call_tracker, invalid_tool_counter
+                        )
+                        abort_for_invalid_tool = abort_for_invalid_tool or should_abort
+                    if isinstance(result, dict) and result.get("error"):
+                        iteration_tool_errors = True
 
                 except IterationInterrupted:
                     raise
                 except Exception as error:
+                    if not call_signature_added:
+                        iteration_tool_signatures.append(
+                            _tool_call_signature(name, raw_args)
+                        )
+                        total_tool_calls += 1
+                    iteration_tool_errors = True
                     result = {"error": str(error)}
 
                 history.append({
                     "role": "tool",
                     "tool_call_id": call_id,
-                    "content": json.dumps(result, ensure_ascii=False)
+                    "content": bound_tool_result(
+                        result, AGENT_SAFEGUARDS["max_tool_result_chars"]
+                    )
                 })
 
             if abort_for_invalid_tool:
                 raise ToolSelectionFailure(
                     "The model repeatedly selected unavailable tools."
                 )
+
+        if iteration_tool_signatures:
+            batch_signature = tuple(iteration_tool_signatures)
+            repeated_batch = batch_signature in recent_tool_batches[-3:]
+            if repeated_batch or iteration_tool_errors:
+                no_progress_count += 1
+            else:
+                no_progress_count = 0
+            recent_tool_batches.append(batch_signature)
+            recent_tool_batches = recent_tool_batches[-4:]
+            LOGGER.info(
+                "Agent progress check no_progress=%d repeated_batch=%s "
+                "tool_errors=%s total_tool_calls=%d",
+                no_progress_count, repeated_batch, iteration_tool_errors,
+                total_tool_calls
+            )
+            if tool_limit_reached or total_tool_calls >= AGENT_SAFEGUARDS["max_tool_calls_per_request"]:
+                print("\n[Shai] Per-request tool-call limit reached. Stopping to prevent an unbounded loop.")
+                return
+            if no_progress_count >= AGENT_SAFEGUARDS["max_consecutive_no_progress_iterations"]:
+                LOGGER.warning("Stopping agent after %d consecutive no-progress iterations",
+                               no_progress_count)
+                print("\n[Shai] The agent is repeating tool calls or receiving errors without progress. "
+                      "Stopping this request to prevent a loop.")
+                return
 
     print("\nAgent stopped: maximum tool-call iterations reached.")
 

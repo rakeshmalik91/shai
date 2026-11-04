@@ -6,8 +6,17 @@ import unittest
 from unittest import mock
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+PROJECT_ROOT_STRING = str(PROJECT_ROOT)
+if PROJECT_ROOT_STRING in sys.path:
+    sys.path.remove(PROJECT_ROOT_STRING)
+sys.path.insert(0, PROJECT_ROOT_STRING)
+
+# Avoid picking up an unrelated agent.py from a parent working directory.
+_existing_agent = sys.modules.get("agent")
+if _existing_agent is not None:
+    _loaded_from = pathlib.Path(getattr(_existing_agent, "__file__", "")).resolve()
+    if _loaded_from.parent != PROJECT_ROOT:
+        del sys.modules["agent"]
 
 import agent
 

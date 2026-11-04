@@ -315,3 +315,41 @@ python3 -m unittest discover -s test -p 'test_*.py' -v
 ## License
 
 MIT License. Add or retain the project's `LICENSE` file when distributing the source.
+
+
+## Agent-loop and context safeguards
+
+Shai bounds conversation history and tool output to avoid runaway API payloads.
+The settings are shared by agent and chat modes:
+
+```json
+"agent_safeguards": {
+  "enabled": true,
+  "max_history_chars": 90000,
+  "max_tool_result_chars": 8000,
+  "keep_recent_turns": 4,
+  "max_recent_tool_cycles": 6,
+  "max_consecutive_no_progress_iterations": 3,
+  "max_tool_calls_per_request": 80,
+  "validate_tool_arguments": true,
+  "reject_unknown_tool_arguments": true
+}
+```
+
+- `max_history_chars` bounds the serialized conversation sent to the provider.
+  Older turns are summarized and old tool-call cycles are removed as complete
+  units; the latest user request is retained.
+- `max_tool_result_chars` limits each saved tool result while preserving its
+  beginning and end.
+- `max_consecutive_no_progress_iterations` stops repeated tool-call batches or
+  consecutive tool-error iterations.
+- `max_tool_calls_per_request` places a hard ceiling on tool executions in a
+  single user request.
+- Tool arguments are checked against the same JSON schemas sent to the provider.
+  Unknown parameters and incorrect types are rejected before tool execution.
+- A provider response ending with `length` or `max_tokens` (including a native
+  finish reason) stops the current request immediately. Shai never executes
+  incomplete tool arguments or blindly resends the same oversized request.
+
+The `patch_file` tool is registered for execution and uses its exact
+`path`, `old_text`, and `new_text` schema.

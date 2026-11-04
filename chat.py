@@ -22,6 +22,7 @@ from modules.provider_selection import PROVIDERS, initialize_provider
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
 from modules.conversation_history import ConversationHistory, input_with_history
+from modules.agent_safeguards import compact_conversation_history
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
 LOGGER = get_logger("shai.chat")
@@ -409,6 +410,20 @@ def main():
             continue
 
         history.append({"role": "user", "content": user_text})
+        safeguards = load_config().get("agent_safeguards", {})
+        if safeguards.get("enabled", True) is not False:
+            def history_limit(key, default):
+                value = safeguards.get(key, default)
+                if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                    return default
+                return value
+            history = compact_conversation_history(
+                history,
+                max_chars=history_limit("max_history_chars", 90000),
+                max_tool_result_chars=history_limit("max_tool_result_chars", 8000),
+                keep_recent_turns=history_limit("keep_recent_turns", 4),
+                max_recent_tool_cycles=history_limit("max_recent_tool_cycles", 6)
+            )
         history_store.save(history, provider=provider, model=model)
         spinner = Spinner("Shai is thinking")
         spinner.start()
