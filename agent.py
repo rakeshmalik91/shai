@@ -3737,11 +3737,9 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                         print("  [{}] {}".format(status_char, item["title"]))
                 continue
 
-            if user_text.startswith("/commit"):
+            if user_text == "/commit-push":
                 try:
-                    parts = user_text.split()
-                    message_only = "--message-only" in parts
-                    print(git_commit(message_only=message_only))
+                    print(git_commit_push())
                 except IterationInterrupted:
                     print("\n[Shai] Command interrupted.")
                 continue
@@ -3753,9 +3751,11 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                     print("\n[Shai] Command interrupted.")
                 continue
 
-            if user_text == "/commit-push":
+            if user_text.startswith("/commit"):
                 try:
-                    print(git_commit_push())
+                    parts = user_text.split()
+                    message_only = "--message-only" in parts
+                    print(git_commit(message_only=message_only))
                 except IterationInterrupted:
                     print("\n[Shai] Command interrupted.")
                 continue
