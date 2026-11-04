@@ -1,0 +1,2 @@
+- [ ] keep task list in .shai/task.json
+- [ ] tool usage is filling up the ui, keep tool usage, context window meter, task list etc frozen on ui and keep updating it in place

@@ -234,6 +234,7 @@ __marimo__/
 .backup
 .backups
 *.backup
+*.bak
 .tmp
 .temp
 *.tmp
@@ -247,5 +248,4 @@ logs
 log
 *.log
 
-docs/todo.txt
 *.zip
