@@ -3,7 +3,14 @@
   "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
   "max_tool_call_iterations": 500,
   "yes_to_all": true,
-  "commit_message_pattern": "{type}: {summary} {changes}",
+  "api_timeout_seconds": 300,
+  "commit_message": {
+    "provider": "",
+    "model": "",
+    "enabled": true,
+    "pattern": "{type}: {summary} {changes}",
+    "prompt": "Generate a concise, conventional commit message for the following changes.\\nFollow the format: <type>: <summary>\\n\\nTypes: feat, fix, docs, test, chore, refactor, style, perf, ci, build\\n\\n{diff_section}\\nReturn only the commit message, nothing else."
+  },
   "tool_safeguards": {
     "duplicate_call_detection": true,
     "duplicate_call_limit": 2,
@@ -33,10 +40,10 @@
     ],
     "retry_invalid_json": true,
     "invalid_tool_selection_enabled": true,
-    "invalid_tool_selection_max_attempts": 3,
+    "invalid_tool_selection_max_attempts": 5,
     "invalid_tool_call_recovery": {
       "enabled": true,
-      "max_recovery_attempts": 2,
+      "max_recovery_attempts": 5,
       "repair_conversation_history": true,
       "preserve_user_request": true,
       "stop_on_repeated_failure": true,

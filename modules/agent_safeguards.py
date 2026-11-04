@@ -331,7 +331,7 @@ def format_tool_call_for_display(name, args, max_chars=2000):
         head = max(1, (limit - len(marker)) // 2)
         tail = max(1, limit - len(marker) - head)
         rendered = rendered[:head] + marker + rendered[-tail:]
-    return "[Shai tool] {}\\nParameters: {}".format(name, rendered)
+    return "[Shai tool] {}: {}".format(name, rendered)
 
 
 def read_file_cache_marker(path, offset=0, limit=100):

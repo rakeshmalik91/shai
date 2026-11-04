@@ -24,7 +24,7 @@ import tty
 import _thread
 
 from chat import Spinner, extract_anthropic_response, response_text
-from modules.provider_selection import PROVIDERS, initialize_provider
+from modules.provider_selection import PROVIDERS, initialize_provider, get_available_models
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
 from modules.conversation_history import ConversationHistory, input_with_history
@@ -1277,21 +1277,201 @@ DEFAULT_COMMIT_MESSAGE_PATTERN = "{type}: {summary} {changes}"
 
 COMMIT_TYPES = ("feat", "fix", "docs", "test", "chore", "refactor", "style", "perf", "ci", "build")
 
+DEFAULT_COMMIT_SYSTEM_PROMPT = "You are a helpful assistant that generates concise, conventional commit messages."
+
+DEFAULT_COMMIT_USER_PROMPT = (
+    "Generate a concise, conventional commit message for the following changes.\n"
+    "Follow the format: <type>: <summary>\n\n"
+    "Types: feat, fix, docs, test, chore, refactor, style, perf, ci, build\n\n"
+    "{diff_section}\n"
+    "Return only the commit message, nothing else."
+)
+
+DEFAULT_COMMIT_DIFF_SECTION_WITH_DIFF = "Files changed:\n{changes}\n\nDiff:\n{diff}\n"
+DEFAULT_COMMIT_DIFF_SECTION_WITHOUT_DIFF = "Changes:\n{changes}\n"
+
 
 def load_commit_message_pattern():
     """Load the commit message pattern from shai_config.json."""
     config = load_config()
-    pattern = config.get("commit_message_pattern", DEFAULT_COMMIT_MESSAGE_PATTERN)
+    commit_config = config.get("commit_message", {})
+    if isinstance(commit_config, dict):
+        pattern = commit_config.get("pattern", DEFAULT_COMMIT_MESSAGE_PATTERN)
+    else:
+        pattern = DEFAULT_COMMIT_MESSAGE_PATTERN
     if not isinstance(pattern, str) or not pattern.strip():
         LOGGER.warning(
-            "Invalid commit_message_pattern in shai_config.json; using default."
+            "Invalid commit_message.pattern in shai_config.json; using default."
         )
         return DEFAULT_COMMIT_MESSAGE_PATTERN
     return pattern
 
 
+def load_commit_message_config():
+    """Load commit message configuration from shai_config.json."""
+    config = load_config()
+    commit_config = config.get("commit_message", {})
+    if not isinstance(commit_config, dict):
+        return {
+            "provider": "",
+            "model": "",
+            "enabled": True,
+            "prompt": DEFAULT_COMMIT_USER_PROMPT,
+        }
+    return {
+        "provider": commit_config.get("provider", ""),
+        "model": commit_config.get("model", ""),
+        "enabled": commit_config.get("enabled", True),
+        "prompt": commit_config.get("prompt", DEFAULT_COMMIT_USER_PROMPT),
+    }
+
+
+def generate_commit_message_llm(changes_summary, diff_content=""):
+    """Generate a commit message using an LLM based on the git changes summary and diff."""
+    commit_config = load_commit_message_config()
+    
+    if not commit_config.get("enabled", True):
+        return None
+    
+    # Get the provider and model for commit messages
+    commit_provider = commit_config.get("provider", "").strip()
+    commit_model = commit_config.get("model", "").strip()
+    
+    # If not specified, fall back to current provider/model
+    if not commit_provider:
+        commit_provider = PROVIDER
+    if not commit_model:
+        commit_model = MODEL
+    
+    # Validate provider
+    if commit_provider not in PROVIDERS:
+        LOGGER.warning(
+            "Invalid commit message provider '%s'; falling back to pattern-based generation.",
+            commit_provider
+        )
+        return None
+    
+    # Validate model is available for the provider
+    try:
+        available_models = get_available_models(commit_provider)
+        if commit_model not in available_models:
+            LOGGER.warning(
+                "Commit message model '%s' not available for provider '%s'; falling back to pattern-based generation.",
+                commit_model, commit_provider
+            )
+            return None
+    except Exception as error:
+        LOGGER.warning(
+            "Could not validate commit message model: %s; falling back to pattern-based generation.",
+            error
+        )
+        return None
+    
+# Build the prompt for the LLM
+    commit_config = load_commit_message_config()
+    user_prompt_template = commit_config.get("prompt", DEFAULT_COMMIT_USER_PROMPT)
+
+    if diff_content:
+        diff_section = DEFAULT_COMMIT_DIFF_SECTION_WITH_DIFF.format(
+            changes=changes_summary, diff=diff_content[:8000]
+        )
+    else:
+        diff_section = DEFAULT_COMMIT_DIFF_SECTION_WITHOUT_DIFF.format(
+            changes=changes_summary
+        )
+
+    prompt = user_prompt_template.format(diff_section=diff_section)
+
+    # Prepare messages for the API call
+    messages = [
+        {"role": "system", "content": DEFAULT_COMMIT_SYSTEM_PROMPT},
+        {"role": "user", "content": prompt}
+    ]
+    try:
+        # Temporarily switch provider/model for the commit message generation
+        original_provider = PROVIDER
+        original_model = MODEL
+        
+        # We need to call the API directly with the commit message provider/model
+        # Let's use a simpler approach - call the provider's API directly
+        key = os.environ.get(PROVIDERS[commit_provider]["key_env"])
+        if not key:
+            LOGGER.warning(
+                "API key not set for commit message provider '%s'; falling back to pattern-based generation.",
+                commit_provider
+            )
+            return None
+        
+        # Build request body based on provider format
+        if PROVIDERS[commit_provider]["format"] == "anthropic":
+            body = {
+                "model": commit_model,
+                "max_tokens": 500,
+                "system": DEFAULT_COMMIT_SYSTEM_PROMPT,
+                "messages": [{"role": "user", "content": prompt}]
+            }
+            headers = {
+                "x-api-key": key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json"
+            }
+        else:
+            body = {
+                "model": commit_model,
+                "messages": messages,
+                "temperature": 0.2,
+                "max_tokens": 500
+            }
+            headers = {
+                "Authorization": "Bearer " + key,
+                "Content-Type": "application/json"
+            }
+            if commit_provider == "openai":
+                body["max_completion_tokens"] = 500
+            if commit_provider == "openrouter":
+                headers["HTTP-Referer"] = "https://openrouter.ai/"
+                headers["X-Title"] = "Shai Coding Agent"
+        
+        request_data = json.dumps(body).encode("utf-8")
+        request = urllib.request.Request(
+            PROVIDERS[commit_provider]["url"],
+            data=request_data,
+            headers=headers,
+            method="POST"
+        )
+        
+        with urllib.request.urlopen(request, timeout=API_TIMEOUT_SECONDS) as response:
+            raw = response.read().decode("utf-8")
+        
+        parsed = json.loads(raw)
+        
+        # Extract the response text based on provider format
+        if PROVIDERS[commit_provider]["format"] == "anthropic":
+            content = parsed.get("content", [])
+            if content and isinstance(content, list):
+                for block in content:
+                    if block.get("type") == "text":
+                        return block.get("text", "").strip()
+        else:
+            choices = parsed.get("choices", [])
+            if choices:
+                message = choices[0].get("message", {})
+                return message.get("content", "").strip()
+        
+        return None
+        
+    except Exception as error:
+        LOGGER.warning(
+            "LLM commit message generation failed: %s; falling back to pattern-based generation.",
+            error
+        )
+        return None
+
+
 def generate_commit_message():
-    """Generate a commit message based on git status and the configured pattern."""
+    """Generate a commit message based on git status and the configured pattern.
+    First tries LLM-based generation if enabled and configured, falls back to pattern-based.
+    """
     # Get staged and unstaged changes
     result = run_interruptible_command(
         ["git", "status", "--porcelain"], ROOT, 15
@@ -1344,6 +1524,20 @@ def generate_commit_message():
     all_files = [f for _, f in changes]
     changes_str = " + ".join(all_files)
 
+    # Get the actual diff for LLM analysis
+    diff_result = run_interruptible_command(
+        ["git", "diff", "HEAD"], ROOT, 15
+    )
+    diff_content = ""
+    if not diff_result["timed_out"] and diff_result["returncode"] == 0:
+        diff_content = diff_result["stdout"].strip()
+
+    # Try LLM-based generation first (pass both file list and diff)
+    llm_message = generate_commit_message_llm(changes_str, diff_content)
+    if llm_message:
+        return llm_message
+
+    # Fall back to pattern-based generation
     pattern = load_commit_message_pattern()
     message = pattern.format(
         type=commit_type,
@@ -1357,13 +1551,17 @@ def generate_commit_message():
     return message
 
 
-def git_commit(message=None):
+def git_commit(message=None, message_only=False):
     """Commit staged changes with the given or generated message.
-    If nothing is staged, stage all changes first."""
+    If nothing is staged, stage all changes first.
+    If message_only is True, only generate and return the message without committing."""
     if message is None:
         message = generate_commit_message()
         if message is None:
             return "No changes to commit."
+
+    if message_only:
+        return message
 
     # Check if there are staged changes
     LOGGER.debug("Checking for staged changes cwd=%s", ROOT)
@@ -3318,7 +3516,7 @@ Commands:
   /code    - Switch to code mode (agent with tools)
   /todo    - Show current task plan
   /task    - Alias for /todo
-  /commit  - Commit staged changes with generated message
+  /commit  - Commit staged changes with generated message (use --message-only to only generate message)
   /push    - Push commits to remote
   /commit-push - Commit and push in one command
   /exit    - Exit Shai
@@ -3389,9 +3587,11 @@ Type 'a' or 'all' at any prompt to approve all future actions.
                         print("  [{}] {}".format(status_char, item["title"]))
                 continue
 
-            if user_text == "/commit":
+            if user_text.startswith("/commit"):
                 try:
-                    print(git_commit())
+                    parts = user_text.split()
+                    message_only = "--message-only" in parts
+                    print(git_commit(message_only=message_only))
                 except IterationInterrupted:
                     print("\n[Shai] Command interrupted.")
                 continue
