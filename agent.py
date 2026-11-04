@@ -1798,7 +1798,15 @@ def _validate_file_content(file_path, content):
 
 
 def _atomic_replace_file(file_path, content):
-    """Back up the original, write/validate a temp file, then atomically replace."""
+    """Back up the original, write/validate a temp file, then atomically replace.
+
+    Text formats such as YAML conventionally end with a newline. LLM-generated
+    full-file replacements often omit that final newline, so normalize it here
+    rather than rejecting an otherwise valid edit.
+    """
+    if file_path.suffix.lower() in (".yaml", ".yml") and content and not content.endswith("\n"):
+        content += "\n"
+
     import tempfile
     import shutil
     file_path.parent.mkdir(parents=True, exist_ok=True)
