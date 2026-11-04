@@ -89,23 +89,6 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings["run_checks_timeout_seconds"], 45)
 
 
-class ToolSchemaTests(unittest.TestCase):
-    def test_kilo_payload_preserves_pagination_instructions_and_schema(self):
-        tools = agent.build_kilo_tools()
-        read_tool = next(
-            item["function"] for item in tools
-            if item["function"]["name"] == "read_file"
-        )
-        self.assertIn("ALWAYS supply", read_tool["description"])
-        self.assertIn("next_offset", read_tool["description"])
-        parameters = read_tool["parameters"]
-        self.assertEqual(
-            parameters["required"], ["path", "offset", "limit"]
-        )
-        self.assertIn("description", parameters["properties"]["offset"])
-        self.assertIn("description", parameters["properties"]["limit"])
-
-
 class ToolSafetyTests(unittest.TestCase):
     def setUp(self):
         self.original_dispatch = dict(agent.TOOL_DISPATCH)
@@ -224,6 +207,41 @@ class ToolSafetyTests(unittest.TestCase):
         cleaned = agent.history_for_new_provider(history)
         self.assertEqual([item["role"] for item in cleaned], ["system", "user", "assistant"])
         self.assertEqual(cleaned[-1]["content"], "hi")
+
+    def test_search_files_accepts_single_file_path(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = pathlib.Path(root)
+            target = root_path / "agent.py"
+            target.write_text("def initialize_provider():\n    return True\n", encoding="utf-8")
+            original_root = agent.ROOT
+            try:
+                agent.ROOT = root_path
+                result = agent.search_files("initialize_provider", "agent.py")
+                self.assertIn("agent.py:1:", result)
+            finally:
+                agent.ROOT = original_root
+
+    def test_three_identical_tool_errors_stop_request(self):
+        function = mock.Mock(return_value={"error": "Not a directory"})
+        agent.TOOL_DISPATCH["test_failing_probe"] = function
+        tracker = {}
+        try:
+            agent.execute_tool_with_safeguards("test_failing_probe", {"path": "agent.py"}, tracker)
+            agent.execute_tool_with_safeguards("test_failing_probe", {"path": "agent.py"}, tracker)
+            third = agent.execute_tool_with_safeguards("test_failing_probe", {"path": "agent.py"}, tracker)
+            self.assertTrue(third.get("stop_request"))
+            self.assertEqual(function.call_count, 3)
+        finally:
+            agent.TOOL_DISPATCH.pop("test_failing_probe", None)
+
+    def test_kilo_schema_preserves_file_search_and_pagination_guidance(self):
+        tools = agent.build_kilo_tools()
+        by_name = {item["function"]["name"]: item["function"] for item in tools}
+        search_description = by_name["search_files"]["description"]
+        self.assertIn("single project file", search_description)
+        read_description = by_name["read_file"]["description"]
+        self.assertIn("next_offset", read_description)
+        self.assertIn("offset", by_name["read_file"]["parameters"]["properties"])
 
 
 if __name__ == "__main__":

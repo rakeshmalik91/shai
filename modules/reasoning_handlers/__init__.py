@@ -45,8 +45,10 @@ def extract_reasoning_summary(provider, response):
         LOGGER.exception("Could not extract reasoning summary provider=%s", provider)
         return ""
     if summary:
-        LOGGER.debug("Provider reasoning summary received provider=%s chars=%d",
-                     provider, len(summary))
+        # Log only provider-designated summaries, never raw private reasoning /
+        # chain-of-thought fields. This keeps debugging useful and bounded.
+        LOGGER.debug("Provider reasoning summary provider=%s chars=%d\n%s",
+                     provider, len(summary), summary)
     return summary
 
 

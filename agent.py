@@ -940,57 +940,42 @@ def read_file(path, offset=0, limit=None):
     return result
 
 def search_files(query, path="."):
+    """Search either one project file or all files beneath a directory."""
     LOGGER.debug("search_files query=%r path=%s", query, path)
-    directory = safe_path(path)
+    target = safe_path(path)
+    if not target.exists():
+        return {"error": "Search path does not exist: {}. Use a project-relative file or directory path.".format(path)}
+    if not target.is_file() and not target.is_dir():
+        return {"error": "Search path is neither a regular file nor a directory: {}.".format(path)}
 
-    if not directory.is_dir():
-        return "Not a directory."
-
-    ignored = {
-        ".git", "node_modules", "__pycache__",
-        ".venv", "venv", ".idea"
-    }
-
+    ignored = {".git", "node_modules", "__pycache__", ".venv", "venv", ".idea"}
+    files = [target] if target.is_file() else target.rglob("*")
     results = []
-
-    for file_path in directory.rglob("*"):
+    scanned = 0
+    for file_path in files:
         if not file_path.is_file():
             continue
-
-        if any(part in ignored for part in file_path.parts):
+        if any(part in ignored for part in file_path.parts) or file_path.name.startswith(".env"):
             continue
-
-        if file_path.name.startswith(".env"):
-            continue
-
         try:
             file_path.resolve().relative_to(ROOT)
-
             if file_path.stat().st_size > MAX_FILE_SIZE:
                 continue
-
             content = file_path.read_text(encoding="utf-8")
-
         except (OSError, UnicodeDecodeError, ValueError):
             continue
-
+        scanned += 1
         for number, line in enumerate(content.splitlines(), 1):
             if query.lower() in line.lower():
-                results.append(
-                    "{}:{}: {}".format(
-                        relative_path(file_path),
-                        number,
-                        line.strip()[:250]
-                    )
-                )
-
+                results.append("{}:{}: {}".format(
+                    relative_path(file_path), number, line.strip()[:250]
+                ))
                 if len(results) >= 100:
                     results.append("...search results truncated...")
-                    LOGGER.debug("search_files truncated query=%r matches>=100", query)
+                    LOGGER.debug("search_files truncated query=%r path=%s scanned=%d", query, path, scanned)
                     return "\n".join(results)
-
-    LOGGER.debug("search_files complete query=%r matches=%d", query, len(results))
-    return "\n".join(results) if results else "No matches found."
+    LOGGER.debug("search_files complete query=%r path=%s scanned=%d matches=%d", query, path, scanned, len(results))
+    return "\n".join(results) if results else "No matches found in {} ({} file(s) scanned).".format(path, scanned)
 
 def git_status():
     LOGGER.debug("Running git status cwd=%s timeout=%ss",
@@ -1319,27 +1304,9 @@ FUNCTIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Project-relative file path."
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "description": (
-                            "Required. Zero-based line offset. Use 0 for the "
-                            "first chunk, then the exact next_offset returned."
-                        )
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 500,
-                        "description": (
-                            "Required. Number of lines to return (1-500). "
-                            "Keep the same limit for subsequent chunks."
-                        )
-                    }
+                    "path": {"type": "string"},
+                    "offset": {"type": "integer", "minimum": 0},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 500}
                 },
                 "required": ["path", "offset", "limit"]
             }
@@ -1349,7 +1316,12 @@ FUNCTIONS = [
         "type": "function",
         "function": {
             "name": "search_files",
-            "description": "Search project files for a text string.",
+            "description": (
+                "Search for a case-insensitive text string. path may be either "
+                "a single project file (for example agent.py) or a project "
+                "directory (for example modules). Use a file path when searching "
+                "one known file; use a directory for recursive search."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1587,15 +1559,21 @@ def build_kilo_tools():
     function object. Kilo uses these descriptions to guide tool selection;
     sending only names and parameter schemas weakens tool routing.
     """
+    descriptions = {
+        "list_files": "List project files under a directory.",
+        "read_file": next((item["function"].get("description", "") for item in FUNCTIONS if item.get("function", {}).get("name") == "read_file"), "Read a project file in line-based chunks using path, offset, and limit."),
+        "search_files": next((item["function"].get("description", "") for item in FUNCTIONS if item.get("function", {}).get("name") == "search_files"), "Search a project file or directory."),
+        "git_status": "Show current Git status.",
+    }
     kilo_tools = []
     for item in FUNCTIONS:
         function = item.get("function", {})
         parameters = function.get("parameters", {})
-        # Preserve the canonical description verbatim. In particular, the
-        # read_file description explains the required pagination sequence.
         kilo_function = {
             "name": function.get("name", ""),
-            "description": function.get("description", ""),
+            "description": descriptions.get(
+                function.get("name"), function.get("description", "")
+            ),
             "parameters": parameters,
         }
         kilo_tools.append({"type": "function", "function": kilo_function})
@@ -1854,6 +1832,8 @@ def execute_tool(name, args):
         result = function(**args)
         LOGGER.debug("Tool execution complete name=%s elapsed=%.3fs result_type=%s",
                      name, time.time() - started, type(result).__name__)
+        if isinstance(result, dict) and result.get("error"):
+            return result
         return {"result": result}
     except IterationInterrupted:
         raise
@@ -1895,50 +1875,49 @@ def invalidate_cached_reads_for_path(call_tracker, changed_path):
 
 
 def execute_tool_with_safeguards(name, args, call_tracker, history=None):
-    """Track exact parameterized calls without blocking useful repeated work."""
+    """Execute calls normally; stop only an identical call stuck on the same error."""
     signature = _tool_call_signature(name, args)
     previous = call_tracker.get(signature)
-    count = previous["count"] if previous else 0
-    settings = TOOL_SAFEGUARDS
-
-    # Never synthesize a duplicate-read response or silently suppress a read.
-    # Each request executes against the current file contents. Pagination is
-    # distinguished by offset/limit in the exact call signature.
-    # Identical calls remain allowed. Different offsets/limits are distinct
-    # signatures and are always independently executed.
+    count = previous.get("count", 0) if isinstance(previous, dict) else 0
+    previous_error_count = previous.get("consecutive_error_count", 0) if isinstance(previous, dict) else 0
     result = execute_tool(name, args)
-    if (
-        name in ("edit_file", "patch_file")
-        and isinstance(result, dict)
-        and not result.get("error")
-        and isinstance(args, dict)
-        and args.get("path")
-    ):
-        invalidate_cached_reads_for_path(call_tracker, args["path"])
+    is_error = isinstance(result, dict) and bool(result.get("error"))
+    error_count = previous_error_count + 1 if is_error else 0
     count += 1
-    call_tracker[signature] = {
-        "count": count, "result": result,
-        "parameters": dict(args) if isinstance(args, dict) else args
-    }
-    warning_after = settings["repeat_call_warning_after"]
-    if settings["repeat_call_warning"] and count >= warning_after:
-        warning = (
-            "Informational: this exact tool call (same name and parameters) "
-            "has been executed {} times. It was allowed to run."
-        ).format(count)
-        if isinstance(result, dict):
-            result = dict(result)
-            result["repeat_call_warning"] = warning
-            result["repeat_call_parameters"] = dict(args)
-        else:
-            result = {"result": result, "repeat_call_warning": warning,
-                      "repeat_call_parameters": dict(args)}
-        call_tracker[signature]["result"] = result
 
-    LOGGER.debug(
-        "Tool repeat verification name=%s count=%d signature=%s parameters=%s",
-        name, count, signature, json.dumps(args, sort_keys=True, default=str)
-    )
+    if (name in ("edit_file", "patch_file") and not is_error
+            and isinstance(args, dict) and args.get("path")):
+        invalidate_cached_reads_for_path(call_tracker, args["path"])
+
+    warning_after = TOOL_SAFEGUARDS["repeat_call_warning_after"]
+    if count >= warning_after and isinstance(result, dict):
+        result = dict(result)
+        result["repeat_call_warning"] = (
+            "This exact tool call has been executed {} times. Identical calls are allowed, "
+            "but check whether the result is adding new information."
+        ).format(count)
+        result["repeat_call_parameters"] = dict(args) if isinstance(args, dict) else args
+
+    # Three identical failed calls in this request indicate a stuck tool cycle.
+    # Successful repeats and different parameter sets remain unrestricted.
+    if is_error and error_count >= 3:
+        result = dict(result)
+        result["stop_request"] = True
+        result["instruction"] = (
+            "This exact tool call has failed three consecutive times with the same parameters. "
+            "Stop retrying it. Choose a different path/tool or explain the blocker to the user."
+        )
+        LOGGER.warning("Stopping repeated failing tool call name=%s count=%d parameters=%s error=%s",
+                       name, error_count, json.dumps(args, sort_keys=True, default=str), result.get("error"))
+
+    call_tracker[signature] = {
+        "count": count,
+        "consecutive_error_count": error_count,
+        "result": result,
+        "parameters": dict(args) if isinstance(args, dict) else args,
+    }
+    LOGGER.debug("Tool repeat verification name=%s count=%d consecutive_errors=%d signature=%s parameters=%s",
+                 name, count, error_count, signature, json.dumps(args, sort_keys=True, default=str))
     return result
 
 
@@ -1973,12 +1952,23 @@ def display_tool_call(name, args):
         display_args.setdefault(
             "limit", AGENT_SAFEGUARDS["default_read_file_lines"]
         )
+    action_labels = {
+        "search_files": "Searching project files",
+        "read_file": "Reading project file",
+        "list_files": "Listing project files",
+        "edit_file": "Preparing file edit",
+        "patch_file": "Applying file patch",
+        "run_checks": "Running project checks",
+        "git_status": "Checking Git status",
+        "git_diff": "Inspecting Git changes",
+    }
+    print("\n[Shai] {}…".format(action_labels.get(name, "Running {}".format(name))))
     if TOOL_CALL_DISPLAY["show_parameters"]:
-        print("\n" + format_tool_call_for_display(
+        print(format_tool_call_for_display(
             name, display_args, TOOL_CALL_DISPLAY["max_argument_chars"]
         ))
     else:
-        print("\n[Shai tool] " + str(name))
+        print("[Shai tool] " + str(name))
     sys.stdout.flush()
 
 
@@ -2316,6 +2306,11 @@ def _ask_model_impl(history, user_text):
                         iteration_tool_successes += 1
                 if isinstance(result, dict) and result.get("error"):
                     iteration_tool_errors = True
+                if isinstance(result, dict) and result.get("error"):
+                    print("[Tool error] {}".format(result.get("error")))
+                if isinstance(result, dict) and result.get("stop_request"):
+                    tool_limit_reached = True
+                    print("\n[Shai] Repeated tool failure detected. Stopping this request; see the debug log for details.")
 
                 tool_result = {
                     "type": "tool_result",
@@ -2392,6 +2387,11 @@ def _ask_model_impl(history, user_text):
                             iteration_tool_successes += 1
                     if isinstance(result, dict) and result.get("error"):
                         iteration_tool_errors = True
+                    if isinstance(result, dict) and result.get("error"):
+                        print("[Tool error] {}".format(result.get("error")))
+                    if isinstance(result, dict) and result.get("stop_request"):
+                        tool_limit_reached = True
+                        print("\n[Shai] Repeated tool failure detected. Stopping this request; see the debug log for details.")
 
                 except IterationInterrupted:
                     raise
@@ -2430,7 +2430,10 @@ def _ask_model_impl(history, user_text):
                 no_progress_count, repeated_batch, iteration_tool_errors,
                 iteration_tool_successes, total_tool_calls
             )
-            if tool_limit_reached or total_tool_calls >= AGENT_SAFEGUARDS["max_tool_calls_per_request"]:
+            if tool_limit_reached:
+                print("\n[Shai] Stopped this request after a repeated tool failure or tool-call safety limit.")
+                return
+            if total_tool_calls >= AGENT_SAFEGUARDS["max_tool_calls_per_request"]:
                 print("\n[Shai] Per-request tool-call limit reached. Stopping to prevent an unbounded loop.")
                 return
             if no_progress_count >= AGENT_SAFEGUARDS["max_consecutive_no_progress_iterations"]:

@@ -3,11 +3,13 @@ import io
 import pathlib
 import sys
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from modules.reasoning_handlers import extract_reasoning_summary, display_reasoning_summary
+import modules.reasoning_handlers as reasoning_handlers
 
 
 class ReasoningHandlerTests(unittest.TestCase):
@@ -70,6 +72,18 @@ class ReasoningHandlerTests(unittest.TestCase):
 
     def test_unknown_provider_is_safe(self):
         self.assertEqual(extract_reasoning_summary("unknown", {"foo": "bar"}), "")
+
+    def test_provider_summary_is_written_to_debug_log_but_raw_reasoning_is_not(self):
+        response = {"choices": [{"message": {
+            "reasoning": "PRIVATE RAW CHAIN OF THOUGHT",
+            "reasoning_details": [{"type": "summary", "text": "Checked the failing path."}]
+        }}]}
+        with mock.patch.object(reasoning_handlers.LOGGER, "debug") as debug:
+            summary = reasoning_handlers.extract_reasoning_summary("kilo", response)
+        self.assertEqual(summary, "Checked the failing path.")
+        logged = " ".join(str(call) for call in debug.call_args_list)
+        self.assertIn("Checked the failing path.", logged)
+        self.assertNotIn("PRIVATE RAW CHAIN", logged)
 
 
 if __name__ == "__main__":

@@ -87,5 +87,9 @@
   "tool_call_display": {
     "show_parameters": true,
     "max_argument_chars": 2000
+  },
+  "reasoning_display": {
+    "enabled": true,
+    "max_chars": 6000
   }
 }
