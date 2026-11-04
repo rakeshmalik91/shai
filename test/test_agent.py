@@ -89,6 +89,23 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings["run_checks_timeout_seconds"], 45)
 
 
+class ToolSchemaTests(unittest.TestCase):
+    def test_kilo_payload_preserves_pagination_instructions_and_schema(self):
+        tools = agent.build_kilo_tools()
+        read_tool = next(
+            item["function"] for item in tools
+            if item["function"]["name"] == "read_file"
+        )
+        self.assertIn("ALWAYS supply", read_tool["description"])
+        self.assertIn("next_offset", read_tool["description"])
+        parameters = read_tool["parameters"]
+        self.assertEqual(
+            parameters["required"], ["path", "offset", "limit"]
+        )
+        self.assertIn("description", parameters["properties"]["offset"])
+        self.assertIn("description", parameters["properties"]["limit"])
+
+
 class ToolSafetyTests(unittest.TestCase):
     def setUp(self):
         self.original_dispatch = dict(agent.TOOL_DISPATCH)

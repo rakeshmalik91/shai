@@ -1319,9 +1319,27 @@ FUNCTIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string"},
-                    "offset": {"type": "integer", "minimum": 0},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 500}
+                    "path": {
+                        "type": "string",
+                        "description": "Project-relative file path."
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": (
+                            "Required. Zero-based line offset. Use 0 for the "
+                            "first chunk, then the exact next_offset returned."
+                        )
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 500,
+                        "description": (
+                            "Required. Number of lines to return (1-500). "
+                            "Keep the same limit for subsequent chunks."
+                        )
+                    }
                 },
                 "required": ["path", "offset", "limit"]
             }
@@ -1569,21 +1587,15 @@ def build_kilo_tools():
     function object. Kilo uses these descriptions to guide tool selection;
     sending only names and parameter schemas weakens tool routing.
     """
-    descriptions = {
-        "list_files": "List project files under a directory.",
-        "read_file": "Read a UTF-8 text file in the project.",
-        "search_files": "Search project files for a text string.",
-        "git_status": "Show current Git status.",
-    }
     kilo_tools = []
     for item in FUNCTIONS:
         function = item.get("function", {})
         parameters = function.get("parameters", {})
+        # Preserve the canonical description verbatim. In particular, the
+        # read_file description explains the required pagination sequence.
         kilo_function = {
             "name": function.get("name", ""),
-            "description": descriptions.get(
-                function.get("name"), function.get("description", "")
-            ),
+            "description": function.get("description", ""),
             "parameters": parameters,
         }
         kilo_tools.append({"type": "function", "function": kilo_function})
