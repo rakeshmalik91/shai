@@ -13,7 +13,7 @@
     "git_push": false,
     "tools": {
       "run_checks": true,
-      "edit_file": false
+      "edit_file": true
     }
   },
   "commit_message": {
