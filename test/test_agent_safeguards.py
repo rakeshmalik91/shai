@@ -303,7 +303,8 @@ class AgentSafeguardModuleTests(unittest.TestCase):
         rendered = format_tool_call_for_display(
             "read_file", {"path": "chat.py", "offset": 200, "limit": 100}
         )
-        self.assertIn("read_file", rendered)
+        self.assertNotIn("[Shai tool]", rendered)
+        self.assertIn('"path":"chat.py"', rendered)
         self.assertIn('"offset":200', rendered)
         self.assertIn('"limit":100', rendered)
 

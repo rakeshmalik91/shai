@@ -3237,7 +3237,7 @@ def _ask_model_impl(history, user_text):
             PROVIDER, MODEL, estimated_prompt_tokens, context_limit,
             len(history), len(json.dumps(history, ensure_ascii=False))
         )
-        spinner = Spinner("Shai is thinking | " + context_status, status_provider=lambda: STATUS.tasks)
+        spinner = Spinner("Shai is thinking | " + context_status)
         spinner.start()
 
         try:
@@ -3682,7 +3682,7 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("Commands: /help /model /switch /switch-model /status /files /diff /reset /ask /code /read-only /ro /todo /task /commit /push /commit-push /exit")
+    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
 
     # Mode: "agent" (with tools) or "ask" (chat only, no tools)
@@ -3733,7 +3733,6 @@ Examples:
   Run the Python tests.
 
 Commands:
-  /help    - Show this help
   /model   - Switch provider and model
   /switch  - Alias for /model
   /status  - Git status
@@ -3878,7 +3877,7 @@ its category or tool is explicitly enabled in config.
                         PROVIDER, MODEL, estimated_prompt_tokens, context_limit, len(history)
                     )
                     print("\n" + colorize("[Shai]", "system") + " {}".format(context_status))
-                    spinner = Spinner("Shai is thinking | " + context_status, status_provider=lambda: STATUS.tasks)
+                    spinner = Spinner("Shai is thinking | " + context_status)
                     spinner.start()
                     LOGGER.info("Ask mode turn started provider=%s model=%s user_chars=%d history_messages=%d",
                                 PROVIDER, MODEL, len(user_text), len(history))
@@ -3933,7 +3932,7 @@ its category or tool is explicitly enabled in config.
                         PROVIDER, MODEL, estimated_prompt_tokens, context_limit, len(history)
                     )
                     print("\n" + colorize("[Shai]", "system") + " {}".format(context_status))
-                    spinner = Spinner("Shai is thinking | " + context_status, status_provider=lambda: STATUS.tasks)
+                    spinner = Spinner("Shai is thinking | " + context_status)
                     spinner.start()
                     LOGGER.info("Read-only mode turn started provider=%s model=%s user_chars=%d history_messages=%d",
                                 PROVIDER, MODEL, len(user_text), len(history))
@@ -4018,7 +4017,7 @@ its category or tool is explicitly enabled in config.
                         history_store.save(history, provider=PROVIDER, model=MODEL)
 
                         # Continue the conversation to get the final answer
-                        spinner = Spinner("Shai is thinking | " + context_status, status_provider=lambda: STATUS.tasks)
+                        spinner = Spinner("Shai is thinking | " + context_status)
                         spinner.start()
                         try:
                             response = api_request(history, PROVIDER, MODEL)

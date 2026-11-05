@@ -331,7 +331,10 @@ def format_tool_call_for_display(name, args, max_chars=2000):
         head = max(1, (limit - len(marker)) // 2)
         tail = max(1, limit - len(marker) - head)
         rendered = rendered[:head] + marker + rendered[-tail:]
-    return "[Shai tool] {}: {}".format(name, rendered)
+    # The live status panel already prints the tool name. Return only its
+    # arguments here; including another tool-name prefix makes the status
+    # line look like the same tool call is being printed twice.
+    return rendered
 
 
 def read_file_cache_marker(path, offset=0, limit=100):
