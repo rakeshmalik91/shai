@@ -81,6 +81,10 @@
     "retain_files": 10,
     "enable_console": false
   },
+  "backup_cleanup": {
+    "enabled": true,
+    "retention_days": 1
+  },
   "file_change_display": {
     "enabled": true,
     "max_diff_lines": 160,

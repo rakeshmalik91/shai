@@ -129,6 +129,36 @@ def load_config():
         return {}
 
 
+def cleanup_old_backups():
+    """Remove backup files older than the configured retention period."""
+    config = load_config()
+    backup_config = config.get("backup_cleanup", {})
+    if not backup_config.get("enabled", True):
+        return
+
+    retention_days = backup_config.get("retention_days", 1)
+    if not isinstance(retention_days, int) or retention_days < 0:
+        LOGGER.warning("Invalid backup_cleanup.retention_days=%r; using 1 day.", retention_days)
+        retention_days = 1
+
+    backup_dir = ROOT / ".shai_backups"
+    if not backup_dir.exists():
+        return
+
+    cutoff_time = time.time() - (retention_days * 86400)
+    removed_count = 0
+    for backup_file in backup_dir.iterdir():
+        try:
+            if backup_file.is_file() and backup_file.stat().st_mtime < cutoff_time:
+                backup_file.unlink()
+                removed_count += 1
+        except OSError:
+            pass
+
+    if removed_count:
+        LOGGER.info("Cleaned up %d backup file(s) older than %d day(s).", removed_count, retention_days)
+
+
 API_TIMEOUT_SECONDS = load_api_timeout_seconds()
 
 
@@ -3718,6 +3748,8 @@ def main():
                 ROOT, API_TIMEOUT_SECONDS)
     PROVIDER, MODEL = initialize_provider(auto_select=True)
     LOGGER.info("Selected provider=%s model=%s", PROVIDER, MODEL)
+
+    cleanup_old_backups()
 
     _load_task_plan()
 
