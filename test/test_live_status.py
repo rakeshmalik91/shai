@@ -37,7 +37,7 @@ class LiveStatusTests(unittest.TestCase):
         self.assertIn("\033[1;35m", output)  # magenta tool label
         self.assertIn("\033[1;33m", output)  # yellow batch counter
         plain_output = __import__("re").sub(r"\x1b\[[0-9;]*m", "", output)
-        self.assertIn("Tools 3/3: edit_file", plain_output)
+        self.assertIn("Tools 3/3: edit_file (agent.py)", plain_output)
         self.assertEqual(panel.tool_count, 3)
 
 

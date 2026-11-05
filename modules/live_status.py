@@ -131,9 +131,11 @@ class LiveStatusPanel:
     def tool_finished(self, name, error=False):
         with self.lock:
             count = self.batch_tool_counts.get(name, 1)
-            self.current_tool = (
-                "{} ({} calls)".format(name, count) if count > 1 else name
-            )
+            # Preserve the parameter preview captured by tool_started().
+            # Resetting this to the bare name here made every completed tool
+            # line lose its arguments, even though the formatter had them.
+            if count > 1:
+                self.current_tool = "{} ({} calls)".format(name, count)
             self.phase = "Executing tools"
             self._render_tool_line("ERROR" if error else "done")
 
