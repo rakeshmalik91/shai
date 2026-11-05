@@ -1,2 +1,0 @@
-- [x] keep task list in .shai/task.json
-- [ ] 
