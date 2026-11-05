@@ -6,10 +6,10 @@
   "approve": {
     "all": true,
     "file_edit": true,
-    "file_delete": false,
-    "file_truncate": false,
+    "file_delete": true,
+    "file_truncate": true,
     "execution": true,
-    "git_commit": false,
+    "git_commit": true,
     "git_push": false,
     "tools": {
       "run_checks": true,
