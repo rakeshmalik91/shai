@@ -56,6 +56,12 @@ Available when running `python3 agent.py [project-path]`.
 
 > **Note:** Git operations require approval unless the session approval setting permits them.
 
+### Shell Execution
+
+| Command | Description |
+|---------|-------------|
+| `/exec <command>` | Execute a shell command in the project root directory. Runs with a 60-second timeout. Captures and displays stdout/stderr. Example: `/exec python -m pytest` |
+
 ---
 
 ## Chat Mode Commands
@@ -117,6 +123,7 @@ Agent Mode:          Chat Mode:
 /commit [--message-only]
 /push
 /commit-push
+/exec <command>
 /exit
 ```
 
