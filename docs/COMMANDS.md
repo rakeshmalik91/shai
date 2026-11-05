@@ -29,6 +29,7 @@ Available when running `python3 agent.py [project-path]`.
 | `/status` | Show Git status (branch, staged/unstaged changes). |
 | `/files` | List project files under the current root. |
 | `/diff` | Show unstaged Git diff. |
+| `/project <path>` | Switch to a different project folder. Resolves `~` and relative paths. Loads conversation history for the new project. |
 
 ### Conversation Control
 
