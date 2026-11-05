@@ -25,9 +25,9 @@
   },
   "tool_safeguards": {
     "duplicate_call_detection": true,
-    "duplicate_call_limit": 2,
+    "duplicate_call_limit": 5,
     "repeat_call_warning": true,
-    "repeat_call_warning_after": 2,
+    "repeat_call_warning_after": 5,
     "run_checks_timeout_seconds": 120,
     "git_status_timeout_seconds": 15,
     "git_diff_timeout_seconds": 15
@@ -58,7 +58,7 @@
       "max_recovery_attempts": 5,
       "repair_conversation_history": true,
       "preserve_user_request": true,
-      "stop_on_repeated_failure": true,
+      "stop_on_repeated_failure": false,
       "max_tool_result_chars": 12000
     }
   },
@@ -102,11 +102,11 @@
     "max_tool_calls_per_request": 500,
     "validate_tool_arguments": true,
     "reject_unknown_tool_arguments": true,
-    "max_invalid_argument_attempts_per_tool": 2,
+    "max_invalid_argument_attempts_per_tool": 5,
     "default_read_file_lines": 100,
     "max_read_file_lines": 500,
     "max_read_file_chars": 4000,
-    "deduplicate_read_file_calls": false
+    "deduplicate_read_file_calls": true
   },
   "tool_call_display": {
     "show_parameters": true,
