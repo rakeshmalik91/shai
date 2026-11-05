@@ -91,7 +91,7 @@ def load_api_timeout_seconds():
 
 DEFAULT_TOOL_CALL_DISPLAY = {
     "show_parameters": True,
-    "max_argument_chars": 2000
+    "max_argument_chars": 120
 }
 
 

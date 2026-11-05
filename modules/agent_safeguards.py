@@ -316,16 +316,32 @@ def tool_call_signature(name, args, default_read_file_lines=100):
     )
 
 
-def format_tool_call_for_display(name, args, max_chars=2000):
-    """Show the full parameter set (including offset/limit) in the terminal."""
+def format_tool_call_for_display(name, args, max_chars=120):
+    """Show a compact parameter preview suitable for the one-line status panel."""
+    def compact(value, string_limit=48):
+        if isinstance(value, str):
+            if len(value) > string_limit:
+                return value[:string_limit - 1] + "…"
+            return value
+        if isinstance(value, dict):
+            return {key: compact(item, string_limit) for key, item in value.items()}
+        if isinstance(value, (list, tuple)):
+            if len(value) > 3:
+                return [compact(item, string_limit) for item in value[:3]] + [
+                    "...(+{} items)".format(len(value) - 3)
+                ]
+            return [compact(item, string_limit) for item in value]
+        return value
+
     try:
+        compact_args = compact(args if isinstance(args, dict) else {"raw": args})
         rendered = json.dumps(
-            args if isinstance(args, dict) else {"raw": args},
+            compact_args,
             ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
         )
     except (TypeError, ValueError):
         rendered = repr(args)
-    limit = max(200, int(max_chars))
+    limit = max(80, int(max_chars))
     if len(rendered) > limit:
         marker = "...[{} parameter characters omitted]...".format(len(rendered) - limit)
         head = max(1, (limit - len(marker)) // 2)
