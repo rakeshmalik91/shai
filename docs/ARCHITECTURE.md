@@ -4,26 +4,75 @@
 
 Shai is a Python command-line assistant with two entry points. Agent mode combines a language model with local project tools; chat mode provides conversation without local project access.
 
-```text
-                         User
-                          |
-                +---------+---------+
-                |                   |
-             agent.py             chat.py
-          Coding-agent mode      Chat mode
-                |
-        Tool schemas and loop
-                |
-      +---------+---------------------+
-      |         |          |          |
-   Discovery  Reading   Editing   Verification
-      |         |          |          |
-      +---------+----------+----------+
-                          |
-                   Project directory
-                          |
-                Provider / model API
+```mermaid
+flowchart TD
+    User[User] -->|Input| Agent[agent.py\nCoding Agent Mode]
+    User -->|Input| Chat[chat.py\nChat Mode]
+
+    subgraph AgentMode["Agent Mode (agent.py)"]
+        Agent --> Loop[Agent Loop\nTool Schemas & Execution]
+        Loop --> Tools[Tool Registry]
+        Tools --> Discovery[Discovery & Code Intelligence]
+        Tools --> Reading[Reading Tools]
+        Tools --> Editing[Editing Tools]
+        Tools --> Verification[Verification Tools]
+        Tools --> TaskMgmt[Task Management]
+        Tools --> GitOps[Git Operations]
+    end
+
+    subgraph ChatMode["Chat Mode (chat.py)"]
+        Chat --> ChatLoop[Conversation Loop]
+        ChatLoop --> SharedTools[Shared Read-Only Tools]
+    end
+
+    subgraph SharedModules["Shared Modules"]
+        ProviderSel[modules/provider_selection.py]
+        ConvHist[modules/conversation_history.py]
+        Safeguards[modules/agent_safeguards.py]
+        Logging[modules/logging_config.py]
+        FileDisplay[modules/file_change_display.py]
+        Reasoning[modules/reasoning_handlers/]
+        ContextMeter[modules/context_meter.py]
+        ToolsMod[modules/tools.py\nShared Read-Only Tools]
+    end
+
+    Loop --> SharedModules
+    ChatLoop --> SharedModules
+    SharedTools --> ToolsMod
+
+    Discovery --> ProjectDir[(Project Directory)]
+    Reading --> ProjectDir
+    Editing --> ProjectDir
+    Verification --> ProjectDir
+    GitOps --> ProjectDir
+
+    ProviderSel -->|API Calls| LLM[(LLM Provider APIs)]
+    Loop --> LLM
+    ChatLoop --> LLM
+
+    Config[shai_config.json] --> Agent
+    Config --> Chat
+    Config --> SharedModules
+    History[.shai/history.json] --> ConvHist
+    Logs[logs/] --> Logging
+
+    style Agent fill:#e1f5fe
+    style Chat fill:#f3e5f5
+    style Loop fill:#fff3e0
+    style ToolsMod fill:#e8f5e9
+    style LLM fill:#fce4ec
+    style ProjectDir fill:#f1f8e9
 ```
+
+## Architecture Overview (Text Summary)
+
+The ASCII diagram above shows the high-level flow. Key points:
+
+- **Two entry points**: `agent.py` (coding agent with tools) and `chat.py` (conversation only)
+- **Shared modules** provide provider selection, conversation history, safeguards, logging, reasoning handlers, context metering, and read-only tools
+- **Agent mode** adds mutating tools (editing, verification, Git, task management) with approval and bounded execution
+- **Chat mode** uses only shared read-only tools from `modules/tools.py`
+- **Configuration** (`shai_config.json`), history (`.shai/history.json`), and logs are persistent data
 
 ## Entry points
 
