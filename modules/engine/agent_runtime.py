@@ -763,6 +763,9 @@ def main():
         print("[Shai] Previous provider changed; retained text history and cleared old tool exchanges.")
     history_store.save(history, provider=PROVIDER, model=MODEL)
 
+    # Clear terminal at startup
+    os.system("cls" if os.name == "nt" else "clear")
+
     print("\n" + colorize("Shai - Coding Agent", "heading"))
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
