@@ -354,7 +354,7 @@ def main():
     print("\n" + colorize("Shai - Chat", "heading"))
     print("Provider:", provider)
     print("Model:", model)
-    print("Commands: /help /model /status /reset /exit")
+    print("Commands: /help /model /project /status /reset /exit")
 
     while True:
         try:
@@ -392,10 +392,11 @@ def main():
         if user_text == "/help":
             print(
                 "\nChat with Shai normally.\n"
-                "/model  - Switch provider and model\n"
-                "/reset  - Clear conversation history\n"
-                "/status - Show provider and model\n"
-                "/exit   - Exit Shai"
+                "/model   - Switch provider and model\n"
+                "/project - Switch project folder\n"
+                "/reset   - Clear conversation history\n"
+                "/status  - Show provider and model\n"
+                "/exit    - Exit Shai"
             )
             continue
         if user_text == "/status":
@@ -407,6 +408,28 @@ def main():
             history = [{"role": "system", "content": SYSTEM_PROMPT}]
             history_store.clear()
             print("Conversation history cleared.")
+            continue
+
+        if user_text.startswith("/project "):
+            new_path = user_text[len("/project "):].strip()
+            if not new_path:
+                print("Usage: /project <path>")
+                continue
+            try:
+                new_root = pathlib.Path(new_path).expanduser().resolve()
+                if not new_root.is_dir():
+                    print("Error: '{}' is not a directory.".format(new_path))
+                    continue
+            except Exception as error:
+                print("Error: Invalid path '{}': {}".format(new_path, error))
+                continue
+            global ROOT
+            ROOT = new_root
+            configure_tools_root(ROOT)
+            history_store = ConversationHistory(ROOT, "chat", SYSTEM_PROMPT)
+            history = history_store.load()
+            history_store.save(history, provider=provider, model=model)
+            print("Project switched to: {}".format(ROOT))
             continue
 
         history.append({"role": "user", "content": user_text})

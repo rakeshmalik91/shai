@@ -3660,7 +3660,7 @@ def history_for_new_provider(history):
 
 
 def main():
-    global PROVIDER, MODEL
+    global PROVIDER, MODEL, ROOT
 
     init_default_logging(load_config())
     LOGGER.info("Starting Shai coding agent root=%s api_timeout=%ss",
@@ -3682,7 +3682,7 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /exit")
+    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /project /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
 
     # Mode: "agent" (with tools) or "ask" (chat only, no tools)
@@ -3748,6 +3748,7 @@ Commands:
   /commit  - Commit staged changes with generated message (use --message-only to only generate message)
   /push    - Push commits to remote
   /commit-push - Commit and push in one command
+  /project - Switch project folder
   /exit    - Exit Shai
 
 Press Ctrl+D while Shai is processing to cancel the current iteration
@@ -3788,6 +3789,27 @@ its category or tool is explicitly enabled in config.
                 }]
                 history_store.clear()
                 print("Conversation history cleared.")
+                continue
+
+            if user_text.startswith("/project "):
+                new_path = user_text[len("/project "):].strip()
+                if not new_path:
+                    print("[Shai] Usage: /project <path>")
+                    continue
+                try:
+                    new_root = pathlib.Path(new_path).expanduser().resolve()
+                    if not new_root.is_dir():
+                        print("[Shai] Error: '{}' is not a directory.".format(new_path))
+                        continue
+                except Exception as error:
+                    print("[Shai] Error: Invalid path '{}': {}".format(new_path, error))
+                    continue
+                ROOT = new_root
+                configure_tools_root(ROOT)
+                history_store = ConversationHistory(ROOT, "agent", SYSTEM_PROMPT)
+                history = history_store.load()
+                history_store.save(history, provider=PROVIDER, model=MODEL)
+                print("[Shai] Project switched to: {}".format(ROOT))
                 continue
 
             if user_text == "/ask":
