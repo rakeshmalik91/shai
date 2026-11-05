@@ -226,6 +226,7 @@ __marimo__/
 # shai specific files
 #------------------------------
 
+setup_keys.sh
 .setup_keys.sh
 .shai
 
