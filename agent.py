@@ -3765,7 +3765,7 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /project /exit")
+    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /project /exec /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
 
     # Mode: "agent" (with tools) or "ask" (chat only, no tools)
@@ -3832,6 +3832,7 @@ Commands:
   /push    - Push commits to remote
   /commit-push - Commit and push in one command
   /project - Switch project folder
+  /exec    - Execute a shell command (e.g., /exec python -m pytest)
   /exit    - Exit Shai
 
 Press Ctrl+D while Shai is processing to cancel the current iteration
@@ -3950,6 +3951,32 @@ its category or tool is explicitly enabled in config.
                     print(git_commit(message_only=message_only))
                 except IterationInterrupted:
                     print("\n[Shai] Command interrupted.")
+                continue
+
+            if user_text.startswith("/exec "):
+                cmd = user_text[len("/exec "):].strip()
+                if not cmd:
+                    print("[Shai] Usage: /exec <command>")
+                    continue
+                try:
+                    result = subprocess.run(
+                        cmd,
+                        shell=True,
+                        cwd=str(ROOT),
+                        capture_output=True,
+                        text=True,
+                        timeout=60
+                    )
+                    if result.stdout:
+                        print(result.stdout.rstrip())
+                    if result.stderr:
+                        print(colorize(result.stderr.rstrip(), "error"), file=sys.stderr)
+                    if result.returncode != 0:
+                        print(colorize("[Shai] Command exited with code {}".format(result.returncode), "warning"))
+                except subprocess.TimeoutExpired:
+                    print(colorize("[Shai] Command timed out after 60 seconds", "error"))
+                except Exception as error:
+                    print(colorize("[Shai] Command failed: {}".format(error), "error"))
                 continue
 
             try:
