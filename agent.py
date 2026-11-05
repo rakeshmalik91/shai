@@ -1652,15 +1652,66 @@ def git_commit(message=None, message_only=False):
     """Commit staged changes with the given or generated message.
     If nothing is staged, stage all changes first.
     If message_only is True, only generate and return the message without committing."""
+
+    # Check for staged and unstaged files
+    LOGGER.debug("Checking for staged changes cwd=%s", ROOT)
+    result = run_interruptible_command(
+        ["git", "diff", "--cached", "--name-only"], ROOT, 10
+    )
+    staged_files = result["stdout"].strip()
+
+    result = run_interruptible_command(
+        ["git", "diff", "--name-only"], ROOT, 10
+    )
+    unstaged_files = result["stdout"].strip()
+
+    # If both staged and unstaged files exist, ask user what to commit
+    if staged_files and unstaged_files:
+        print("Both staged and unstaged changes detected.")
+        print("Staged files:")
+        for f in staged_files.split("\n"):
+            print("  {}".format(f))
+        print("Unstaged files:")
+        for f in unstaged_files.split("\n"):
+            print("  {}".format(f))
+        print()
+        print("Commit options:")
+        print("  1) Staged only")
+        print("  2) All (stage unstaged files too)")
+        try:
+            choice = input("Choose [1/2]: ").strip()
+        except EOFError:
+            raise IterationInterrupted()
+        if choice == "2":
+            # Stage all unstaged files
+            LOGGER.debug("Staging all changes cwd=%s", ROOT)
+            result = run_interruptible_command(
+                ["git", "add", "-A"], ROOT, 10
+            )
+            output = result["stdout"] + result["stderr"]
+            if result["timed_out"]:
+                return "Git add timed out after 10 seconds.\n{}".format(output)
+            if result["returncode"] != 0:
+                return "Git add failed:\n{}".format(output)
+        elif choice != "1":
+            return "Invalid choice. Commit cancelled."
+
     if message is None:
         message = generate_commit_message()
         if message is None:
             return "No changes to commit."
 
+    # Ask for confirmation before committing (unless message_only)
+    if not message_only:
+        print("Commit message:")
+        print(message)
+        if not confirm_action("Commit with this message? [y/n] ", category="git_commit"):
+            return "Commit cancelled."
+
     if message_only:
         return message
 
-    # Check if there are staged changes
+    # Check if there are staged changes (after potential staging above)
     LOGGER.debug("Checking for staged changes cwd=%s", ROOT)
     result = run_interruptible_command(
         ["git", "diff", "--cached", "--name-only"], ROOT, 10
@@ -1707,7 +1758,7 @@ def git_push():
 def git_commit_push(message=None):
     """Commit and push in one command."""
     commit_result = git_commit(message)
-    if commit_result.startswith("Git commit failed") or commit_result.startswith("Git commit timed out"):
+    if commit_result.startswith("Git commit failed") or commit_result.startswith("Git commit timed out") or commit_result == "Commit cancelled.":
         return commit_result
     push_result = git_push()
     return "{}\n{}".format(commit_result, push_result)

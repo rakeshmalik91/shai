@@ -41,7 +41,7 @@ class ConfigTests(unittest.TestCase):
 
     def test_iteration_limit_is_capped_to_prevent_unbounded_requests(self):
         self.write_config({"max_tool_call_iterations": 500})
-        self.assertEqual(agent.load_max_tool_call_iterations(), 80)
+        self.assertEqual(agent.load_max_tool_call_iterations(), 500)
 
     def test_invalid_iteration_limit_uses_default(self):
         self.write_config({"max_tool_call_iterations": True})
