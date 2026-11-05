@@ -3237,7 +3237,7 @@ def _ask_model_impl(history, user_text):
             PROVIDER, MODEL, estimated_prompt_tokens, context_limit,
             len(history), len(json.dumps(history, ensure_ascii=False))
         )
-        spinner = Spinner("Shai is thinking | " + context_status)
+        spinner = Spinner("Shai is thinking | " + context_status, status_provider=lambda: STATUS.tasks)
         spinner.start()
 
         try:
@@ -3877,7 +3877,7 @@ its category or tool is explicitly enabled in config.
                         PROVIDER, MODEL, estimated_prompt_tokens, context_limit, len(history)
                     )
                     print("\n" + colorize("[Shai]", "system") + " {}".format(context_status))
-                    spinner = Spinner("Shai is thinking | " + context_status)
+                    spinner = Spinner("Shai is thinking | " + context_status, status_provider=lambda: STATUS.tasks)
                     spinner.start()
                     LOGGER.info("Ask mode turn started provider=%s model=%s user_chars=%d history_messages=%d",
                                 PROVIDER, MODEL, len(user_text), len(history))
@@ -3932,7 +3932,7 @@ its category or tool is explicitly enabled in config.
                         PROVIDER, MODEL, estimated_prompt_tokens, context_limit, len(history)
                     )
                     print("\n" + colorize("[Shai]", "system") + " {}".format(context_status))
-                    spinner = Spinner("Shai is thinking | " + context_status)
+                    spinner = Spinner("Shai is thinking | " + context_status, status_provider=lambda: STATUS.tasks)
                     spinner.start()
                     LOGGER.info("Read-only mode turn started provider=%s model=%s user_chars=%d history_messages=%d",
                                 PROVIDER, MODEL, len(user_text), len(history))
@@ -4017,7 +4017,7 @@ its category or tool is explicitly enabled in config.
                         history_store.save(history, provider=PROVIDER, model=MODEL)
 
                         # Continue the conversation to get the final answer
-                        spinner = Spinner("Shai is thinking | " + context_status)
+                        spinner = Spinner("Shai is thinking | " + context_status, status_provider=lambda: STATUS.tasks)
                         spinner.start()
                         try:
                             response = api_request(history, PROVIDER, MODEL)

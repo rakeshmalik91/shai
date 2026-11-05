@@ -90,9 +90,11 @@ SYSTEM_PROMPT = (
 class Spinner:
     """Simple terminal spinner, compatible with Python 3.9 and iSH."""
 
-    def __init__(self, message="Shai is thinking", interval=0.12):
+    def __init__(self, message="Shai is thinking", interval=0.12, status_provider=None):
         self.message = message
         self.interval = interval
+        self.status_provider = status_provider
+        self._rendered_lines = 0
         self._stop_event = threading.Event()
         self._thread = None
         self._frames = ("|", "/", "-", "\\")

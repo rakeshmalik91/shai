@@ -1,2 +1,2 @@
 - [x] keep task list in .shai/task.json
-- [ ] 
+- [x] keep populated task checklist visible and refresh it during thinking\n- [ ] 
