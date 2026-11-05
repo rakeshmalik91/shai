@@ -841,6 +841,8 @@ def main():
                     "content": SYSTEM_PROMPT
                 }]
                 history_store.clear()
+                # Clear terminal
+                os.system("cls" if os.name == "nt" else "clear")
                 print("Conversation history cleared.")
                 continue
 
