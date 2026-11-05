@@ -251,7 +251,7 @@ class AgentSafeguardModuleTests(unittest.TestCase):
         self.assertFalse(abort_first)
         self.assertFalse(abort_second)
         self.assertFalse(abort_third)
-        self.assertIn("Validation warning 1/2", first["instruction"])
+        self.assertIn("Validation warning 1/5", first["instruction"])
         self.assertFalse(second["tool_disabled_for_request"])
         self.assertEqual(third["result"], "ok")
         execute.assert_called_once()

@@ -155,3 +155,56 @@ output. It collapses only each consecutive batch of tool calls into one
 in-place-updated status line. Normal assistant text and warnings remain normal
 scrolling chat output. Context-meter and task-plan values are maintained as
 state without independently printing repetitive status messages.
+
+
+## Modular package layout
+
+The root scripts are now thin compatibility entry points. Existing commands remain
+unchanged:
+
+- `python agent.py [project_path]` loads `modules.engine.agent_runtime`.
+- `python chat.py [project_path]` loads `modules.ui.chat_runtime`.
+
+The compatibility entry points alias the runtime module namespace when imported,
+so existing imports and test integrations that patch `agent` or `chat` continue
+to operate on the live implementation.
+
+### Engine and UI boundaries
+
+- `modules/engine/agent_runtime.py` owns the coding-agent orchestration and tool
+  lifecycle.
+- `modules/engine/process_control.py` owns bounded subprocess execution,
+  interruption monitoring, and Ctrl+D handling.
+- `modules/ui/chat_runtime.py` owns the chat experience and provider response
+  presentation.
+- `modules/ui/spinner.py` owns the terminal spinner component.
+- Existing shared modules under `modules/` continue to own provider selection,
+  conversation history, context metering, safeguards, logging, reasoning
+  extraction, terminal styling, and live status presentation.
+
+### Command organization
+
+`modules/commands/` separates command aliases, canonical command descriptions,
+help text, and command normalization. The interactive agent loop consumes the
+normalizer while preserving command arguments such as `/project <path>` and
+`/exec <command>`.
+
+### Tool organization
+
+The shared read-only project tools are divided by responsibility:
+
+- `modules/tools/common.py`: project root and path-safety primitives.
+- `modules/tools/filesystem.py`: listing, reading, and text search.
+- `modules/tools/git.py`: Git status and diff inspection.
+- `modules/tools/inspection.py`: AST outlines, symbol/reference lookup,
+  project/test maps, and test-failure inspection.
+- `modules/tools/schemas.py`: read-only tool schemas and dispatch registry.
+- `modules/tools/__init__.py` and `modules/tools.py`: stable compatibility
+  exports for existing imports.
+
+### Configuration compatibility
+
+No configuration values, defaults, keys, or configuration files were changed.
+Both runtime modules resolve `shai_config.json` from the project root, exactly
+as before. The configuration file in the refactor archive is byte-for-byte
+identical to the supplied source archive.

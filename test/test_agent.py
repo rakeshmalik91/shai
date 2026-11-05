@@ -1,5 +1,6 @@
 import json
 import pathlib
+import re
 import sys
 import tempfile
 import unittest
@@ -139,7 +140,10 @@ class ConfigTests(unittest.TestCase):
         ):
             agent.display_tool_errors(["Check path is not a directory."])
         self.assertEqual(events[0], "end")
-        self.assertIn("[Tool error] Check path is not a directory.", events[1])
+        # Error labels are colourized for interactive terminals; assert on
+        # visible text rather than requiring ANSI escape sequences to be absent.
+        visible_output = re.sub(r"\x1b\[[0-9;]*m", "", str(events[1]))
+        self.assertIn("[Tool error] Check path is not a directory.", visible_output)
 
 
 class PlanContinuationTests(unittest.TestCase):
