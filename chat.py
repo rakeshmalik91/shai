@@ -394,6 +394,7 @@ def main():
         if user_text == "/help":
             print(
                 "\nChat with Shai normally.\n"
+                "/help   - Show this help\n"
                 "/model  - Switch provider and model\n"
                 "/reset  - Clear conversation history\n"
                 "/status - Show provider and model\n"

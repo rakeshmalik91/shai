@@ -34,6 +34,7 @@ Available when running `python3 agent.py [project-path]`.
 
 | Command | Description |
 |---------|-------------|
+| `/help` | Show help with examples and command list. |
 | `/reset` | Clear conversation history (keeps system prompt). |
 | `/exit` | Exit Shai. |
 | `Ctrl+D` | During an iteration: cancel current operation and return to prompt. |
@@ -62,6 +63,7 @@ Available when running `python3 chat.py`.
 
 | Command | Aliases | Description |
 |---------|---------|-------------|
+| `/help` | — | Show help with examples and command list. |
 | `/model` | `/switch`, `/switch-model` | Switch provider and model. |
 | `/status` | — | Show current provider and model. |
 | `/reset` | — | Clear conversation history. |
@@ -101,6 +103,7 @@ See `shai_config.json` for the full configuration schema.
 ```
 Agent Mode:          Chat Mode:
 ─────────────────    ────────────
+/help                /help
 /code                /model
 /ask                 /status
 /read-only, /ro      /reset

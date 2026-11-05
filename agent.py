@@ -3682,7 +3682,7 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /exit")
+    print("Commands: /help /model /switch /switch-model /status /files /diff /reset /ask /code /read-only /ro /todo /task /commit /push /commit-push /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
 
     # Mode: "agent" (with tools) or "ask" (chat only, no tools)
@@ -3733,6 +3733,7 @@ Examples:
   Run the Python tests.
 
 Commands:
+  /help    - Show this help
   /model   - Switch provider and model
   /switch  - Alias for /model
   /status  - Git status
