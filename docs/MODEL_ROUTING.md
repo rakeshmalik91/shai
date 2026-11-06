@@ -8,7 +8,7 @@ discovery, and explicit priority. It is currently integrated with:
 
 - Chat (`chat`).
 - Agent orchestration and tool decisions (`orchestrator`).
-- Commit-message generation invoked by `/commit` and `/commit --message-only`
+- Commit-message generation invoked by `/commit`, `/commit --message-only` and `/commit-push`
   (`commit_message`).
 
 The other roles are defined in the routing schema but do not yet have distinct
