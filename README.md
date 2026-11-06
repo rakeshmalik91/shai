@@ -111,7 +111,7 @@ sh ./run_all_tests.sh
 - [Project architecture](docs/ARCHITECTURE.md)
 - [Provider configuration](docs/PROVIDERS.md)
 - [Terminal output formatting](docs/TERMINAL_OUTPUT.md)
-- [Future tools roadmap](docs/roadmap/TOOLS_ROADMAP.md)
+- [Future tools roadmap](docs/plans/TOOLS_ROADMAP.md)
 - [Natural language command triggering roadmap](ROADMAP.md)
 
 ## Project Structure

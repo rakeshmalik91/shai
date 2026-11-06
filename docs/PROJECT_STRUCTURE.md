@@ -119,7 +119,7 @@ This document provides a complete overview of the Shai project structure, includ
 | `TODO.md` | Task tracking |
 | `TOOLS.md` | Tool reference |
 | `bugfixes/` | Bug fix documentation |
-| `roadmap/` | Future roadmap documents |
+| `plans/` | Future roadmap documents |
 
 ## Tests (`test/`)
 

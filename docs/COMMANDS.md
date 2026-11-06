@@ -133,4 +133,4 @@ Agent Mode:          Chat Mode:
 
 - [Existing Tools](TOOLS.md) — Model-callable tools available in Agent mode
 - [Architecture](ARCHITECTURE.md) — Project architecture overview
-- [Tools Roadmap](roadmap/TOOLS_ROADMAP.md) — Planned tool additions
+- [Tools Roadmap](plans/TOOLS_ROADMAP.md) — Planned tool additions
