@@ -18,13 +18,15 @@ and execution policy. Arguments are parsed into an array and executed with
 
 | Executable | Supported operations | Approval |
 |---|---|---|
-| `git` | `status`, summary/path-scoped `diff`, `log` (including `--oneline -10` and bounded pretty formats), `branch --show-current`, `rev-parse`, metadata-only `show` | No per-run approval by default; only read-only subcommands are accepted |
+| `git` | Configurable. Restricted mode uses the subcommands and argument rules in `shai_config.json`; unrestricted mode accepts any Git subcommand and arguments. | Configurable with `requires_approval` |
 | `python3` | `-m pytest`, `-m unittest discover`, `-m compileall` | Approval required by default |
 
 The executable is resolved by Shai; the model cannot supply an arbitrary
 executable path. Python script execution, package installation, arbitrary
-interpreters, Git mutation, remote/network Git operations, privileged commands,
-pipes, redirects, command substitution, and shell expansion are not supported.
+interpreters, privileged commands, pipes, redirects, command substitution, and
+shell expansion are not supported. Git may be configured as restricted or
+unrestricted; unrestricted Git can perform mutations, remote/network operations,
+and other actions supported by the installed Git executable.
 
 Python test modules execute project code. A test suite or `conftest.py` can
 perform arbitrary actions, including network access. Shai does not currently
@@ -70,8 +72,11 @@ Before a process starts, Shai:
 
 1. Checks that `os_command.enabled` is true.
 2. Resolves the executable from the fixed allowlist.
-3. Validates the command profile and every supported option.
-4. Resolves `cwd` and path arguments beneath the active project root.
+3. Applies the configured Git policy (or Python module policy). In Git
+   unrestricted mode, positive allowlists and argument rules are bypassed, but
+   the configured Git blacklists are still enforced.
+4. Resolves `cwd` beneath the active project root. Restricted Git path rules
+   additionally validate path arguments.
 5. Rejects traversal, absolute paths, protected paths, and unsupported command
    forms. Shell syntax is never interpreted; arguments are passed literally.
 6. Constructs an argument vector and invokes the process with `shell=False`.
@@ -79,13 +84,14 @@ Before a process starts, Shai:
    group cleanup where supported.
 8. Returns structured status, exit code, duration, output, and truncation data.
 
-Git runs with system/global configuration disabled, pager/editor interaction
-suppressed, fsmonitor disabled, and external diff/textconv disabled for diff
-and show operations. To support repositories on shared or mounted filesystems
-whose owner differs from the current process, Shai passes
-`-c safe.directory=<canonical project root>` to that Git invocation only. It
-does not modify global Git configuration or trust additional directories. Child processes receive a minimal environment rather than
-the full parent environment.
+Git receives a minimal environment with system/global configuration disabled,
+pager interaction suppressed, and terminal prompting disabled. In restricted
+mode, configured per-invocation options can disable fsmonitor and external
+diff/textconv. The default configuration adds the canonical project root as a
+per-invocation `safe.directory` value; it does not modify global Git
+configuration. Unrestricted mode bypasses Git argument validation and does not
+inject restricted-mode subcommand options. Child processes receive a minimal
+environment rather than the full parent environment.
 
 The project-root check is an application-level boundary, not a complete OS
 sandbox. Same-user processes may still access other resources allowed by the
@@ -95,21 +101,34 @@ operating system. Use OS/container sandboxing if stronger isolation is needed.
 
 ```json
 {
-  "shai_command": {"enabled": true},
   "os_command": {
     "enabled": true,
     "default_timeout_seconds": 30,
     "max_timeout_seconds": 120,
-    "max_stdout_bytes": 24576,
-    "max_stderr_bytes": 8192,
-    "preserve_output_head_bytes": 4096,
-    "preserve_output_tail_bytes": 4096,
-    "terminate_child_processes": true,
     "commands": {
       "git": {
         "enabled": true,
+        "allow_unrestricted": false,
+        "requires_approval": false,
         "subcommands": ["status", "diff", "log", "branch", "rev-parse", "show"],
-        "requires_approval": false
+        "injected_global_options": [
+          "-c", "safe.directory=${PROJECT_ROOT}",
+          "-c", "core.fsmonitor=false",
+          "-c", "core.pager=cat"
+        ],
+        "injected_subcommand_options": {
+          "diff": ["--no-ext-diff", "--no-textconv"],
+          "show": ["--no-ext-diff", "--no-textconv"]
+        },
+        "forbidden_options": ["-c", "-C", "--config-env", "--exec-path", "--git-dir", "--work-tree"],
+        "forbidden_option_prefixes": ["--config-env=", "--git-dir=", "--work-tree="],
+        "argument_rules": {
+          "log": {
+            "allowed_args": ["--oneline", "--format=short", "--format=fuller"],
+            "numeric_options": ["-n", "--max-count"],
+            "max_numeric_value": 1000
+          }
+        }
       },
       "python3": {
         "enabled": true,
@@ -121,10 +140,32 @@ operating system. Use OS/container sandboxing if stronger isolation is needed.
 }
 ```
 
-The command profile is validated in code as well as configured here. Adding an
-executable or subcommand requires a code review and tests; adding a string to
-configuration alone cannot authorize an unknown executable or arbitrary
-operation.
+To allow every Git subcommand and its arguments, set
+`os_command.commands.git.allow_unrestricted` to `true`. This bypasses only the
+positive subcommand allowlist and argument rules. The negative policy always
+applies in both modes: `blocked_subcommands`, `forbidden_options`,
+`forbidden_option_prefixes`, and `forbidden_argument_patterns`. Blacklist checks
+are performed against the supplied argument vector before any injected options
+are added. This does **not** turn `/exec` into a shell: arguments remain an
+array and execution still uses `shell=False`, the bounded process runner,
+configured timeout/output limits, project-relative working directory, and the
+configured approval setting.
+
+To customize policy, edit `subcommands`, `argument_rules`,
+`blocked_subcommands`, `forbidden_options`, `forbidden_option_prefixes`,
+`forbidden_argument_patterns`, and the injected-option maps in `shai_config.json`.
+`forbidden_argument_patterns` contains regular expressions tested against each
+argument token. `argument_rules` supports `allowed_args`, `value_options`,
+`numeric_options`, `max_numeric_value`, regular-expression `patterns`,
+`positional_patterns`, `allow_project_paths_after_separator`, and `require_any`.
+The implementation contains the generic rule evaluator; individual Git option
+allowlists and supported formats live in JSON.
+
+The executable identity (`git` or `python3`) remains an application-level
+allowlist. Within Git, restricted subcommands and their argument policies are
+configuration-driven; adding a subcommand with a corresponding rule does not
+require editing the validator. Unrestricted mode bypasses those Git-specific
+rules entirely.
 
 Python execution approval uses the existing `approve.tools.os_command` or
 `approve.execution` policy. An explicit tool-level `false` takes precedence.
@@ -153,3 +194,18 @@ based on an ambiguous timeout.
 subcommands, disallowed mutation, Python module restrictions, path traversal,
 working-directory restrictions, approval rejection, disabled configuration,
 argument-vector parsing, and tool registration.
+
+### Interactive Git allowlisting
+
+When a Git command is rejected by the positive allowlist (not by a blacklist),
+Shai displays the complete command and asks whether to whitelist it:
+
+1. Exact command and parameters (`approved_commands`).
+2. Every parameter for that Git subcommand (`approved_subcommands`).
+3. Every Git command and subcommand (`allow_unrestricted`).
+
+The selected permission is persisted in `shai_config.json`, then the command is
+retried. Explicit blacklist rules (`blocked_subcommands`, forbidden options,
+option prefixes, and argument patterns) are evaluated first and cannot be
+bypassed by any whitelist choice. The approval preview also displays the full
+resolved command, including injected Git options.

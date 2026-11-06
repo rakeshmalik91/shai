@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import shlex
 import ast
 import re
 import importlib.util
@@ -425,6 +426,61 @@ def os_command(executable, args, cwd=".", timeout_seconds=None):
         root=ROOT, settings=settings, confirm=approve,
         runner=run_bounded_interruptible_command,
     )
+
+    # When a positive Git allowlist blocks a request, offer narrowly scoped
+    # persistent whitelisting in the interactive chat. Blacklist failures
+    # never reach this branch and cannot be overridden here.
+    if result.get("status") == "whitelist_required" and executable == "git":
+        STATUS.suspend_line()
+        full_command = "git " + shlex.join(args)
+        print("\n[Shai] Git command blocked by the configured allowlist:")
+        print("  " + full_command)
+        print("\nWhitelist this command? Choose the scope:")
+        print("  1. This exact command and parameters only")
+        print("  2. All parameters for git {}".format(args[0] if args else "(no subcommand)"))
+        print("  3. All Git commands and subcommands (unrestricted)")
+        print("  0. No, keep it blocked")
+        try:
+            choice = input("Whitelist scope [0-3]: ").strip()
+        except EOFError:
+            raise IterationInterrupted()
+        if choice in ("1", "2", "3"):
+            try:
+                with CONFIG_FILE.open("r", encoding="utf-8") as handle:
+                    persisted = json.load(handle)
+                git_profile = persisted.setdefault("os_command", {}).setdefault("commands", {}).setdefault("git", {})
+                if choice == "1":
+                    entries = git_profile.setdefault("approved_commands", [])
+                    if args not in entries:
+                        entries.append(list(args))
+                    scope_label = "exact command"
+                elif choice == "2":
+                    entries = git_profile.setdefault("approved_subcommands", [])
+                    subcommand = args[0]
+                    if subcommand not in entries:
+                        entries.append(subcommand)
+                    scope_label = "git {} subcommand".format(subcommand)
+                else:
+                    git_profile["allow_unrestricted"] = True
+                    scope_label = "all Git commands"
+                temporary = CONFIG_FILE.with_name(CONFIG_FILE.name + ".tmp")
+                with temporary.open("w", encoding="utf-8") as handle:
+                    json.dump(persisted, handle, indent=2, ensure_ascii=False)
+                    handle.write("\n")
+                temporary.replace(CONFIG_FILE)
+                print("[Shai] Whitelisted {}. Retrying the command.".format(scope_label))
+                settings = load_config().get("os_command", {})
+                result = execute_os_command(
+                    executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
+                    root=ROOT, settings=settings, confirm=approve,
+                    runner=run_bounded_interruptible_command,
+                )
+            except (OSError, ValueError, TypeError, KeyError) as error:
+                print("[Shai] Could not save whitelist: {}".format(error))
+                result = {"error": "Could not persist Git whitelist: {}".format(error), "status": "rejected"}
+        else:
+            result = {"error": "User declined to whitelist the Git command; no process was started.", "status": "rejected"}
+
     LOGGER.info("os_command result executable=%s status=%s exit_code=%s",
                 executable, result.get("status", "rejected"), result.get("exit_code"))
     return result

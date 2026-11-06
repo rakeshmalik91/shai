@@ -15,7 +15,10 @@ from modules.engine.process_control import IterationInterrupted
 
 
 class OSCommandRejected(ValueError):
-    pass
+    def __init__(self, message, whitelistable=False, whitelist_scope=None):
+        super().__init__(message)
+        self.whitelistable = whitelistable
+        self.whitelist_scope = whitelist_scope
 
 
 
@@ -58,81 +61,142 @@ def _validate_tokens(args):
 
 
 def _validate_git_args(args, profile, root):
-    hardcoded_subcommands = {"status", "diff", "log", "branch", "rev-parse", "show"}
-    if (not args or args[0] not in hardcoded_subcommands
-            or args[0] not in profile.get("subcommands", [])):
-        raise OSCommandRejected("Git subcommand is not in the os_command allowlist.")
-    subcommand = args[0]
+    """Apply configurable Git blacklists, then optional allowlist rules.
+
+    Unrestricted mode bypasses only the positive allowlists and argument rules.
+    Explicit blacklists always apply in both modes.
+    """
+    # Negative policy is unconditional: unrestricted means no allowlist, not
+    # permission to execute explicitly blocked commands or arguments.
+    blocked_subcommands = profile.get("blocked_subcommands", [])
+    if args and isinstance(blocked_subcommands, list) and args[0] in blocked_subcommands:
+        raise OSCommandRejected("Git subcommand is blocked by os_command configuration.")
+
+    forbidden = profile.get("forbidden_options", [])
+    prefixes = profile.get("forbidden_option_prefixes", [])
+    forbidden_patterns = profile.get("forbidden_argument_patterns", [])
+    for token in args:
+        if isinstance(forbidden, list) and token in forbidden:
+            raise OSCommandRejected("Git option is blocked by os_command configuration.")
+        if isinstance(prefixes, list) and any(
+            isinstance(prefix, str) and prefix and token.startswith(prefix)
+            for prefix in prefixes
+        ):
+            raise OSCommandRejected("Git option is blocked by os_command configuration.")
+        if isinstance(forbidden_patterns, list) and any(
+            isinstance(pattern, str) and re.search(pattern, token)
+            for pattern in forbidden_patterns
+        ):
+            raise OSCommandRejected("Git argument matches a blocked pattern in os_command configuration.")
+
+    # Explicit user-approved entries bypass positive allowlists only. The
+    # blacklist above is always evaluated first and cannot be whitelisted.
+    approved_commands = profile.get("approved_commands", [])
+    if isinstance(approved_commands, list) and args in approved_commands:
+        return args
+    approved_subcommands = profile.get("approved_subcommands", [])
+    subcommand = args[0] if args else ""
+    if profile.get("allow_unrestricted") is True:
+        return args
+    if isinstance(approved_subcommands, list) and subcommand in approved_subcommands:
+        return args
+
+    subcommands = profile.get("subcommands", [])
+    if not args or not isinstance(subcommands, list) or args[0] not in subcommands:
+        raise OSCommandRejected("Git subcommand is not in the os_command allowlist.", True, "subcommand")
+
+    rules = profile.get("argument_rules", {})
+    rule = rules.get(subcommand) if isinstance(rules, dict) else None
+    if not isinstance(rule, dict):
+        raise OSCommandRejected("No argument policy is configured for git {}.".format(subcommand), True, "subcommand")
+
     tail = args[1:]
-    if any(token in ("-c", "-C", "--config-env", "--exec-path", "--git-dir", "--work-tree")
-           or token.startswith(("--config-env=", "--git-dir=", "--work-tree="))
-           for token in tail):
-        raise OSCommandRejected("Git configuration, directory overrides and exec-path options are not allowed.")
 
-    if subcommand == "status":
-        allowed = {"--short", "--branch", "--porcelain", "--untracked-files=no", "--untracked-files=normal"}
-        if any(token not in allowed for token in tail):
-            raise OSCommandRejected("Unsupported git status argument.")
-    elif subcommand == "diff":
-        allowed = {"--stat", "--name-only", "--name-status", "--cached", "--staged",
-                   "--check", "--no-ext-diff", "--no-textconv", "--color=never", "--"}
-        after_separator = False
-        path_count = 0
-        for token in tail:
-            if token == "--":
-                after_separator = True
-                continue
-            if after_separator:
-                _validate_git_path(token, root)
-                path_count += 1
-            elif token not in allowed:
-                raise OSCommandRejected("Unsupported git diff argument.")
-        if not any(token in {"--stat", "--name-only", "--name-status", "--check"} for token in tail) and path_count == 0:
-            raise OSCommandRejected("git diff must use a summary option or an explicit safe path after --.")
-    elif subcommand == "log":
-        index = 0
-        while index < len(tail):
-            token = tail[index]
-            if token in ("--oneline", "--decorate", "--no-decorate",
-                         "--pretty=oneline", "--pretty=short"):
-                index += 1
-            elif token in ("-n", "--max-count"):
+    allowed = rule.get("allowed_args", [])
+    value_options = rule.get("value_options", [])
+    numeric_options = rule.get("numeric_options", [])
+    patterns = rule.get("patterns", [])
+    numeric_patterns = rule.get("numeric_patterns", [])
+    positional_patterns = rule.get("positional_patterns", [])
+    max_numeric = rule.get("max_numeric_value", 1000)
+    allow_paths = rule.get("allow_project_paths_after_separator") is True
+    after_separator = False
+    seen = []
+    index = 0
+    while index < len(tail):
+        token = tail[index]
+        if token == "--" and allow_paths:
+            after_separator = True
+            index += 1
+            continue
+        if after_separator:
+            _validate_git_path(token, root)
+            seen.append("<path>")
+            index += 1
+            continue
+        if token in allowed:
+            seen.append(token)
+            index += 1
+            continue
+        if token in value_options:
+            if index + 1 >= len(tail):
+                raise OSCommandRejected("{} requires a value.".format(token))
+            seen.append(token)
+            index += 2
+            continue
+        matched_numeric = False
+        for option in numeric_options:
+            if token == option:
                 if index + 1 >= len(tail) or not tail[index + 1].isdigit():
-                    raise OSCommandRejected("git log -n/--max-count requires a numeric limit.")
-                if int(tail[index + 1]) < 1 or int(tail[index + 1]) > 1000:
-                    raise OSCommandRejected("git log count must be between 1 and 1000.")
+                    raise OSCommandRejected("{} requires a numeric value.".format(token))
+                number = int(tail[index + 1])
+                if number < 1 or number > max_numeric:
+                    raise OSCommandRejected("{} value must be between 1 and {}.".format(option, max_numeric))
+                seen.append(option)
                 index += 2
-            elif re.fullmatch(r"-[1-9][0-9]{0,3}", token):
-                if int(token[1:]) > 1000:
-                    raise OSCommandRejected("git log count must be between 1 and 1000.")
+                matched_numeric = True
+                break
+            if token.startswith(option + "="):
+                value = token.split("=", 1)[1]
+                if not value.isdigit() or not 1 <= int(value) <= max_numeric:
+                    raise OSCommandRejected("{} value must be between 1 and {}.".format(option, max_numeric))
+                seen.append(option)
                 index += 1
-            elif re.fullmatch(r"--max-count=[1-9][0-9]{0,3}", token):
-                if int(token.split("=", 1)[1]) > 1000:
-                    raise OSCommandRejected("git log count must be between 1 and 1000.")
+                matched_numeric = True
+                break
+        if matched_numeric:
+            continue
+        matched_pattern = False
+        for pattern_rule in numeric_patterns:
+            if not isinstance(pattern_rule, dict) or not isinstance(pattern_rule.get("pattern"), str):
+                continue
+            if re.fullmatch(pattern_rule["pattern"], token):
+                number_match = re.search(r"[0-9]+", token)
+                maximum = pattern_rule.get("max", max_numeric)
+                if number_match and isinstance(maximum, int) and int(number_match.group()) > maximum:
+                    raise OSCommandRejected("Git numeric argument must not exceed {}.".format(maximum))
+                seen.append("<pattern>")
                 index += 1
-            elif token in ("--pretty=format:%h %s", "--pretty=format:%H %s",
-                           "--format=%h %s", "--format=%H %s"):
-                index += 1
-            else:
-                raise OSCommandRejected("Unsupported git log argument.")
-    elif subcommand == "branch":
-        if any(token != "--show-current" for token in tail):
-            raise OSCommandRejected("Only git branch --show-current is allowed.")
-    elif subcommand == "rev-parse":
-        allowed = {"--show-toplevel", "--is-inside-work-tree", "--short", "HEAD"}
-        if any(token not in allowed for token in tail):
-            raise OSCommandRejected("Unsupported git rev-parse argument.")
-    elif subcommand == "show":
-        allowed = {"--stat", "--oneline", "--no-patch", "HEAD"}
-        if any(token not in allowed and not re.fullmatch(r"HEAD~[0-9]{1,4}", token)
-               for token in tail):
-            raise OSCommandRejected("Unsupported git show argument.")
-        if not any(token in ("--stat", "--oneline", "--no-patch") for token in tail):
-            raise OSCommandRejected("git show is limited to metadata/summary output; add --stat, --oneline or --no-patch.")
+                matched_pattern = True
+                break
+        if matched_pattern:
+            continue
+        if any(isinstance(pattern, str) and re.fullmatch(pattern, token) for pattern in patterns):
+            seen.append("<pattern>")
+            index += 1
+            continue
+        if not token.startswith("-") and any(
+            isinstance(pattern, str) and re.fullmatch(pattern, token)
+            for pattern in positional_patterns
+        ):
+            seen.append("<positional>")
+            index += 1
+            continue
+        raise OSCommandRejected("Unsupported git {} argument: {}".format(subcommand, token), True, "command")
 
-    # Prevent custom external diff drivers and text converters from running.
-    if subcommand in ("diff", "show"):
-        return [subcommand, "--no-ext-diff", "--no-textconv"] + tail
+    required_any = rule.get("require_any", [])
+    if required_any and not any(item in seen for item in required_any):
+        raise OSCommandRejected(rule.get("require_any_message", "Git command is missing a required summary option."))
     return args
 
 
@@ -256,15 +320,30 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
         maximum = min(maximum, 120)  # hard runtime ceiling; config cannot remove it
         timeout = min(timeout, maximum)
     except (OSCommandRejected, OSError, ValueError) as error:
-        return {"error": str(error)}
+        response = {"error": str(error)}
+        if isinstance(error, OSCommandRejected) and error.whitelistable:
+            response.update({"status": "whitelist_required", "whitelist_scope": error.whitelist_scope})
+        return response
 
     # Git's dubious-ownership check is intentionally satisfied per invocation,
     # for this canonical project root only. Do not write safe.directory to the
     # user's global Git configuration.
-    command = ([binary, "-c", "safe.directory={}".format(project_root),
-                "-c", "core.fsmonitor=false", "-c", "core.pager=cat"] + tokens
-               if executable == "git" else [binary] + tokens)
+    if executable == "git":
+        prefix = command_settings.get("injected_global_options", [])
+        if not isinstance(prefix, list) or not all(isinstance(item, str) for item in prefix):
+            return {"error": "Invalid os_command.commands.git.injected_global_options configuration."}
+        prefix = [item.replace("${PROJECT_ROOT}", str(project_root)) for item in prefix]
+        command = [binary] + prefix + tokens
+        injected = command_settings.get("injected_subcommand_options", {})
+        if (command_settings.get("allow_unrestricted") is not True
+                and isinstance(injected, dict) and tokens):
+            extra = injected.get(tokens[0], [])
+            if isinstance(extra, list) and all(isinstance(item, str) for item in extra):
+                command = [binary] + prefix + [tokens[0]] + extra + tokens[1:]
+    else:
+        command = [binary] + tokens
     preview = "\n".join((
+        "Full command: {}".format(shlex.join(command)),
         "Executable: {}".format(binary),
         "Arguments: {}".format(shlex.join(tokens)),
         "Working directory: {}".format(working_directory),
