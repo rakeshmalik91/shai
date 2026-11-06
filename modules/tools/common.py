@@ -101,19 +101,34 @@ def _save_grant(path_pattern, permissions):
 
 
 def _request_interactive_access(path, permission):
-    """Ask for scoped permission only in an interactive terminal."""
+    """Ask for scoped permission in a real interactive terminal only.
+
+    Tests may inject ACCESS_PROMPT to exercise the flow, but the test runner
+    itself is never allowed to fall through to stdin/input().
+    """
+    import os
     import sys
+
     if not getattr(sys.stdin, "isatty", lambda: False)():
         return False
+    if ACCESS_PROMPT is None:
+        if "PYTEST_CURRENT_TEST" in os.environ or "unittest" in sys.modules:
+            return False
+        prompt = input
+    else:
+        prompt = ACCESS_PROMPT
+
     relative = pathlib.Path(path).as_posix().strip("/") or "."
-    print("\nShai is blocked from accessing a project path.")
     labels = {"view": "read", "edit": "write", "truncate": "write (truncate)",
               "delete": "delete", "execute": "exec"}
+    requested_code = {"view": "r", "edit": "w", "truncate": "w",
+                      "delete": "d", "execute": "x"}.get(permission, "?")
+    print("\nShai is blocked from accessing a project path.")
     print("  Path:       {}".format(relative))
-    print("  Requested:  {} ({})".format(labels.get(permission, permission), permission))
-    print("  Scope:      [1] this file/folder  [2] parent  [3] level-2 parent  [4] deny" )
+    print("  Requested:  {} ({})".format(requested_code, labels.get(permission, permission)))
+    print("  Scope:      [1] this file/folder  [2] parent  [3] level-2 parent  [4] deny")
     try:
-        scope = (ACCESS_PROMPT or input)("Grant scope [1-4]: ").strip().lower()
+        scope = prompt("Grant scope [1-4]: ").strip().lower()
     except (EOFError, KeyboardInterrupt, OSError):
         return False
     if scope in ("4", "deny", "d", ""):
@@ -130,39 +145,63 @@ def _request_interactive_access(path, permission):
         return False
     if base in ("", "."):
         base = "."
-    print("  Permissions: read, write, delete, exec, all")
+
+    print("  Access bits: r=read, w=write, x=exec, d=delete, a=all")
     try:
-        choice = (ACCESS_PROMPT or input)("Grant which permissions? [read/write/delete/exec/all; comma-separated]: ").strip().lower()
+        choice = prompt("Grant permissions [rwxda; e.g. rwx]: ").strip().lower()
     except (EOFError, KeyboardInterrupt, OSError):
         return False
+
     aliases = {
-        "read": ("view",),
-        "write": ("edit", "truncate"),
-        "delete": ("delete",),
-        "exec": ("execute",),
-        "all": ("view", "edit", "truncate", "delete", "execute"),
+        "read": "r", "view": "r", "write": "w", "edit": "w",
+        "exec": "x", "execute": "x", "delete": "d", "all": "a",
     }
-    selected = set()
-    for item in choice.replace(" ", "").split(","):
-        if item not in aliases:
-            print("Invalid permission '{}'; access remains denied.".format(item))
-            return False
-        selected.update(aliases[item])
-    if not selected:
+    # Accept compact Unix-style bits (rwx, rw, x, etc.) and retain the
+    # previous comma-separated words as a backwards-compatible input form.
+    if choice in aliases:
+        choice = aliases[choice]
+    elif "," in choice or any(ch.isspace() for ch in choice):
+        tokens = [part for part in re.split(r"[,\s]+", choice) if part]
+        normalized = ""
+        for token in tokens:
+            if token not in aliases:
+                print("Invalid permission '{}'; access remains denied.".format(token))
+                return False
+            normalized += aliases[token]
+        choice = normalized
+    if choice == "a":
+        selected = {"view", "edit", "truncate", "delete", "execute"}
+    elif choice and all(ch in "rwxd" for ch in choice):
+        selected = set()
+        if "r" in choice:
+            selected.add("view")
+        if "w" in choice:
+            selected.update(("edit", "truncate"))
+        if "x" in choice:
+            selected.add("execute")
+        if "d" in choice:
+            selected.add("delete")
+    else:
+        print("Invalid permission selection; access remains denied.")
         return False
+
     if permission not in selected:
         print("Requested capability '{}' was not selected; no grant was saved.".format(
             labels.get(permission, permission)
         ))
         return False
-    # Folder scopes include descendants; exact scopes stay exact.
+    # Folder scopes include descendants; exact scopes stay exact unless the
+    # selected exact target is itself a directory.
     is_directory_scope = (scope in ("2", "parent", "p", "3", "parent2", "level-2", "grandparent", "l2") or
                          ((ROOT / base).is_dir() if base != "." else True))
     rule_path = ("**" if base == "." else base + "/**") if is_directory_scope else base
     permissions = {name: name in selected for name in
                    ("view", "edit", "truncate", "delete", "execute")}
     _save_grant(rule_path, permissions)
-    print("Access granted for {}: {}".format(base, ", ".join(sorted(selected))))
+    print("Access granted for {}: {}".format(base, "".join(
+        bit for bit, name in (("r", "view"), ("w", "edit"), ("x", "execute"), ("d", "delete"))
+        if name in selected
+    )))
     return permission in selected
 
 def _relative_path(target, root):

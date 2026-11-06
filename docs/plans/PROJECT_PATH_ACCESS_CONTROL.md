@@ -32,7 +32,10 @@ denies truncate/delete.
   execution targets; Git pathspecs require `view`.
 - Approval settings cannot override path policy.
 - Interactive blocks ask for exact path/folder, parent, level-2 parent, or deny,
-  followed by read/write/delete/exec/all capability selection.
+  followed by compact permission selection: `r` read, `w` write (including
+  truncate), `x` execute, `d` delete, or `a` for all (for example, `rwx`).
+  Tests inject a prompt callback when exercising this flow; test execution never
+  reads from stdin.
 - User grants persist under the active project's `.shai/project_access.json`;
   non-interactive runs never prompt.
 

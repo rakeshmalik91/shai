@@ -230,4 +230,6 @@ working directory and Python targets, and `view` for Git pathspecs.
 Generic rules live in `assets/project_access_config.json`. User-approved per-project grants are stored in the
 active project's `.shai/project_access.json` (ignored by Git). Interactive
 blocks ask for the exact file/folder, parent, or level-2 parent scope and the
-read/write/delete/exec/all capabilities. See `docs/CONFIGURATION.md`.
+compact permission bits: `r` read, `w` write (including truncate), `x` execute,
+`d` delete, or `a` for all (for example, `rwx`). Tests never prompt through
+stdin. See `docs/CONFIGURATION.md`.

@@ -166,7 +166,7 @@ class ProjectAccessControlTests(unittest.TestCase):
 
     def test_interactive_grant_for_exact_file_and_requested_capability(self):
         from unittest.mock import patch
-        answers = iter(["1", "read"])
+        answers = iter(["1", "r"])
         with patch("sys.stdin.isatty", return_value=True), patch.object(
             common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
         ):
@@ -182,7 +182,7 @@ class ProjectAccessControlTests(unittest.TestCase):
                         "delete": False, "execute": True},
             "paths": [{"path": "hidden/**", "edit": False, "truncate": False}]
         })
-        answers = iter(["2", "write"])
+        answers = iter(["2", "w"])
         with patch("sys.stdin.isatty", return_value=True), patch.object(
             common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
         ):
@@ -194,7 +194,7 @@ class ProjectAccessControlTests(unittest.TestCase):
     def test_interactive_level_two_parent_grant(self):
         from unittest.mock import patch
         (self.root / "area" / "nested").mkdir(parents=True)
-        answers = iter(["3", "exec"])
+        answers = iter(["3", "x"])
         with patch("sys.stdin.isatty", return_value=True), patch.object(
             common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
         ):
@@ -210,6 +210,35 @@ class ProjectAccessControlTests(unittest.TestCase):
             with self.assertRaises(common.ProjectAccessDenied):
                 common.require_access("hidden/secret.txt", "view")
         self.assertFalse((self.root / ".shai" / "project_access.json").exists())
+
+    def test_test_runner_never_falls_through_to_stdin(self):
+        from unittest.mock import patch
+        with patch("sys.stdin.isatty", return_value=True), patch.object(
+            common, "ACCESS_PROMPT", None
+        ), patch("builtins.input", side_effect=AssertionError("test attempted stdin prompt")):
+            with self.assertRaises(common.ProjectAccessDenied):
+                common.require_access("hidden/secret.txt", "view")
+
+    def test_compact_rwx_permissions_and_delete_bit(self):
+        from unittest.mock import patch
+        answers = iter(["1", "rwx"])
+        with patch("sys.stdin.isatty", return_value=True), patch.object(
+            common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
+        ):
+            self.assertTrue(common.require_access("hidden/secret.txt", "view"))
+        for permission in ("view", "edit", "truncate", "execute"):
+            self.assertTrue(common.access_decision("hidden/secret.txt", permission)[0])
+        self.assertFalse(common.access_decision("hidden/secret.txt", "delete")[0])
+
+    def test_compact_delete_bit_is_independent(self):
+        from unittest.mock import patch
+        answers = iter(["1", "d"])
+        with patch("sys.stdin.isatty", return_value=True), patch.object(
+            common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
+        ):
+            self.assertTrue(common.require_access("hidden/secret.txt", "delete"))
+        self.assertTrue(common.access_decision("hidden/secret.txt", "delete")[0])
+        self.assertFalse(common.access_decision("hidden/secret.txt", "view")[0])
 
     def test_non_interactive_denial_never_prompts(self):
         from unittest.mock import patch
@@ -238,7 +267,7 @@ class ProjectAccessControlTests(unittest.TestCase):
                         "delete": False, "execute": False},
             "paths": []
         })
-        answers = iter(["1", "all"])
+        answers = iter(["1", "a"])
         with patch("sys.stdin.isatty", return_value=True), patch.object(
             common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
         ):
@@ -248,7 +277,7 @@ class ProjectAccessControlTests(unittest.TestCase):
 
     def test_project_grants_are_isolated_per_project(self):
         from unittest.mock import patch
-        answers = iter(["1", "read"])
+        answers = iter(["1", "r"])
         with patch("sys.stdin.isatty", return_value=True), patch.object(
             common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
         ):
@@ -261,7 +290,7 @@ class ProjectAccessControlTests(unittest.TestCase):
 
     def test_exact_folder_grant_covers_descendants(self):
         from unittest.mock import patch
-        answers = iter(["1", "read"])
+        answers = iter(["1", "r"])
         with patch("sys.stdin.isatty", return_value=True), patch.object(
             common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
         ):
@@ -271,7 +300,7 @@ class ProjectAccessControlTests(unittest.TestCase):
 
     def test_level_two_parent_at_project_root_covers_project(self):
         from unittest.mock import patch
-        answers = iter(["3", "read"])
+        answers = iter(["3", "r"])
         with patch("sys.stdin.isatty", return_value=True), patch.object(
             common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
         ):
@@ -307,7 +336,7 @@ class ProjectAccessControlTests(unittest.TestCase):
         from modules.engine import agent_runtime as runtime
         original_runtime_root = runtime.ROOT
         runtime.ROOT = self.root
-        answers = iter(["1", "read"])
+        answers = iter(["1", "r"])
         try:
             with patch("sys.stdin.isatty", return_value=True), patch.object(
                 common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
@@ -358,7 +387,7 @@ class ProjectAccessControlTests(unittest.TestCase):
 
     def test_grant_without_requested_capability_is_not_persisted(self):
         from unittest.mock import patch
-        answers = iter(["1", "write"])
+        answers = iter(["1", "w"])
         with patch("sys.stdin.isatty", return_value=True), patch.object(
             common, "ACCESS_PROMPT", side_effect=lambda _prompt: next(answers)
         ):

@@ -165,6 +165,9 @@ inspection; `edit` controls ordinary modifications (existing files also need
 `view` for safe diff previews); `truncate` separately gates high-risk reductions; `execute` gates controlled command working
 directories and Python targets. `delete` is reserved for future deletion
 tools. Interactive blocks ask for the exact file/folder, parent, or level-2
-parent scope and read/write/delete/exec/all capabilities. Denied entries are
+parent scope and compact permission bits: `r` read, `w` write (including
+truncate), `x` execute, `d` delete, or `a` for all. For example, `rwx` grants
+read/write/execute without delete. Test runs never fall through to stdin; tests
+that exercise the interactive flow inject a prompt callback. Denied entries are
 filtered from directory listings and recursive discovery. See
 `docs/CONFIGURATION.md` for the full flow.
