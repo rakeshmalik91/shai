@@ -1,0 +1,346 @@
+{
+  "version": 1,
+  "commands": [
+    {
+      "id": "help",
+      "slash_command": "/help",
+      "description": "Show command help",
+      "modes": [
+        "agent",
+        "ask",
+        "read-only",
+        "chat"
+      ],
+      "aliases": [],
+      "triggers": [
+        "show command help",
+        "show me the commands",
+        "list available commands",
+        "how do i use shai",
+        "help",
+        "show help"
+      ],
+      "risk": "read_only"
+    },
+    {
+      "id": "model",
+      "slash_command": "/model",
+      "description": "Switch provider and model",
+      "modes": [
+        "agent",
+        "ask",
+        "read-only",
+        "chat"
+      ],
+      "aliases": [
+        "/switch",
+        "/switch-model"
+      ],
+      "triggers": [
+        "switch model",
+        "change model",
+        "change provider",
+        "switch provider",
+        "select a different model",
+        "switch to another model",
+        "change the ai model"
+      ],
+      "risk": "local"
+    },
+    {
+      "id": "status",
+      "slash_command": "/status",
+      "description": "Show repository status in agent modes or provider status in chat",
+      "modes": [
+        "agent",
+        "ask",
+        "read-only"
+      ],
+      "aliases": [],
+      "triggers": [
+        "show git status",
+        "show repository status",
+        "check git status",
+        "check the working tree",
+        "show working tree status",
+        "show me git status",
+        "check repository status",
+        "what is the git status",
+        "show my git status"
+      ],
+      "risk": "read_only"
+    },
+    {
+      "id": "status-chat",
+      "slash_command": "/status",
+      "description": "Show provider and model status",
+      "modes": [
+        "chat"
+      ],
+      "aliases": [],
+      "triggers": [
+        "show status",
+        "show current status",
+        "what model am i using",
+        "which model am i using",
+        "show current model",
+        "show me status",
+        "show provider status"
+      ],
+      "risk": "read_only"
+    },
+    {
+      "id": "files",
+      "slash_command": "/files",
+      "description": "List project files",
+      "modes": [
+        "agent",
+        "read-only"
+      ],
+      "aliases": [],
+      "triggers": [
+        "list project files",
+        "show project files",
+        "list files in the project",
+        "show the project file list",
+        "show me project files",
+        "list all project files"
+      ],
+      "risk": "read_only"
+    },
+    {
+      "id": "diff",
+      "slash_command": "/diff",
+      "description": "Show unstaged Git diff",
+      "modes": [
+        "agent",
+        "read-only"
+      ],
+      "aliases": [],
+      "triggers": [
+        "show git diff",
+        "show the git diff",
+        "show my changes",
+        "show unstaged changes",
+        "what changed in the working tree",
+        "show me the diff",
+        "show changes",
+        "review my git diff"
+      ],
+      "risk": "read_only"
+    },
+    {
+      "id": "reset",
+      "slash_command": "/reset",
+      "description": "Clear conversation history",
+      "modes": [
+        "agent",
+        "ask",
+        "read-only",
+        "chat"
+      ],
+      "aliases": [],
+      "triggers": [
+        "clear conversation history",
+        "clear chat history",
+        "reset conversation",
+        "reset this conversation",
+        "clear the conversation",
+        "clear the chat"
+      ],
+      "risk": "destructive"
+    },
+    {
+      "id": "ask",
+      "slash_command": "/ask",
+      "description": "Switch to ask mode",
+      "modes": [
+        "agent"
+      ],
+      "aliases": [],
+      "triggers": [
+        "switch to ask mode",
+        "enter ask mode",
+        "turn on ask mode",
+        "switch to ask"
+      ],
+      "risk": "mode_change"
+    },
+    {
+      "id": "read-only",
+      "slash_command": "/read-only",
+      "description": "Switch to read-only mode",
+      "modes": [
+        "agent"
+      ],
+      "aliases": [
+        "/ro"
+      ],
+      "triggers": [
+        "switch to read only mode",
+        "switch to read-only mode",
+        "enter read only mode",
+        "enable read only mode",
+        "switch to read-only",
+        "go read-only"
+      ],
+      "risk": "mode_change"
+    },
+    {
+      "id": "code",
+      "slash_command": "/code",
+      "description": "Switch to coding-agent mode",
+      "modes": [
+        "agent",
+        "ask",
+        "read-only"
+      ],
+      "aliases": [],
+      "triggers": [
+        "switch to code mode",
+        "switch to coding mode",
+        "enter code mode",
+        "enable coding mode",
+        "switch to code",
+        "go to code mode"
+      ],
+      "risk": "mode_change"
+    },
+    {
+      "id": "todo",
+      "slash_command": "/todo",
+      "description": "Show current task plan",
+      "modes": [
+        "agent"
+      ],
+      "aliases": [
+        "/task"
+      ],
+      "triggers": [
+        "show my task list",
+        "show the task plan",
+        "show current tasks",
+        "list current tasks",
+        "what tasks are pending",
+        "show todo",
+        "show todos",
+        "show me the todo list",
+        "show me my task list"
+      ],
+      "risk": "read_only"
+    },
+    {
+      "id": "commit",
+      "slash_command": "/commit",
+      "description": "Commit staged changes",
+      "modes": [
+        "agent"
+      ],
+      "aliases": [],
+      "triggers": [
+        "commit staged changes",
+        "commit the staged changes",
+        "create a git commit",
+        "commit my changes",
+        "commit the staged files",
+        "make a commit"
+      ],
+      "risk": "repository_mutation"
+    },
+    {
+      "id": "commit-message",
+      "slash_command": "/commit --message-only",
+      "description": "Generate a commit message without committing",
+      "modes": [
+        "agent"
+      ],
+      "aliases": [],
+      "triggers": [
+        "generate a commit message",
+        "suggest a commit message",
+        "write a commit message",
+        "generate commit message",
+        "create a commit message only"
+      ],
+      "risk": "read_only"
+    },
+    {
+      "id": "push",
+      "slash_command": "/push",
+      "description": "Push commits to remote",
+      "modes": [
+        "agent"
+      ],
+      "aliases": [],
+      "triggers": [
+        "push my commits",
+        "push the commits",
+        "push to origin",
+        "push the current branch",
+        "push changes to remote",
+        "push my changes"
+      ],
+      "risk": "network_mutation"
+    },
+    {
+      "id": "commit-push",
+      "slash_command": "/commit-push",
+      "description": "Commit and push",
+      "modes": [
+        "agent"
+      ],
+      "aliases": [],
+      "triggers": [
+        "commit and push",
+        "commit then push",
+        "commit my changes and push",
+        "commit and push changes",
+        "commit changes and push them"
+      ],
+      "risk": "network_mutation"
+    },
+    {
+      "id": "project",
+      "slash_command": "/project",
+      "description": "Switch project directory; requires an explicit path",
+      "modes": [
+        "agent",
+        "chat"
+      ],
+      "aliases": [],
+      "triggers": [],
+      "risk": "local"
+    },
+    {
+      "id": "exec",
+      "slash_command": "/exec",
+      "description": "Execute a shell command",
+      "modes": [
+        "agent"
+      ],
+      "aliases": [],
+      "triggers": [],
+      "risk": "privileged"
+    },
+    {
+      "id": "exit",
+      "slash_command": "/exit",
+      "description": "Exit Shai",
+      "modes": [
+        "agent",
+        "ask",
+        "read-only",
+        "chat"
+      ],
+      "aliases": [],
+      "triggers": [
+        "exit shai",
+        "quit shai",
+        "close shai",
+        "quit",
+        "exit"
+      ],
+      "risk": "session_control"
+    }
+  ]
+}

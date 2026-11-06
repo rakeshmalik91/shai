@@ -21,6 +21,8 @@ import urllib.parse
 import urllib.request
 
 from modules.terminal_style import colorize
+from modules.commands.natural_language import resolve_natural_language_command
+from modules.commands.registry import normalize_command
 from modules.ui.spinner import Spinner
 from modules.provider_selection import (
     PROVIDERS, initialize_provider, get_provider_config,
@@ -331,6 +333,11 @@ def main():
 
         if not user_text:
             continue
+        natural_command = resolve_natural_language_command(user_text, "chat")
+        if natural_command:
+            print("[Shai] Interpreted as {}.".format(natural_command))
+            user_text = natural_command
+        user_text = normalize_command(user_text)
         if user_text == "/exit":
             print("Goodbye.")
             break

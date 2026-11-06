@@ -1,19 +1,8 @@
-"""Canonical Shai CLI command descriptions."""
-COMMANDS = {
-    "/help": "Show command help",
-    "/model": "Switch provider and model",
-    "/status": "Show Git status",
-    "/files": "List project files",
-    "/diff": "Show Git diff",
-    "/reset": "Clear conversation history",
-    "/ask": "Switch to ask mode",
-    "/read-only": "Switch to read-only mode",
-    "/code": "Switch to coding-agent mode",
-    "/todo": "Show the current task plan",
-    "/commit": "Commit staged changes",
-    "/push": "Push commits",
-    "/commit-push": "Commit and push",
-    "/project": "Switch project directory",
-    "/exec": "Execute an approved shell command",
-    "/exit": "Exit Shai",
-}
+"""Command descriptions generated from the JSON command registry."""
+from .natural_language import load_command_registry
+
+COMMANDS = {}
+for _item in load_command_registry()["commands"]:
+    COMMANDS.setdefault(
+        _item["slash_command"], _item.get("description", "")
+    )

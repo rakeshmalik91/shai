@@ -26,6 +26,7 @@ import _thread
 from modules.ui.spinner import Spinner
 from modules.ui.chat_runtime import extract_anthropic_response, response_text
 from modules.commands.registry import normalize_command
+from modules.commands.natural_language import resolve_natural_language_command
 from modules.commands.help import HELP_TEXT
 from modules.engine import (
     configuration, project_inspection, task_plan, git_operations,
@@ -783,6 +784,10 @@ def main():
             if not user_text:
                 continue
 
+            natural_command = resolve_natural_language_command(user_text, mode)
+            if natural_command:
+                print("[Shai] Interpreted as {}.".format(natural_command))
+                user_text = natural_command
             user_text = normalize_command(user_text)
 
             if user_text == "/exit":
