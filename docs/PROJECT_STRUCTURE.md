@@ -239,6 +239,6 @@ compact permission bits: `r` read, `w` write (including truncate), `x` execute,
 stdin. See `docs/CONFIGURATION.md`.
 
 
-Project-specific model routes live in `.Shai/model_routing.json`. The
-`.Shai/` directory is Git-ignored; `assets/model_routing.json` is the
+Project-specific model routes live in `.shai/model_routing.json`. The
+`.shai/` directory is Git-ignored; `assets/model_routing.json` is the
 version-controlled template with all supported roles initially unconfigured.

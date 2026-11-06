@@ -130,13 +130,13 @@ canonical directory when logging initializes. A custom absolute or relative
 
 `assets/model_routing.json` is the tracked routing template. It declares every
 supported task category with an empty candidate list, so routing is disabled
-until a project configures candidates. The active project's override is `.Shai/model_routing.json`. This specific
+until a project configures candidates. The active project's override is `.shai/model_routing.json`. This specific
 file is intentionally committed with the project so the team's routing policy
-is shared. Other files under `.Shai/` remain Git-ignored. The root `.gitignore`
-uses `.Shai/*` with an exception for `.Shai/model_routing.json`.
+is shared. Other files under `.shai/` remain Git-ignored. The root `.gitignore`
+uses `.shai/*` with an exception for `.shai/model_routing.json`.
 
 For a populated example, see `assets/model_routing.sample.json`. Copy its
-`models` entries into `.Shai/model_routing.json` and replace every
+`models` entries into `.shai/model_routing.json` and replace every
 `YOUR_*_MODEL` placeholder with an exact model identifier returned by that
 provider's model discovery. The Ollama examples also require those models to
 be installed locally.

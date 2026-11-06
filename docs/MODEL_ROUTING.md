@@ -18,7 +18,7 @@ runtime call sites. See [the remaining implementation plan](plans/MODEL_ROUTING_
 
 - `assets/model_routing.json` is the tracked empty template and defines the
   supported roles and default configuration shape.
-- `<project>/.Shai/model_routing.json` is the active project's override.
+- `<project>/.shai/model_routing.json` is the active project's override.
 - The project file overrides only roles it explicitly defines. Other roles
   retain their template values (currently empty candidate lists).
 - The provider/model selected through the normal ShAI configuration remains
@@ -26,9 +26,9 @@ runtime call sites. See [the remaining implementation plan](plans/MODEL_ROUTING_
 - Provider credentials, API endpoints, and provider-specific settings remain
   in provider configuration; they do not belong in the routing file.
 
-The `.Shai` spelling is intentional in the current implementation and is
-case-sensitive on case-sensitive filesystems. Do not confuse it with the
-lowercase `.shai/` directory used for project-local grants, logs, and backups.
+The directory name is consistently lowercase `.shai/` across runtime code,
+tests, and documentation. This is the same project-local directory used for
+access grants, logs, task state, and backups.
 
 ## Example
 
@@ -136,7 +136,7 @@ The command-driven commit flow uses the shared task-role API boundary:
 - `/commit --message-only` uses the same routed request and returns the generated
   message without creating a commit.
 - `/commit-push` inherits the same behaviour because it delegates to `git_commit`.
-- The shared router resolves the active project's `.Shai/model_routing.json`,
+- The shared router resolves the active project's `.shai/model_routing.json`,
   applies priority/availability selection, temporarily switches the provider and
   model for the request, and restores the normal provider/model afterward.
 - The shared provider adapter handles provider-specific request/response formats;

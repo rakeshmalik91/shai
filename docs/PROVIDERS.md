@@ -173,10 +173,10 @@ model-specific value is available.
 ## Task-based model routing
 
 Shai supports project-local model routing by task category. Configure candidate
-models in `.Shai/model_routing.json`; use `assets/model_routing.json` as the
+models in `.shai/model_routing.json`; use `assets/model_routing.json` as the
 tracked template. Candidates are ordered by ascending `priority` (1 is highest)
 and must exist in the selected provider's discovered model list. A missing or
 unavailable route uses the normal default provider/model. See
 [CONFIGURATION.md](CONFIGURATION.md#model-routing) for the complete schema and
-supported roles. `.Shai/` is ignored by Git so project-specific preferences are
+supported roles. `.shai/` is ignored by Git so project-specific preferences are
 not committed accidentally.

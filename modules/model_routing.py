@@ -1,7 +1,7 @@
 """Project-scoped, priority-ordered model routing.
 
 The tracked assets/model_routing.json is a schema/default template. The active
-project's .Shai/model_routing.json supplies project-specific role overrides.
+project's .shai/model_routing.json supplies project-specific role overrides.
 """
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def load_routing_config(project_root):
     models = {role: list(models.get(role, [])) if isinstance(models.get(role, []), list) else []
               for role in ROLES}
 
-    project_file = pathlib.Path(project_root).expanduser().resolve() / ".Shai" / "model_routing.json"
+    project_file = pathlib.Path(project_root).expanduser().resolve() / ".shai" / "model_routing.json"
     project = _read_json(project_file)
     if project:
         if project.get("version") != SCHEMA_VERSION:

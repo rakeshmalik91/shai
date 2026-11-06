@@ -11,7 +11,7 @@ class ModelRoutingTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.project = pathlib.Path(self.temp.name)
-        self.route_file = self.project / ".Shai" / "model_routing.json"
+        self.route_file = self.project / ".shai" / "model_routing.json"
         self.route_file.parent.mkdir()
         self.original_template = model_routing.TEMPLATE_FILE
         self.template = self.project / "template.json"
@@ -100,8 +100,10 @@ class ModelRoutingTests(unittest.TestCase):
 
     def test_project_routing_file_is_gitignored_and_template_is_tracked(self):
         ignore = (self.project / ".gitignore")
-        ignore.write_text(".Shai/\\n", encoding="utf-8")
-        self.assertIn(".Shai/", ignore.read_text(encoding="utf-8"))
+        ignore.write_text(".shai/*\\n!.shai/model_routing.json\\n", encoding="utf-8")
+        ignore_rules = ignore.read_text(encoding="utf-8")
+        self.assertIn(".shai/*", ignore_rules)
+        self.assertIn("!.shai/model_routing.json", ignore_rules)
         self.assertTrue(model_routing.TEMPLATE_FILE.exists())
 
     def test_discovery_is_cached_per_project_and_provider(self):
