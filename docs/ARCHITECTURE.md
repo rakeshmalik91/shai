@@ -48,7 +48,7 @@ flowchart TD
     Loop --> LLM
     ChatLoop --> LLM
 
-    Config[assets/shai_config.json + split runtime configs + .shai/project_access.json] --> Agent
+    Config[assets/shai_config.json + split runtime configs + assets/project_access_config.json + .shai/project_access.json] --> Agent
     Config --> Chat
     Config --> SharedModules
     History[.shai/history.json] --> ConvHist
@@ -127,7 +127,7 @@ Reasoning handlers expose provider-supplied summaries when available. They do no
 
 ## Persistent data
 
-- `assets/shai_config.json`: core runtime configuration and last-used provider/model; `assets/provider_config.json`: provider overrides; `assets/command_config.json`: command policies.
+- `assets/shai_config.json`: core runtime configuration and last-used provider/model; `assets/project_access_config.json`: generic project path access policy; `assets/provider_config.json`: provider overrides; `assets/command_config.json`: command policies.
 - `.shai/history.json`: conversation history in the selected working project.
 - `.shai/project_access.json`: user-approved path grants scoped to that project (ignored by Git).
 - `logs/`: diagnostic logs when file logging is enabled.
@@ -216,7 +216,7 @@ operations require `edit`, with a separate `truncate` check for high-risk
 content reductions. Controlled command execution checks `execute` for its
 working directory and Python targets, and `view` for Git pathspecs.
 
-Generic policy is stored in the `project_access` section of `assets/shai_config.json`; user-approved project-specific grants are stored in `.shai/project_access.json`.
+Generic policy is stored in `assets/project_access_config.json`; user-approved project-specific grants are stored in `.shai/project_access.json`.
 Path rules use project-relative globs, explicit deny always wins, and
 canonicalization prevents traversal and symlink escapes. Access checks are
 separate from interactive/configured approvals: approval cannot grant a

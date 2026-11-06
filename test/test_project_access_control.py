@@ -39,6 +39,16 @@ class ProjectAccessControlTests(unittest.TestCase):
     def write_policy(self, policy):
         self.config.write_text(json.dumps({"project_access": policy}), encoding="utf-8")
 
+    def test_generic_policy_uses_dedicated_config_file(self):
+        expected = pathlib.Path(common.__file__).resolve().parents[2] / "assets" / "project_access_config.json"
+        self.assertEqual(
+            pathlib.Path(self.original_config).name,
+            "project_access_config.json"
+        )
+        self.assertTrue(expected.is_file())
+        core_config = json.loads((expected.parent / "shai_config.json").read_text(encoding="utf-8"))
+        self.assertNotIn("project_access", core_config)
+
     def test_default_policy_and_rule_deny(self):
         self.assertTrue(common.access_decision("visible/ok.txt", "view")[0])
         self.assertFalse(common.access_decision("hidden/secret.txt", "view")[0])

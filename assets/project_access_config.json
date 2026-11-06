@@ -1,0 +1,109 @@
+{
+  "project_access": {
+    "default": {
+      "view": true,
+      "edit": true,
+      "truncate": false,
+      "delete": false,
+      "execute": true
+    },
+    "paths": [
+      {
+        "path": ".git",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": ".git/**",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": ".env*",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": "**/.env*",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": "**/credentials.json",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": "**/secrets.json",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": ".ssh",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": ".ssh/**",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": ".aws",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": ".aws/**",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": "credentials.json",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      },
+      {
+        "path": "secrets.json",
+        "view": false,
+        "edit": false,
+        "truncate": false,
+        "delete": false,
+        "execute": false
+      }
+    ]
+  }
+}

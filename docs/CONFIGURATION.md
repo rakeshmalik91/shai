@@ -2,7 +2,8 @@
 
 Shai configuration is stored under `assets/` and split by responsibility:
 
-- `assets/shai_config.json` — core agent, runtime, display, retry, approval, and safeguard settings.
+- `assets/shai_config.json` — core agent, runtime, retry, approval, and safeguard settings.
+- `assets/project_access_config.json` — generic project path access defaults and administrator-authored path rules.
 - `assets/provider_config.json` — provider endpoint/authentication overrides under `providers`.
 - `assets/command_config.json` — Shai slash-command and OS command settings (`shai_command`, `os_command`).
 - `assets/context_window_config.json` — per-model context limits and active context token limit.
@@ -15,13 +16,12 @@ Runtime configuration loaders merge the split files for consumers that need a un
 
 ## Project path access policy
 
-Generic project-access defaults and administrator-authored path rules live only
-inside the `project_access` object in `assets/shai_config.json`. Shai's
-project-specific, user-approved exceptions are stored separately in the active
-project's ignored `.shai/project_access.json` file. No second generic access
-configuration file is used.
+Generic project-access defaults and administrator-authored path rules live in
+`assets/project_access_config.json`. This is a shared, application-level policy
+file; it is separate from both the core `assets/shai_config.json` and each
+project's user-approved grants in `.shai/project_access.json`.
 
-Example generic configuration (inside `assets/shai_config.json`):
+Example `assets/project_access_config.json`:
 
 ```json
 {

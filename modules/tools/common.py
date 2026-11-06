@@ -5,7 +5,7 @@ import pathlib
 
 ROOT = pathlib.Path.cwd().resolve()
 MAX_FILE_SIZE = 200_000
-GENERIC_CONFIG_FILE = pathlib.Path(__file__).resolve().parents[2] / "assets" / "shai_config.json"
+GENERIC_CONFIG_FILE = pathlib.Path(__file__).resolve().parents[2] / "assets" / "project_access_config.json"
 PROJECT_GRANTS_FILE = None
 DEFAULT_ACCESS_POLICY = {
     "default": {"view": True, "edit": True, "truncate": False, "delete": False, "execute": True},
@@ -63,7 +63,7 @@ def _grants_path():
 
 
 def load_access_policy():
-    """Merge generic defaults/rules from shai_config with project-local user grants."""
+    """Merge generic rules from project_access_config with project-local grants."""
     generic = _read_json(GENERIC_CONFIG_FILE).get("project_access", {})
     if not isinstance(generic, dict):
         generic = {}

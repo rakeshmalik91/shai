@@ -158,8 +158,8 @@ expose a general-purpose delete-file or arbitrary shell command.
 
 ## Project path permissions
 
-All project file tools use generic rules in the `project_access` section of
-`assets/shai_config.json` and user-approved grants in
+All project file tools use generic rules in
+`assets/project_access_config.json` and user-approved grants in
 `.shai/project_access.json`. `view` controls reads, listings, searches and
 inspection; `edit` controls ordinary modifications (existing files also need
 `view` for safe diff previews); `truncate` separately gates high-risk reductions; `execute` gates controlled command working

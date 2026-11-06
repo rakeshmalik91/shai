@@ -27,7 +27,8 @@ This document provides a complete overview of the Shai project structure, includ
 ├── requirements.txt
 ├── run_all_tests.sh
 ├── setup_keys.sample.sh
-├── assets/shai_config.json         # Core runtime + generic project_access policy
+├── assets/shai_config.json         # Core runtime configuration
+├── assets/project_access_config.json # Generic project path access policy
 ├── assets/provider_config.json    # Provider overrides
 ├── assets/command_config.json     # Command and execution configuration
 └── test/                     # Unit tests
@@ -154,6 +155,7 @@ This document provides a complete overview of the Shai project structure, includ
 | File | Description |
 |------|-------------|
 | `assets/shai_config.json` | Core runtime configuration (model, approvals, limits) |
+| `assets/project_access_config.json` | Generic project path access defaults and rules |
 | `assets/provider_config.json` | Provider endpoints, authentication and overrides |
 | `assets/command_config.json` | Shai commands, OS commands and execution policy |
 | `.shai/history.json` | Conversation history per project |
@@ -225,8 +227,7 @@ operations require `edit`, with a separate `truncate` check for high-risk
 content reductions. Controlled command execution checks `execute` for its
 working directory and Python targets, and `view` for Git pathspecs.
 
-Generic rules live in the `project_access` section of
-`assets/shai_config.json`. User-approved per-project grants are stored in the
+Generic rules live in `assets/project_access_config.json`. User-approved per-project grants are stored in the
 active project's `.shai/project_access.json` (ignored by Git). Interactive
 blocks ask for the exact file/folder, parent, or level-2 parent scope and the
 read/write/delete/exec/all capabilities. See `docs/CONFIGURATION.md`.
