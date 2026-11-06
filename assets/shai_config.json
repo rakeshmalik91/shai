@@ -72,10 +72,6 @@
     "preserve_output_tail_bytes": 8192,
     "terminate_child_processes": true
   },
-  "backup_cleanup": {
-    "enabled": true,
-    "retention_days": 1
-  },
   "agent_safeguards": {
     "enabled": true,
     "max_history_chars": 90000,

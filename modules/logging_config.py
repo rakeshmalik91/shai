@@ -14,7 +14,7 @@ import threading
 from typing import Optional
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent.parent
-DEFAULT_LOG_DIR = SCRIPT_DIR / ".Shai" / "logs"
+DEFAULT_LOG_DIR = SCRIPT_DIR / "logs"
 DEFAULT_LOG_FILE = "shai.log"
 DEFAULT_RETAIN_FILES = 10
 DEFAULT_LOG_LEVEL = logging.DEBUG
@@ -135,9 +135,9 @@ def get_logger(name):
     return logging.getLogger(name)
 
 
-def load_logging_config(config, project_root=None):
+def load_logging_config(config):
     settings = config.get("logging", {}) if isinstance(config, dict) else {}
-    config_path = SCRIPT_DIR / "assets" / "logging_config.json"
+    config_path = pathlib.Path(__file__).resolve().parent.parent / "assets" / "logging_config.json"
     try:
         with config_path.open("r", encoding="utf-8") as handle:
             dedicated = json.load(handle)
@@ -152,22 +152,9 @@ def load_logging_config(config, project_root=None):
         "WARNING": logging.WARNING, "ERROR": logging.ERROR,
         "CRITICAL": logging.CRITICAL,
     }
-    # Logs are project-local state. Resolve configured relative subdirectories
-    # beneath <project-root>/.Shai and reject absolute/traversal escapes.
-    project_root = pathlib.Path(project_root or SCRIPT_DIR).expanduser().resolve()
-    shai_dir = project_root / ".Shai"
-    configured_log_dir = pathlib.Path(settings.get("log_dir", "logs"))
-    if configured_log_dir.is_absolute():
-        configured_log_dir = pathlib.Path(configured_log_dir.name)
-    else:
-        configured_log_dir = pathlib.Path(
-            *[part for part in configured_log_dir.parts if part not in ("", ".", "..", "/")]
-        )
-    log_dir = (shai_dir / configured_log_dir).resolve()
-    try:
-        log_dir.relative_to(shai_dir.resolve())
-    except ValueError:
-        log_dir = shai_dir / "logs"
+    log_dir = pathlib.Path(settings.get("log_dir", "logs"))
+    if not log_dir.is_absolute():
+        log_dir = SCRIPT_DIR / log_dir
     log_file = pathlib.Path(settings.get("log_file", DEFAULT_LOG_FILE))
     if log_file.is_absolute():
         try:
@@ -191,39 +178,27 @@ def load_logging_config(config, project_root=None):
 
 
 _default_logger = None
-_default_log_root = None
 
 
-def init_default_logging(config=None, project_root=None):
-    global _default_logger, _default_log_root
-    requested_root = pathlib.Path(project_root or SCRIPT_DIR).expanduser().resolve()
-    if _default_logger is not None and _default_log_root == requested_root:
-        return _default_logger
+def init_default_logging(config=None):
+    global _default_logger
     if _default_logger is not None:
-        for handler in logging.getLogger().handlers[:]:
-            logging.getLogger().removeHandler(handler)
-            try:
-                handler.close()
-            except Exception:
-                pass
-        _default_logger = None
+        return _default_logger
     if config is None:
         try:
             with (SCRIPT_DIR / "assets" / "shai_config.json").open("r", encoding="utf-8") as handle:
                 config = json.load(handle)
         except (OSError, ValueError, TypeError):
             config = {}
-    settings = load_logging_config(config, project_root=requested_root)
+    settings = load_logging_config(config)
     if not settings.get("enabled", True):
         null_logger = logging.getLogger("shai")
         null_logger.addHandler(logging.NullHandler())
         null_logger.setLevel(logging.CRITICAL + 1)
         _default_logger = null_logger
-        _default_log_root = requested_root
         return _default_logger
     settings.pop("enabled", None)
     _default_logger = setup_logging(**settings)
-    _default_log_root = requested_root
     return _default_logger
 
 

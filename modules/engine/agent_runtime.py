@@ -309,7 +309,7 @@ Rules:
 # -------------------------------------------------------------------
 
 IGNORED_PROJECT_DIRS = {
-    ".shai_backups", ".venv", "venv", "node_modules",
+    ".shai_backups", "shai_backups", ".venv", "venv", "node_modules",
     "__pycache__", ".pytest_cache", ".mypy_cache", ".idea"
 }
 
@@ -873,7 +873,7 @@ class ToolSelectionFailure(Exception):
 def main():
     global PROVIDER, MODEL, ROOT
 
-    init_default_logging(load_config(), project_root=ROOT)
+    init_default_logging(load_config())
     LOGGER.info("Starting Shai coding agent root=%s api_timeout=%ss",
                 ROOT, API_TIMEOUT_SECONDS)
     PROVIDER, MODEL = initialize_provider(auto_select=True)

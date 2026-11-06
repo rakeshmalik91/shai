@@ -49,7 +49,7 @@ Shai uses `shai_config.json` for all settings. Key sections:
 - **retry** — retry/backoff settings for API requests
 - **shai_command** — enable deterministic natural-language routing to registered Shai slash commands
 - **os_command** — enable restricted, bounded OS command profiles in Agent mode
-- **project_access_config.json** — generic path access defaults and rules; per-project user grants are saved under `.shai/project_access.json`
+- **project_access_config.json** — generic path access defaults and rules; per-project user grants are saved under `.shai/project_access.json`; automatic edit backups and retention policy live under `.shai/shai_backups/` and `.shai/backup_config.json`
 
 See [Provider configuration](docs/PROVIDERS.md) and [Commands reference](docs/COMMANDS.md) for details.
 

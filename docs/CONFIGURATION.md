@@ -8,10 +8,10 @@ Shai configuration is stored under `assets/` and split by responsibility:
 - `assets/command_config.json` — Shai slash-command and OS command settings (`shai_command`, `os_command`).
 - `assets/context_window_config.json` — per-model context limits and active context token limit.
 - `assets/cli_config.json` — terminal/CLI presentation, tool-call display, reasoning display, and file-change display.
-- `assets/logging_config.json` — log level, project-local output subdirectory, retention, and console logging. Log files are written under `<project-root>/.Shai/logs/` by default.
+- `assets/logging_config.json` — log level, output location, rotation, retention, and console logging.
 - `assets/command_registry.json` — natural-language command registry.
 
-Runtime configuration loaders merge the split files for consumers that need a unified view. Provider/model selection metadata remains in the core configuration; provider-specific endpoint and authentication overrides belong in `provider_config.json`. Context-window values, CLI presentation settings, and logging settings are persisted only to their dedicated files. Logging settings control the subdirectory beneath the active project's `.Shai/` directory; logs are never written to a shared repository-level `logs/` directory.
+Runtime configuration loaders merge the split files for consumers that need a unified view. Provider/model selection metadata remains in the core configuration; provider-specific endpoint and authentication overrides belong in `provider_config.json`. Context-window values, CLI presentation settings, and logging settings are persisted only to their dedicated files.
 
 
 ## Project path access policy
@@ -95,3 +95,22 @@ persisted. Non-interactive runs never prompt and remain denied.
 - Access policy is independent of command/file approval settings. An approval
   does not itself grant path access.
 - Missing or malformed generic policy falls back to built-in safe defaults.
+
+
+## Project backup configuration
+
+Automatic file backups are stored under `<project-root>/.shai/shai_backups/`.
+Their cleanup policy is project-specific and lives in
+`<project-root>/.shai/backup_config.json`:
+
+```json
+{
+  "enabled": true,
+  "retention_days": 1
+}
+```
+
+If this file is missing or invalid, ShAI uses the safe defaults shown above.
+The former `<project-root>/.shai_backups/` directory is migrated into the new
+location during backup cleanup. Only the generated backup directory is ignored
+by Git; `.shai/backup_config.json` remains available for project-specific policy.

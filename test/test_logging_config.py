@@ -1,11 +1,9 @@
 import logging
 import tempfile
 import unittest
-from unittest.mock import patch
-import json
 from pathlib import Path
 
-from modules.logging_config import setup_logging, load_logging_config
+from modules.logging_config import setup_logging
 
 
 class LoggingConfigTests(unittest.TestCase):
@@ -14,29 +12,6 @@ class LoggingConfigTests(unittest.TestCase):
         for handler in root.handlers[:]:
             root.removeHandler(handler)
             handler.close()
-
-
-    def test_configured_logs_are_project_local_under_shai(self):
-        with tempfile.TemporaryDirectory() as project_dir:
-            settings = load_logging_config(
-                {"logging": {"enabled": True, "log_dir": "logs"}},
-                project_root=Path(project_dir),
-            )
-            self.assertEqual(settings["log_dir"], Path(project_dir) / ".Shai" / "logs")
-
-    def test_absolute_log_directory_is_kept_inside_project_shai(self):
-        with tempfile.TemporaryDirectory() as project_dir, tempfile.TemporaryDirectory() as outside:
-            fake_install = Path(project_dir) / "install"
-            assets = fake_install / "assets"
-            assets.mkdir(parents=True)
-            (assets / "logging_config.json").write_text(json.dumps({
-                "enabled": True, "log_dir": outside
-            }))
-            with patch("modules.logging_config.SCRIPT_DIR", fake_install):
-                settings = load_logging_config({}, project_root=Path(project_dir))
-            expected = Path(project_dir) / ".Shai" / Path(outside).name
-            self.assertEqual(settings["log_dir"], expected)
-            self.assertTrue(settings["log_dir"].is_relative_to(Path(project_dir) / ".Shai"))
 
     def test_newest_entries_are_at_top_and_per_run_files_retained(self):
         with tempfile.TemporaryDirectory() as root_dir:

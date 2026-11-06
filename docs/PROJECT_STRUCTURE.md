@@ -8,12 +8,13 @@ This document provides a complete overview of the Shai project structure, includ
 .
 ├── .gitignore
 ├── .lectra-project.json
-├── .shai/                    # Runtime data (history, task state)
+├── .shai/                    # Project-local runtime data and configuration
 │   ├── .gitignore
 │   ├── history.json
 │   ├── task.json
-│   └── project_access.json     # User-approved path grants (ignored by Git)
-├── .shai_backups/            # Automatic backups of edited files
+│   ├── project_access.json    # User-approved path grants (ignored by Git)
+│   ├── backup_config.json     # Project-specific backup retention policy
+│   └── shai_backups/          # Automatic backups of edited files
 ├── LICENSE
 ├── README.md
 ├── __init__.py
@@ -21,7 +22,7 @@ This document provides a complete overview of the Shai project structure, includ
 ├── chat.py                   # Entry point: Chat mode
 ├── assets/                   # Runtime and command JSON configuration
 ├── docs/                     # Documentation
-├── .Shai/                    # Project-local runtime state and logs\n│   └── logs/                 # Diagnostic logs
+├── logs/                     # Diagnostic logs
 ├── modules/                  # Core implementation modules
 ├── pytest.ini
 ├── requirements.txt
@@ -159,8 +160,8 @@ This document provides a complete overview of the Shai project structure, includ
 | `assets/provider_config.json` | Provider endpoints, authentication and overrides |
 | `assets/command_config.json` | Shai commands, OS commands and execution policy |
 | `.shai/history.json` | Conversation history per project |
-| `.shai/task.json` | Task plan state |
-| `.Shai/logs/` | Project-local diagnostic logs (when enabled) |
+| `.shai/task.json` | Task plan state |\n| `.shai/backup_config.json` | Project-specific backup cleanup settings |\n| `.shai/shai_backups/` | Automatic backups of edited files |
+| `logs/` | Diagnostic logs (when enabled) |
 | `setup_keys.sh` | User-created shell file for API keys (not committed) |
 
 ## Module Dependency Overview

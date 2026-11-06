@@ -8,7 +8,7 @@
 
 Allow ShAI to use different language models for different classes of work while keeping one configured default model as the reliable fallback.
 
-The routing layer should select a model by task purpose, not by whichever component happens to call the provider. It should support separate models for orchestration, planning, implementation, debugging, testing, conversation, commit messages, and other specialist tasks.
+The routing layer should select a model by task purpose, not by whichever component happens to call the provider. Each task category can define multiple candidate models, ordered by priority. ShAI selects the highest-priority candidate that is currently available and falls through to the next candidate when a candidate is unavailable.
 
 The configuration is project-specific. A project's routing preferences must not silently affect another project.
 
@@ -53,64 +53,67 @@ Example:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
+  "availability": {
+    "cache_seconds": 30,
+    "probe_timeout_seconds": 5,
+    "failure_cooldown_seconds": 60
+  },
   "models": {
-    "orchestrator": {
-      "provider": "openai",
-      "model": "model-for-orchestration"
-    },
-    "planner": {
-      "provider": "openai",
-      "model": "model-for-planning"
-    },
-    "code": {
-      "provider": "openai",
-      "model": "model-for-code"
-    },
-    "debug": {
-      "provider": "openai",
-      "model": "model-for-debugging"
-    },
-    "test": {
-      "provider": "openai",
-      "model": "model-for-test-analysis"
-    },
-    "chat": {
-      "provider": "openai",
-      "model": "model-for-conversation"
-    },
-    "commit_message": {
-      "provider": "openai",
-      "model": "model-for-commit-messages"
-    },
-    "review": {
-      "provider": "openai",
-      "model": "model-for-code-review"
-    },
-    "documentation": {
-      "provider": "openai",
-      "model": "model-for-documentation"
-    },
-    "research": {
-      "provider": "openai",
-      "model": "model-for-research"
-    }
+    "orchestrator": [
+      {"provider": "openai", "model": "preferred-orchestrator-model", "priority": 1},
+      {"provider": "anthropic", "model": "secondary-orchestrator-model", "priority": 2}
+    ],
+    "planner": [
+      {"provider": "openai", "model": "preferred-planning-model", "priority": 1},
+      {"provider": "kilo-free", "model": "fallback-planning-model", "priority": 2}
+    ],
+    "code": [
+      {"provider": "openai", "model": "preferred-code-model", "priority": 1},
+      {"provider": "anthropic", "model": "fallback-code-model", "priority": 2}
+    ],
+    "debug": [
+      {"provider": "openai", "model": "preferred-debug-model", "priority": 1},
+      {"provider": "kilo-free", "model": "fallback-debug-model", "priority": 2}
+    ],
+    "test": [
+      {"provider": "openai", "model": "preferred-test-model", "priority": 1},
+      {"provider": "anthropic", "model": "fallback-test-model", "priority": 2}
+    ],
+    "chat": [
+      {"provider": "openai", "model": "preferred-chat-model", "priority": 1}
+    ],
+    "commit_message": [
+      {"provider": "openai", "model": "preferred-commit-model", "priority": 1}
+    ],
+    "review": [
+      {"provider": "anthropic", "model": "preferred-review-model", "priority": 1}
+    ],
+    "documentation": [
+      {"provider": "openai", "model": "preferred-documentation-model", "priority": 1}
+    ],
+    "research": [
+      {"provider": "openai", "model": "preferred-research-model", "priority": 1}
+    ]
   }
 }
 ```
 
-The model strings above are placeholders, not recommendations or hard-coded supported model names.
+All model identifiers are illustrative placeholders. Replace them with identifiers supported by the installed provider configuration.
 
-### 4.1 Route shape
+### 4.1 Candidate shape and priority
 
-Each role maps to a route object:
+Each role maps to an array of candidate objects:
 
 - `provider`: provider identifier already registered in ShAI.
 - `model`: model identifier accepted by that provider's existing configuration.
+- `priority`: positive integer; **1 is highest priority**. Lower numbers are tried first.
+
+Candidates are sorted by ascending `priority`; original array order is the stable tie-breaker. Duplicate priorities are allowed but should produce a validation warning. Duplicate provider/model pairs within one role should be ignored after the first occurrence.
 
 Do not add API keys, base URLs, secrets, temperature, token limits, or arbitrary provider settings to this file. Provider-level configuration remains in the existing provider configuration.
 
-### 4.2 Initial supported roles
+### 4.2 Supported task roles
 
 | Role | Intended responsibility |
 |---|---|
@@ -127,7 +130,7 @@ Do not add API keys, base URLs, secrets, temperature, token limits, or arbitrary
 
 Roles should be constants or a centrally maintained registry in code. Unknown role names must not be treated as arbitrary provider/model selectors.
 
-## 5. Routing behavior
+## 5. Availability-aware routing
 
 Introduce one shared model-resolution entry point, conceptually:
 
@@ -135,47 +138,63 @@ Introduce one shared model-resolution entry point, conceptually:
 resolve_model(task_role, project_root, default_model)
 ```
 
-It should return a normalized model selection and routing metadata. It should not instantiate providers or perform a model request itself.
+It returns the selected model and routing metadata. It does not instantiate providers or perform the task request itself.
 
-Suggested resolution sequence:
+### 5.1 Candidate selection
 
-1. Obtain the already-resolved default model from the existing configuration/provider layer.
-2. Normalize and validate the requested task role.
-3. Locate the active project root using the same project-root resolution used by the rest of ShAI.
-4. Load and validate `.Shai/model_routing.json` (preferably once per configuration fingerprint, with explicit reload when the file changes).
-5. Find the route for the requested role.
-6. Validate that the provider exists and the model is accepted by the existing provider registry/configuration.
-7. Return the selected route if all checks pass.
-8. Otherwise return the default model and a structured fallback reason.
+1. Load the active project's routing file.
+2. Validate the role's candidate list and each candidate independently.
+3. Sort valid candidates by ascending `priority` (stable array order for ties).
+4. Check candidates in that order using the provider adapter's availability mechanism.
+5. Select the first candidate reported available.
+6. If a candidate is unavailable, record the reason and continue to the next candidate.
+7. If no specialist candidate is available, select the default model from existing ShAI configuration.
 
-Every model invocation should go through this shared resolver, including background tasks and tool-related LLM calls. Avoid separate ad-hoc routing logic in individual modules.
+A missing role or empty candidate list goes directly to the default model.
 
-## 6. Fallback requirements
+### 5.2 What "available" means
 
-The default configured model is the fallback in all of these cases:
+Availability must be based on evidence, not assumptions:
 
-- `.Shai` directory does not exist.
-- `model_routing.json` does not exist.
-- File cannot be read due to permissions or I/O errors.
-- JSON is malformed or empty.
-- Root value is not an object.
-- `version` is missing or unsupported.
+- Provider is registered and configured.
+- Model identifier is accepted by that provider.
+- Required credentials/configuration are present.
+- Provider/model is not in an active cooldown after a recent transient failure.
+- If the provider offers a cheap model-list or health endpoint, use it.
+- Otherwise use a bounded, low-cost provider-specific preflight only when supported.
+
+Do not send the full user prompt merely to probe availability. Do not treat an HTTP timeout as proof that a model does not exist. Distinguish unsupported-model/configuration errors, authentication errors, rate limits, transient network failures, and service outages.
+
+Availability probes are cached for `cache_seconds` to avoid repeated requests. A failed candidate may be placed in cooldown for `failure_cooldown_seconds`; expiry allows it to be checked again. `probe_timeout_seconds` bounds each probe. These settings are project routing preferences, subject to safe global hard limits.
+
+### 5.3 Runtime failover
+
+If the selected candidate fails during the actual request:
+
+- For eligible provider/availability failures (rate limiting, transient network errors, service unavailable, model unavailable), mark it temporarily unavailable and try the next untried candidate in priority order.
+- Retry each candidate at most once for the same request.
+- Do not fail over on policy refusals, invalid user input, content validation failures, or ordinary model answers.
+- If all candidates fail, make one bounded attempt with the default configured model unless it was already tried.
+- If the default model also fails, surface the normal provider error.
+- Preserve the original conversation/task input when switching candidates. Do not append partial or duplicate tool-call state from a failed attempt without validating it.
+
+### 5.4 Default fallback
+
+The default configured model remains the final fallback when:
+
+- Project `.Shai` directory or routing file is missing.
+- Routing file cannot be read, is malformed, or has an unsupported schema version.
 - `models` is missing or is not an object.
-- A role entry is missing.
-- A role entry is not an object.
-- `provider` or `model` is missing, blank, or the wrong type.
-- Provider is not registered.
-- Model is not recognized or permitted by that provider.
-- A route cannot be instantiated or fails a preflight validation.
-- The requested role is unknown.
+- Requested role is missing or unknown.
+- Role candidate list is empty or structurally invalid.
+- Every candidate is invalid, unsupported, unconfigured, or unavailable.
+- Every candidate fails with an eligible runtime failure.
 
-A malformed route should not invalidate otherwise valid routes unless the overall document structure or version is invalid. For example, an invalid `debug` entry should cause only `debug` to use the default; a valid `code` route should remain usable.
-
-If the configured specialist model fails during a request, define a bounded fallback policy: retry the request once using the default model for eligible transient/provider/model errors. Do not loop indefinitely. Do not silently retry policy refusals or invalid user requests as though they were infrastructure failures.
+A malformed candidate should be skipped without discarding other valid candidates in that role. A malformed role list should fall back for that role only. An invalid top-level schema/version should disable routing and use the default model for all roles.
 
 If the default model itself is unavailable, surface the normal provider error. Do not invent a second fallback.
 
-## 7. Integration plan
+## 6. Integration plan
 
 ### Phase 1 — Configuration and resolver
 
@@ -183,8 +202,8 @@ If the default model itself is unavailable, surface the normal provider error. D
 - Define the supported role registry and schema version.
 - Resolve the active project root consistently.
 - Load `.Shai/model_routing.json`.
-- Validate the document and individual route entries.
-- Implement default-model fallback for every invalid/missing case.
+- Validate the document, role candidate lists, candidate objects, and priorities independently.
+- Implement priority-ordered availability checks, bounded runtime failover, and default-model fallback for every missing/invalid/exhausted case.
 - Keep the existing default model configuration unchanged.
 - Add safe diagnostics for invalid configuration.
 
@@ -226,12 +245,12 @@ Expose enough diagnostic information to answer: "Which model handled this task, 
 - Document `.Shai/model_routing.json` and all supported roles.
 - Provide a sample configuration with placeholder model identifiers.
 - Explain that omitted roles use the default.
-- Explain all invalid-config fallback behavior.
+- Explain candidate priority, availability probes/cache/cooldown, runtime failover, and all invalid-config fallback behavior.
 - Document project isolation and the case-sensitive `.Shai` directory.
 - Do not migrate or copy global settings into project files automatically.
 - Ensure generated project-local configuration is treated as local state and is not committed by default; document how a team may deliberately version-control it if desired.
 
-## 8. Testing plan
+## 7. Testing plan
 
 Tests must be deterministic and must never prompt for interactive input. Use temporary project roots, temporary `.Shai` directories, mocked provider registries, and fake model clients.
 
@@ -242,12 +261,15 @@ Tests must be deterministic and must never prompt for interactive input. Use tem
 - Empty file and malformed JSON use default.
 - Invalid JSON root, version, or `models` type uses default.
 - Unknown version uses default.
-- Valid configuration loads all supported roles.
-- Missing role uses default.
+- Valid configuration loads multiple candidates for each supported role.
+- Candidates are sorted by ascending priority with stable ties.
+- Missing role and empty candidate list use default.
 - Unknown role uses default.
-- Invalid route shape falls back for that role only.
-- Unknown provider and unsupported model fall back for that role only.
-- Blank and non-string provider/model values are rejected.
+- Invalid top-level schema/version uses default for all roles.
+- Invalid candidate is skipped while valid candidates for that role remain usable.
+- Invalid role candidate-list shape uses default for that role only.
+- Unknown provider and unsupported model candidates are skipped.
+- Blank and non-string provider/model values and invalid priorities are rejected.
 - Unreadable file and I/O failure use default.
 - Extra unknown fields are handled according to a documented strictness policy.
 
@@ -264,9 +286,10 @@ Tests must be deterministic and must never prompt for interactive input. Use tem
 
 - Every task role reaches the resolver.
 - Existing call sites without a role use the default.
-- Each specialist role selects its configured model.
-- Invalid specialist selection uses the default.
-- Specialist runtime failure performs at most one eligible default retry.
+- Each specialist role selects the highest-priority available candidate.
+- Unavailable candidates are skipped and the next priority candidate is tried.
+- Invalid/exhausted specialist candidate lists use the default.
+- Specialist runtime failure performs bounded failover through untried candidates and then the default.
 - Default-model failure surfaces normally.
 - Fallback diagnostics identify the reason without leaking secrets.
 
@@ -277,22 +300,24 @@ Tests must be deterministic and must never prompt for interactive input. Use tem
 - Tool execution, command permissions, project path controls, and interactive access approval are unaffected.
 - Test suite does not read from stdin or wait for user input.
 
-## 9. Acceptance criteria
+## 8. Acceptance criteria
 
 The feature is ready when:
 
 1. Routing configuration exists only at `<project-root>/.Shai/model_routing.json`.
 2. The global/default model remains defined by the existing ShAI configuration.
 3. A missing or invalid routing file never prevents startup or ordinary model calls.
-4. Every absent/invalid route resolves to the default configured model.
+4. A missing role, malformed role list, or exhausted candidate list resolves to the default configured model; an invalid individual candidate is skipped while lower-priority candidates remain eligible.
 5. A valid route for one role does not get discarded because a different role entry is invalid.
 6. All listed task categories use the central resolver.
-7. Projects cannot inherit each other's routing configuration.
-8. Routing decisions and fallback reasons are observable without exposing secrets.
-9. Tests cover configuration, isolation, routing, runtime fallback, and backward compatibility.
-10. All tests run non-interactively.
+7. Each category supports multiple priority-ranked candidates and chooses the highest-priority available candidate.
+8. Availability probes are bounded/cached, and runtime failover is limited to eligible failures without retrying refusals or invalid requests.
+9. Projects cannot inherit each other's routing configuration.
+10. Routing decisions, candidate skips, availability state, and fallback reasons are observable without exposing secrets.
+11. Tests cover configuration, isolation, priority ordering, availability caching, runtime failover, and backward compatibility.
+12. All tests run non-interactively.
 
-## 10. Decisions to preserve during implementation
+## 9. Decisions to preserve during implementation
 
 - Use `.Shai` exactly as specified; do not silently substitute `.shai`.
 - Keep generic/global provider and default-model configuration separate from project-specific routing.
