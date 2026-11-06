@@ -106,17 +106,14 @@ Available when running `python3 chat.py`.
 
 ## Configuration
 
-Commands and behavior can be customized via `assets/command_config.json`:
+Commands and behavior are customized across split configuration files under `assets/`:
 
-- `max_tool_call_iterations` — Maximum tool calls per agent iteration (default: 80)
-- `tool_safeguards` — Enable/disable safeguards (repeat detection, history compaction, etc.)
-- `retry` — API retry settings (count, backoff, jitter, retryable statuses)
-- `approve` — Granular tool/category approval settings
-- `shai_command` — Enable/disable natural-language routing to registered Shai commands
-- `os_command` — Enable/disable command profiles and set timeout/output limits
-- `tool_call_display` — Tool call display settings (`show_parameters`, `max_argument_chars`)
+- `assets/shai_config.json` — Core settings: `max_tool_call_iterations` (iteration ceiling), `tool_safeguards` (repeat call detection, timeout bounds), `retry` (HTTP retry and recovery policy), and `approve` (granular tool/category approval permissions).
+- `assets/command_config.json` — Execution policies: `shai_command` (enable/disable natural language routing) and `os_command` (allowlisted command profiles, subcommands, and bounds).
+- `assets/command_registry.json` — Canonical slash command metadata, aliases, and exact trigger phrases.
+- `assets/cli_config.json` — Terminal interface settings: `tool_call_display` (`show_parameters`, `max_argument_chars`), file change diff previews, and reasoning display.
 
-See `assets/command_config.json` for command settings and `assets/command_registry.json` for natural-language routing.
+See [`CONFIGURATION.md`](CONFIGURATION.md) for full details on the configuration layout and precedence rules.
 
 ---
 

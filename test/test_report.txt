@@ -1,15 +1,15 @@
 SHAI TEST REPORT
 ========================================================================
 Status: PASSED
-Started: 2026-11-06T10:30:13.769534+00:00
-Finished: 2026-11-06T10:30:14.426536+00:00
-Duration: 0.66 seconds
+Started: 2026-11-06T10:50:43.315771+00:00
+Finished: 2026-11-06T10:50:43.892534+00:00
+Duration: 0.58 seconds
 Python: 3.11.2
 
 UNITTEST
 ------------------------------------------------------------------------
 Status: PASSED
-Run: 277 | Failures: 0 | Errors: 0 | Skipped: 0
+Run: 282 | Failures: 0 | Errors: 0 | Skipped: 0
 test_approval_settings_support_category_and_tool_overrides (test.test_agent.ConfigTests.test_approval_settings_support_category_and_tool_overrides) ... ok
 test_global_approval_applies_when_category_is_not_explicitly_denied (test.test_agent.ConfigTests.test_global_approval_applies_when_category_is_not_explicitly_denied) ... ok
 test_invalid_iteration_limit_uses_default (test.test_agent.ConfigTests.test_invalid_iteration_limit_uses_default) ... ok
@@ -124,6 +124,10 @@ test_settings_fallback_on_corrupt_or_invalid_config (test.test_file_change_displ
 test_settings_normalization_of_invalid_types (test.test_file_change_display.FileChangeDisplayTests.test_settings_normalization_of_invalid_types) ... ok
 test_small_diff_is_not_truncated (test.test_file_change_display.FileChangeDisplayTests.test_small_diff_is_not_truncated) ... ok
 test_truncates_large_diff_and_preserves_head_tail (test.test_file_change_display.FileChangeDisplayTests.test_truncates_large_diff_and_preserves_head_tail) ... ok
+test_custom_handler_intercepts_confirm_action (test.test_interaction.InteractionHandlerTests.test_custom_handler_intercepts_confirm_action) ... ok
+test_custom_handler_intercepts_git_choice (test.test_interaction.InteractionHandlerTests.test_custom_handler_intercepts_git_choice) ... ok
+test_custom_handler_intercepts_risky_approval (test.test_interaction.InteractionHandlerTests.test_custom_handler_intercepts_risky_approval) ... ok
+test_set_invalid_handler_raises_type_error (test.test_interaction.InteractionHandlerTests.test_set_invalid_handler_raises_type_error) ... ok
 test_keeps_visible_text_and_drops_thinking_blocks (test.test_invalid_tool_recovery.ConversationRepairTests.test_keeps_visible_text_and_drops_thinking_blocks) ... ok
 test_outgoing_history_preserves_valid_tool_calls (test.test_invalid_tool_recovery.ConversationRepairTests.test_outgoing_history_preserves_valid_tool_calls) ... ok
 test_outgoing_history_sanitizes_cohere_thinking_even_without_recovery (test.test_invalid_tool_recovery.ConversationRepairTests.test_outgoing_history_sanitizes_cohere_thinking_even_without_recovery) ... ok
@@ -283,6 +287,7 @@ test_load_tool_registry_missing_or_duplicate_name_raises (test.test_tool_registr
 test_load_tool_registry_missing_tools_array_raises (test.test_tool_registry.ToolRegistryTests.test_load_tool_registry_missing_tools_array_raises) ... ok
 test_load_tool_registry_non_dict_entry_raises (test.test_tool_registry.ToolRegistryTests.test_load_tool_registry_non_dict_entry_raises) ... ok
 test_registry_has_unique_named_tools (test.test_tool_registry.ToolRegistryTests.test_registry_has_unique_named_tools) ... ok
+test_get_file_outline_no_duplicate_methods_and_supports_async (test.test_tools_module.SharedToolsModuleTests.test_get_file_outline_no_duplicate_methods_and_supports_async) ... ok
 test_list_files_empty_and_populated_directory (test.test_tools_module.SharedToolsModuleTests.test_list_files_empty_and_populated_directory) ... ok
 test_read_file_bounds_and_validations (test.test_tools_module.SharedToolsModuleTests.test_read_file_bounds_and_validations) ... ok
 test_read_only_dispatch_and_schemas_are_shared (test.test_tools_module.SharedToolsModuleTests.test_read_only_dispatch_and_schemas_are_shared) ... ok
@@ -290,7 +295,7 @@ test_root_configuration_and_safe_path (test.test_tools_module.SharedToolsModuleT
 test_search_files_single_and_recursive (test.test_tools_module.SharedToolsModuleTests.test_search_files_single_and_recursive) ... ok
 
 ----------------------------------------------------------------------
-Ran 277 tests in 0.505s
+Ran 282 tests in 0.492s
 
 OK
 

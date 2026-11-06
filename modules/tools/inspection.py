@@ -26,8 +26,10 @@ def _walk_visible_files(root, pattern="*"):
             child = current / name
             if _visible(child) and child.match(pattern):
                 yield child
+
+
 def get_file_outline(path):
-    """Return top-level imports, classes, functions and methods with line ranges."""
+    """Return top-level imports, classes, functions and methods in source line order."""
     target = safe_path(path)
     require_access(path, "view")
     if not target.is_file():
@@ -42,21 +44,19 @@ def get_file_outline(path):
         tree = ast.parse(text)
     except SyntaxError as error:
         return "Invalid Python syntax: " + str(error)
-    lines = text.splitlines()
+
     outline = []
-    for node in ast.walk(tree):
+    for node in tree.body:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             for alias in node.names:
                 outline.append("import {} at line {}".format(alias.name, node.lineno))
         elif isinstance(node, ast.ClassDef):
             outline.append("class {} at line {}".format(node.name, node.lineno))
             for item in node.body:
-                if isinstance(item, ast.FunctionDef):
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     outline.append("  def {} at line {}".format(item.name, item.lineno))
-        elif isinstance(node, ast.FunctionDef):
-            # Only top-level functions
-            if isinstance(node.parent, ast.Module) if hasattr(node, 'parent') else True:
-                outline.append("def {} at line {}".format(node.name, node.lineno))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            outline.append("def {} at line {}".format(node.name, node.lineno))
     return "\n".join(outline) if outline else "(no imports, classes, or functions found)"
 
 
@@ -185,5 +185,3 @@ def inspect_test_failure(output):
         elif current_test and ("AssertionError" in line or "assert " in line or "Traceback" in line):
             failures.append("  " + line.strip())
     return "\n".join(failures) if failures else "No clear test failures detected in output."
-
-

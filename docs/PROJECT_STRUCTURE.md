@@ -1,6 +1,6 @@
 # Project Structure
 
-This document provides a complete overview of the Shai project structure, including all modules, entry points, tests, and documentation.
+This document provides a complete overview of the Shai project structure, including all modules, entry points, tests, configuration, and documentation.
 
 ## Root Directory
 
@@ -13,33 +13,46 @@ This document provides a complete overview of the Shai project structure, includ
 │   ├── task.json
 │   ├── project_access.json    # User-approved path grants (ignored by Git)
 │   ├── backup_config.json     # Project-specific backup retention policy
+│   ├── model_routing.json     # Project-specific model route overrides
 │   └── shai_backups/          # Automatic backups of edited files
 ├── LICENSE
 ├── README.md
 ├── __init__.py
-├── agent.py                  # Entry point: Coding agent mode
-├── chat.py                   # Entry point: Chat mode
-├── assets/                   # Runtime and command JSON configuration
-├── docs/                     # Documentation
-├── modules/                  # Core implementation modules
+├── agent.py                  # Entry point: Coding agent CLI
+├── chat.py                   # Entry point: Chat mode CLI
+├── assets/                   # Shared runtime and command JSON configuration
+│   ├── shai_config.json
+│   ├── project_access_config.json
+│   ├── provider_config.json
+│   ├── model_routing.json
+│   ├── command_config.json
+│   ├── context_window_config.json
+│   ├── cli_config.json
+│   ├── logging_config.json
+│   ├── command_registry.json
+│   └── tools_registry.json
+├── docs/                     # Technical specifications and guides
+│   ├── bugfixes/
+│   └── plans/
+├── modules/                  # Core implementation packages
+│   ├── commands/
+│   ├── engine/
+│   ├── reasoning_handlers/
+│   ├── tools/
+│   └── ui/
 ├── pytest.ini
 ├── requirements.txt
 ├── run_all_tests.sh
 ├── setup_keys.sample.sh
-├── assets/shai_config.json         # Core runtime configuration
-├── assets/project_access_config.json # Generic project path access policy
-├── assets/provider_config.json    # Provider overrides
-├── assets/model_routing.json      # Tracked model-routing template
-├── assets/command_config.json     # Command and execution configuration
-└── test/                     # Unit tests
+└── test/                     # Comprehensive hermetic test suite
 ```
 
 ## Entry Points
 
 | File | Description |
 |------|-------------|
-| `agent.py` | Coding agent with full tool access (editing, Git, verification, task management) |
-| `chat.py` | Conversational mode without local project or OS command tools |
+| `agent.py` | CLI entry point for coding agent mode (launches `modules.ui.agent_cli`) |
+| `chat.py` | CLI entry point for conversational chat mode (launches `modules.ui.chat_runtime`) |
 
 ## Core Modules (`modules/`)
 
@@ -58,11 +71,12 @@ This document provides a complete overview of the Shai project structure, includ
 | `terminal_style.py` | Terminal styling utilities |
 | `tools/` | Shared read-only project inspection tools used by Agent mode |
 
-### Engine Modules (`modules/engine/`) - Agent Mode Implementation
+### Engine Modules (`modules/engine/`) — Core Agent Execution Engine
 
 | Module | Responsibility |
 |--------|----------------|
-| `agent_runtime.py` | Compatibility/runtime composition surface, shared namespace |
+| `agent_runtime.py` | Compatibility/runtime composition surface, shared namespace and engine facade |
+| `interaction.py` | Pluggable UI/GUI interaction delegate interface (`InteractionHandler`, confirmations, choices) |
 | `configuration.py` | Config loading, safeguards, approvals, limits |
 | `file_editing.py` | Approval, validation, atomic edits, check execution |
 | `git_operations.py` | Git operations, commit-message generation |
@@ -75,15 +89,24 @@ This document provides a complete overview of the Shai project structure, includ
 | `tool_execution.py` | Tool normalization, dispatch, safeguards, execution |
 | `tool_presentation.py` | Tool and assistant output formatting |
 
+### User Interface (`modules/ui/`) — Presentation & Frontend Adapters
+
+The UI layer is completely decoupled from the engine. Alternative frontends (e.g. GUI, Web, Desktop) can drive the engine without terminal dependencies:
+
+| Module | Responsibility |
+|--------|----------------|
+| `agent_cli.py` | Interactive terminal REPL, slash-command dispatch, and ANSI rendering for agent mode |
+| `chat_runtime.py` | Interactive terminal REPL and presentation for chat mode |
+| `spinner.py` | Non-blocking terminal activity spinner |
+
 ### Commands (`modules/commands/`)
 
 | Module | Responsibility |
 |--------|----------------|
 | `shai_command.py` | Deterministic natural-language routing for Shai slash commands |
-| `aliases.py` | Command aliases loaded from `assets/command_registry.json
-- `assets/tools_registry.json` — canonical model-facing tool schemas and availability` |
-| `definitions.py` | Command definitions |
-| `help.py` | Help system |
+| `aliases.py` | Command aliases loaded dynamically from `assets/command_registry.json` |
+| `definitions.py` | Command definitions and help text loaded from `assets/command_registry.json` |
+| `help.py` | Formatted help text system |
 | `registry.py` | Slash-command normalization and registry facade |
 
 ### Reasoning Handlers (`modules/reasoning_handlers/`)
@@ -98,37 +121,35 @@ This document provides a complete overview of the Shai project structure, includ
 | `openai_compatible.py` | OpenAI-compatible APIs |
 | `openrouter.py` | OpenRouter |
 
-### Tools (`modules/tools/`) - Shared Tools and Controlled OS Execution
+### Tools (`modules/tools/`) — Shared Tools and Controlled OS Execution
 
 | Module | Responsibility |
 |--------|----------------|
-| `common.py` | Shared tool utilities |
-| `filesystem.py` | Filesystem operations |
-| `git.py` | Git read operations |
-| `inspection.py` | Code inspection (AST-based) |
+| `common.py` | Centralized path access policy, glob matching, and project root management |
+| `filesystem.py` | Read-only filesystem operations (`list_files`, `read_file`, `search_files`) |
+| `git.py` | Read-only Git inspection (`git_status`, `git_diff`) |
+| `inspection.py` | AST code inspection (`get_file_outline`, `find_symbol`, `find_references`, `get_project_map`, `get_test_map`, `inspect_test_failure`) |
 | `os_command.py` | Agent-only allowlisted OS command execution; no shell |
-| `schemas.py` | Tool schemas |
-
-### UI (`modules/ui/`)
-
-| Module | Responsibility |
-|--------|----------------|
-| `chat_runtime.py` | Chat mode runtime |
-| `spinner.py` | Loading spinner |
+| `schemas.py` | Canonical tool dispatch tables and function definitions |
 
 ## Documentation (`docs/`)
 
 | File | Description |
 |------|-------------|
 | `ARCHITECTURE.md` | Detailed architecture overview with diagrams |
-| `COMMANDS.md` | Command reference |
-| `MODULAR_ARCHITECTURE.md` | Legacy modular architecture reference |
-| `PROVIDERS.md` | Provider integration details |
-| `TERMINAL_OUTPUT.md` | Terminal output handling |
-| `TODO.md` | Task tracking |
-| `TOOLS.md` | Tool reference |
-| `bugfixes/` | Bug fix documentation |
-| `plans/` | Future roadmap documents |
+| `COMMANDS.md` | Slash command reference and global shortcuts |
+| `CONFIGURATION.md` | Split configuration layout and policy specification |
+| `MODEL_ROUTING.md` | Project-scoped task-role routing and candidate resolution |
+| `OS_COMMAND.md` | Controlled OS command execution and security profile |
+| `PROJECT_PATH_ACCESS_CONTROL.md` | Path permission rules, glob matching, and interactive grants |
+| `PROJECT_STRUCTURE.md` | Repository structure and module dependency overview |
+| `PROVIDERS.md` | Provider integration details, authentication, and endpoint overrides |
+| `SHAI_COMMAND.md` | Deterministic natural-language routing to slash commands |
+| `TERMINAL_OUTPUT.md` | ANSI color conventions and transient tool activity line |
+| `TESTING.md` | Automated test runner workflow and durable report formats |
+| `TOOLS.md` | Existing tool reference and parameter contracts |
+| `bugfixes/` | Resolved bug reports and architectural fixes |
+| `plans/` | Future architectural, tool, sandbox, and testing roadmaps |
 
 ## Tests (`test/`)
 
@@ -136,109 +157,80 @@ This document provides a complete overview of the Shai project structure, includ
 |------|-------------|
 | `test_agent.py` | Agent mode tests |
 | `test_agent_safeguards.py` | Safeguards tests |
+| `test_backup_management.py` | Backup management and retention tests |
 | `test_bounded_execution.py` | Bounded execution tests |
 | `test_chat.py` | Chat mode tests |
+| `test_commit_message_routing.py` | Commit message routing tests |
 | `test_configuration.py` | Configuration tests |
 | `test_context_meter.py` | Context meter tests |
 | `test_conversation_history.py` | Conversation history tests |
 | `test_engine_module_boundaries.py` | Engine module boundary tests |
 | `test_file_change_display.py` | File change display tests |
+| `test_interaction.py` | Pluggable UI interaction and confirmation tests |
 | `test_invalid_tool_recovery.py` | Invalid tool recovery tests |
 | `test_live_status.py` | Live status tests |
 | `test_logging_config.py` | Logging configuration tests |
+| `test_model_routing.py` | Model routing tests |
 | `test_modular_architecture.py` | Modular architecture tests |
-| `test_priority_tools.py` | Priority tools tests |
+| `test_os_command.py` | OS command allowlist and bounds tests |
+| `test_priority_tools.py` | Priority code intelligence and line replacement tests |
+| `test_project_access_control.py` | Path access control and interactive grant tests |
 | `test_provider_selection.py` | Provider selection tests |
 | `test_reasoning_handlers.py` | Reasoning handlers tests |
-| `test_tools_module.py` | Tools module tests |
-
-## Configuration & Data Files
-
-| File | Description |
-|------|-------------|
-| `assets/shai_config.json` | Core runtime configuration (model, approvals, limits) |
-| `assets/project_access_config.json` | Generic project path access defaults and rules |
-| `assets/provider_config.json` | Provider endpoints, authentication and overrides |
-| `assets/command_config.json` | Shai commands, OS commands and execution policy |
-| `.shai/history.json` | Conversation history per project |
-| `.shai/task.json` | Task plan state |\n| `.shai/backup_config.json` | Project-specific backup cleanup settings |\n| `.shai/shai_backups/` | Automatic backups of edited files |
-| `.shai/logs/` | Diagnostic logs (when enabled) |
-| `setup_keys.sh` | User-created shell file for API keys (not committed) |
+| `test_shai_command.py` | Natural-language command routing tests |
+| `test_tool_registry.py` | Tool registry validation tests |
+| `test_tools_module.py` | Shared read-only tools and filesystem tests |
 
 ## Module Dependency Overview
 
 ```
 agent.py
-├── modules/engine/agent_runtime.py (composition surface)
-│   ├── modules/engine/configuration.py
-│   ├── modules/engine/project_inspection.py
-│   ├── modules/engine/task_plan.py
-│   ├── modules/engine/git_operations.py
-│   ├── modules/engine/file_editing.py
-│   ├── modules/engine/provider_api.py
-│   ├── modules/engine/tool_execution.py
-│   ├── modules/engine/tool_presentation.py
-│   ├── modules/engine/history_recovery.py
-│   └── modules/engine/model_orchestration.py
-├── modules/commands/registry.py
-├── modules/tools/ (shared read-only tools)
-├── modules/provider_selection.py
-├── modules/model_routing.py
-├── modules/conversation_history.py
-├── modules/agent_safeguards.py
-├── modules/logging_config.py
-├── modules/file_change_display.py
-├── modules/reasoning_handlers/
-├── modules/context_meter.py
-└── modules/live_status.py
+└── modules/ui/agent_cli.py (Interactive Terminal REPL)
+    ├── modules/engine/agent_runtime.py (Engine Facade & Composition Surface)
+    │   ├── modules/engine/interaction.py (Pluggable UI/GUI delegates)
+    │   ├── modules/engine/configuration.py
+    │   ├── modules/engine/project_inspection.py
+    │   ├── modules/engine/task_plan.py
+    │   ├── modules/engine/git_operations.py
+    │   ├── modules/engine/file_editing.py
+    │   ├── modules/engine/provider_api.py
+    │   ├── modules/engine/tool_execution.py
+    │   ├── modules/engine/tool_presentation.py
+    │   ├── modules/engine/history_recovery.py
+    │   └── modules/engine/model_orchestration.py
+    ├── modules/commands/registry.py
+    ├── modules/tools/ (shared read-only tools)
+    ├── modules/provider_selection.py
+    ├── modules/model_routing.py
+    ├── modules/conversation_history.py
+    ├── modules/agent_safeguards.py
+    ├── modules/logging_config.py
+    ├── modules/file_change_display.py
+    ├── modules/reasoning_handlers/
+    ├── modules/context_meter.py
+    └── modules/live_status.py
+
+[Future GUI Entrypoint, e.g. gui.py]
+└── modules/ui/gui_runtime.py (GUI Frontend)
+    └── modules/engine/agent_runtime.py (Same engine, driven via InteractionHandler callbacks)
 
 chat.py
-├── modules/ui/chat_runtime.py
-├── modules/tools/ (shared read-only tools)
-├── modules/provider_selection.py
-├── modules/model_routing.py
-├── modules/conversation_history.py
-├── modules/agent_safeguards.py
-├── modules/logging_config.py
-├── modules/reasoning_handlers/
-└── modules/context_meter.py
+└── modules/ui/chat_runtime.py
+    ├── modules/tools/ (shared read-only tools)
+    ├── modules/provider_selection.py
+    ├── modules/model_routing.py
+    ├── modules/conversation_history.py
+    ├── modules/agent_safeguards.py
+    ├── modules/logging_config.py
+    ├── modules/reasoning_handlers/
+    └── modules/context_meter.py
 ```
 
 ## Key Design Principles
 
-1. **Two stable entry points**: `agent.py` and `chat.py` remain unchanged as launch/import surfaces
-2. **Engine decomposition**: Implementation moved from monolithic `agent_runtime.py` into focused domain modules
-3. **Shared namespace compatibility**: Extracted modules install functions into `agent_runtime`'s shared namespace for backward compatibility
-4. **Tool separation**: Read-only tools in `modules/tools/` shared by both modes; mutating tools remain in agent mode
-5. **Provider abstraction**: `provider_selection.py` and `reasoning_handlers/` isolate provider-specific logic
-6. **Test coverage**: Dedicated test for engine module boundaries (`test_engine_module_boundaries.py`)
-
-### Configuration files (`assets/`)
-
-- `shai_config.json`: core runtime and approval settings.
-- `provider_config.json`: provider endpoint/authentication overrides.
-- `command_config.json`: command execution and command policy.
-- `context_window_config.json`: model context-window limits.
-- `cli_config.json`: terminal interface and display preferences.
-- `logging_config.json`: logging behaviour and retention.
-- `command_registry.json`: natural-language command registry.
-
-## Project path access control
-
-All project-path decisions are centralized in `modules/tools/common.py`.
-Filesystem tools and code-inspection tools require `view`; file mutation
-operations require `edit`, with a separate `truncate` check for high-risk
-content reductions. Controlled command execution checks `execute` for its
-working directory and Python targets, and `view` for Git pathspecs.
-
-Generic rules live in `assets/project_access_config.json`. User-approved per-project grants are stored in the
-active project's `.shai/project_access.json` (ignored by Git). Interactive
-blocks ask for the exact file/folder, parent, or level-2 parent scope and the
-compact permission bits: `r` read, `w` write (including truncate), `x` execute,
-`d` delete, or `a` for all (for example, `rwx`). Tests never prompt through
-stdin. See `docs/CONFIGURATION.md`.
-
-
-Project-specific model routes live in `.shai/model_routing.json`. The
-`.shai/` directory is Git-ignored; `assets/model_routing.json` is the
-version-controlled template with all supported roles initially unconfigured.
+1. **Two stable entry points**: `agent.py` and `chat.py` launch respective UI runtimes while preserving backward-compatible import namespaces.
+2. **Strict CLI vs Engine Separation**: Terminal I/O, prompts, colorization, and REPL controls are isolated in `modules/ui/`, allowing clean GUI integration without terminal entanglements.
+3. **Pluggable Interaction Layer**: `modules/engine/interaction.py` enables frontends to provide custom confirmation dialogs, choice pickers, and status listeners.
+4. **Engine decomposition**: Engine logic is partitioned into cohesive domain modules under `modules/engine/`.
+5. **Tool separation**: Read-only inspection tools in `modules/tools/` are shared by both agent and chat modes; mutating tools remain restricted to agent mode.
+6. **Centralized access control**: `modules/tools/common.py` enforces canonical path validation and policy evaluation before any filesystem, AST, or OS operation.

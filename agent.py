@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Compatibility entry point for the modular Shai coding-agent engine."""
+"""Compatibility and CLI entry point for the Shai coding agent."""
 import sys
-from modules.engine import agent_runtime as _runtime
 
 if __name__ == "__main__":
-    _runtime.main()
+    from modules.ui.agent_cli import main
+    sys.exit(main())
 else:
     # Keep legacy imports and monkeypatch-based integrations bound to the
     # actual runtime module namespace.
+    from modules.engine import agent_runtime as _runtime
     sys.modules[__name__] = _runtime

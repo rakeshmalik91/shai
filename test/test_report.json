@@ -1,12 +1,12 @@
 {
   "status": "passed",
-  "started_at": "2026-11-06T10:30:13.769534+00:00",
-  "finished_at": "2026-11-06T10:30:14.426536+00:00",
-  "duration_seconds": 0.66,
+  "started_at": "2026-11-06T10:50:43.315771+00:00",
+  "finished_at": "2026-11-06T10:50:43.892534+00:00",
+  "duration_seconds": 0.58,
   "python_version": "3.11.2",
   "unittest": {
     "success": true,
-    "tests_run": 277,
+    "tests_run": 282,
     "failures": 0,
     "errors": 0,
     "skipped": 0,
@@ -461,6 +461,22 @@
       },
       {
         "test": "test_truncates_large_diff_and_preserves_head_tail (test.test_file_change_display.FileChangeDisplayTests.test_truncates_large_diff_and_preserves_head_tail)",
+        "status": "passed"
+      },
+      {
+        "test": "test_custom_handler_intercepts_confirm_action (test.test_interaction.InteractionHandlerTests.test_custom_handler_intercepts_confirm_action)",
+        "status": "passed"
+      },
+      {
+        "test": "test_custom_handler_intercepts_git_choice (test.test_interaction.InteractionHandlerTests.test_custom_handler_intercepts_git_choice)",
+        "status": "passed"
+      },
+      {
+        "test": "test_custom_handler_intercepts_risky_approval (test.test_interaction.InteractionHandlerTests.test_custom_handler_intercepts_risky_approval)",
+        "status": "passed"
+      },
+      {
+        "test": "test_set_invalid_handler_raises_type_error (test.test_interaction.InteractionHandlerTests.test_set_invalid_handler_raises_type_error)",
         "status": "passed"
       },
       {
@@ -1097,6 +1113,10 @@
       },
       {
         "test": "test_registry_has_unique_named_tools (test.test_tool_registry.ToolRegistryTests.test_registry_has_unique_named_tools)",
+        "status": "passed"
+      },
+      {
+        "test": "test_get_file_outline_no_duplicate_methods_and_supports_async (test.test_tools_module.SharedToolsModuleTests.test_get_file_outline_no_duplicate_methods_and_supports_async)",
         "status": "passed"
       },
       {

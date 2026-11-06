@@ -48,6 +48,10 @@ class SharedToolsModuleTests(unittest.TestCase):
         # Non-directory path
         self.assertEqual(tools.list_files("empty_dir/file.txt"), "Not a directory.")
 
+        # Default argument
+        root_listing = tools.list_files()
+        self.assertIn("empty_dir/", root_listing)
+
     def test_read_file_bounds_and_validations(self):
         file_path = self.root / "sample.txt"
         file_path.write_text("line 1\nline 2\nline 3\nline 4\nline 5\n", encoding="utf-8")
@@ -99,6 +103,23 @@ class SharedToolsModuleTests(unittest.TestCase):
 
         # No matches found
         self.assertEqual(tools.search_files("nonexistent_string", "src"), "No matches found.")
+
+    def test_get_file_outline_no_duplicate_methods_and_supports_async(self):
+        code = '''import os\n\nclass Worker:\n    def run(self):\n        pass\n    async def run_async(self):\n        pass\n\ndef top():\n    pass\n\nasync def top_async():\n    pass\n'''
+        p = self.root / "mod.py"
+        p.write_text(code, encoding="utf-8")
+        outline = tools.get_file_outline("mod.py")
+        lines = outline.splitlines()
+
+        self.assertIn("import os at line 1", lines)
+        self.assertIn("class Worker at line 3", lines)
+        self.assertIn("  def run at line 4", lines)
+        self.assertIn("  def run_async at line 6", lines)
+        self.assertIn("def top at line 9", lines)
+        self.assertIn("def top_async at line 12", lines)
+        # Verify method run is NOT duplicated at top level
+        self.assertNotIn("def run at line 4", lines)
+        self.assertNotIn("def run_async at line 6", lines)
 
 
 if __name__ == "__main__":

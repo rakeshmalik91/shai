@@ -1,4 +1,5 @@
 """Filesystem-oriented project inspection tools with centralized access checks."""
+import pathlib
 from . import common
 from .common import safe_path, require_access, ProjectAccessDenied
 
@@ -11,7 +12,7 @@ def _allowed(path, permission="view"):
         return False
 
 
-def list_files(path):
+def list_files(path="."):
     """List only entries the active project policy permits the agent to view."""
     try:
         target = safe_path(path)
@@ -102,6 +103,3 @@ def search_files(query, path="."):
                 if len(results) >= 100:
                     return "\\n".join(results) + "\\n... (truncated at 100 results)"
     return "\\n".join(results) if results else "No matches found."
-
-
-import pathlib

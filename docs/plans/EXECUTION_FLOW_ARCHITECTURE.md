@@ -672,8 +672,9 @@ modules/
 │   └── bus.py                   # In-process event dispatch
 │
 └── ui/
-    ├── chat_runtime.py
-    ├── live_status.py
+    ├── agent_cli.py             # Interactive agent terminal REPL (extracted from engine)
+    ├── chat_runtime.py          # Interactive chat terminal REPL
+    ├── spinner.py               # Non-blocking terminal activity spinner
     └── ...
 ```
 
