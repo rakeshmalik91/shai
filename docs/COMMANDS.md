@@ -138,7 +138,7 @@ Agent Mode:          Chat Mode:
 /commit [--message-only]
 /push
 /commit-push
-/exec <executable> <args...> (legacy alias: /os-command)
+/exec <executable> <args...>, /os-command 
 /exit
 ```
 

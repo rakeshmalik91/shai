@@ -826,7 +826,7 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /project /exec (legacy alias: /os-command) /exit")
+    print("Commands: /help /model /project /status /files /diff /reset /ask /code /todo /commit /push /exec /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
 
     # Mode: "agent" (with tools) or "ask" (chat only, no tools)
