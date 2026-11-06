@@ -100,12 +100,22 @@ Press `Ctrl+D` while Shai is processing to cancel the current iteration and retu
 
 ## Tests
 
+Run the complete test suite from the project root:
+
 ```sh
 sh ./run_all_tests.sh
 ```
 
-- `unittest` is the required test runner (stdlib).
-- `pytest` is optional and runs automatically when installed.
+The runner executes unittest discovery, runs pytest as an additional check when
+installed, and compiles the application and test modules. It exits non-zero if
+any required check fails. Every run refreshes these reports under `test/`:
+
+- `test/test_report.txt` — readable summary and detailed test output.
+- `test/test_report.json` — machine-readable status, counts, timing, and per-test outcomes.
+- `test/test_report_pytest.xml` — JUnit XML output when pytest is installed.
+
+`unittest` is the required test runner (stdlib); `pytest` is optional and runs
+automatically when installed.
 
 ## Documentation
 
@@ -114,6 +124,7 @@ sh ./run_all_tests.sh
 - [Project architecture](docs/ARCHITECTURE.md)
 - [Provider configuration](docs/PROVIDERS.md)
 - [Terminal output formatting](docs/TERMINAL_OUTPUT.md)
+- [Testing and test reports](docs/TESTING.md)
 - [Future tools roadmap](docs/plans/TOOLS.md)
 - [shai_command reference](docs/SHAI_COMMAND.md)
 - [os_command reference](docs/OS_COMMAND.md)
