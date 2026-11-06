@@ -18,6 +18,7 @@ from modules.terminal_style import colorize
 from modules.commands.registry import normalize_command
 from modules.commands.shai_command import resolve_shai_command
 from modules.commands.help import HELP_TEXT
+from modules.model_routing import resolve_model as resolve_routed_model
 from modules.engine import agent_runtime as engine
 from modules.engine.interaction import (
     DefaultCliInteractionHandler,
@@ -266,7 +267,9 @@ def main() -> int:
                             max_recent_tool_cycles=history_limit("max_recent_tool_cycles", 6)
                         )
                     history_store.save(history, provider=engine.PROVIDER, model=engine.MODEL)
-                    context_limit = get_context_window(engine.PROVIDER, engine.MODEL, engine.load_config())
+                    route = resolve_routed_model("chat", engine.ROOT, engine.PROVIDER, engine.MODEL)
+                    effective_provider, effective_model = route["provider"], route["model"]
+                    context_limit = get_context_window(effective_provider, effective_model, engine.load_config())
                     estimated_prompt_tokens = estimate_messages_tokens(history)
                     context_status = format_context_status(estimated_prompt_tokens, context_limit)
                     print("\n" + colorize("[Shai]", "system") + " {}".format(context_status))
@@ -275,11 +278,11 @@ def main() -> int:
                     try:
                         response = engine.api_request_for_role(history, "chat")
                         log_and_display_usage(
-                            LOGGER, response, get_provider_config(engine.PROVIDER)["format"],
+                            LOGGER, response, get_provider_config(effective_provider)["format"],
                             estimated_prompt_tokens, context_limit
                         )
-                        display_reasoning_summary(engine.PROVIDER, response)
-                        answer = response_text(response, engine.PROVIDER)
+                        display_reasoning_summary(effective_provider, response)
+                        answer = response_text(response, effective_provider)
                     except Exception as error:
                         LOGGER.exception("Ask mode turn failed")
                         answer = None
@@ -307,7 +310,9 @@ def main() -> int:
                             max_recent_tool_cycles=history_limit("max_recent_tool_cycles", 6)
                         )
                     history_store.save(history, provider=engine.PROVIDER, model=engine.MODEL)
-                    context_limit = get_context_window(engine.PROVIDER, engine.MODEL, engine.load_config())
+                    route = resolve_routed_model("orchestrator", engine.ROOT, engine.PROVIDER, engine.MODEL)
+                    effective_provider, effective_model = route["provider"], route["model"]
+                    context_limit = get_context_window(effective_provider, effective_model, engine.load_config())
                     estimated_prompt_tokens = estimate_messages_tokens(history)
                     context_status = format_context_status(estimated_prompt_tokens, context_limit)
                     print("\n" + colorize("[Shai]", "system") + " {}".format(context_status))
@@ -316,11 +321,11 @@ def main() -> int:
                     try:
                         response = engine.api_request_for_role(history, "orchestrator")
                         log_and_display_usage(
-                            LOGGER, response, get_provider_config(engine.PROVIDER)["format"],
+                            LOGGER, response, get_provider_config(effective_provider)["format"],
                             estimated_prompt_tokens, context_limit
                         )
-                        display_reasoning_summary(engine.PROVIDER, response)
-                        answer, tool_calls = response_text(response, engine.PROVIDER)
+                        display_reasoning_summary(effective_provider, response)
+                        answer, tool_calls = response_text(response, effective_provider)
                     except Exception as error:
                         LOGGER.exception("Read-only mode turn failed")
                         answer = None
@@ -376,17 +381,21 @@ def main() -> int:
 
                         history.extend(tool_results)
                         history_store.save(history, provider=engine.PROVIDER, model=engine.MODEL)
-
+                        route = resolve_routed_model("orchestrator", engine.ROOT, engine.PROVIDER, engine.MODEL)
+                        effective_provider, effective_model = route["provider"], route["model"]
+                        context_limit = get_context_window(effective_provider, effective_model, engine.load_config())
+                        estimated_prompt_tokens = estimate_messages_tokens(history)
+                        context_status = format_context_status(estimated_prompt_tokens, context_limit)
                         spinner = Spinner("Shai is thinking | " + context_status)
                         spinner.start()
                         try:
                             response = engine.api_request_for_role(history, "orchestrator")
                             log_and_display_usage(
-                                LOGGER, response, get_provider_config(engine.PROVIDER)["format"],
+                                LOGGER, response, get_provider_config(effective_provider)["format"],
                                 estimated_prompt_tokens, context_limit
                             )
-                            display_reasoning_summary(engine.PROVIDER, response)
-                            answer, _ = response_text(response, engine.PROVIDER)
+                            display_reasoning_summary(effective_provider, response)
+                            answer, _ = response_text(response, effective_provider)
                         except Exception as error:
                             LOGGER.exception("Read-only follow-up failed")
                             answer = None

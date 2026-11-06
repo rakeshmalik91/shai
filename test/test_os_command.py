@@ -165,6 +165,7 @@ class OSCommandTests(unittest.TestCase):
             confirm=lambda _: True, runner=self.runner,
         )
         self.assertIn("disabled", result["error"])
+        self.assertIn("command_config.json", result["error"])
         self.assertEqual(self.calls, [])
 
     def test_agent_registry_exposes_os_command(self):

@@ -12,16 +12,42 @@ def load_settings(config_path=None):
         "preserve_head_lines": 90,
         "preserve_tail_lines": 40,
     }
-    if config_path is None:
-        config_path = pathlib.Path(__file__).resolve().parent.parent / "assets" / "shai_config.json"
-    try:
-        with pathlib.Path(config_path).open("r", encoding="utf-8") as handle:
-            config = json.load(handle)
-        supplied = config.get("file_change_display", {})
-        if isinstance(supplied, dict):
-            defaults.update(supplied)
-    except (OSError, ValueError, TypeError):
-        pass
+    supplied = None
+    if config_path is not None:
+        path = pathlib.Path(config_path)
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                config = json.load(handle)
+            if isinstance(config, dict):
+                if "file_change_display" in config and isinstance(config["file_change_display"], dict):
+                    supplied = config["file_change_display"]
+                elif path.name != "cli_config.json" and (path.parent / "cli_config.json").is_file():
+                    with (path.parent / "cli_config.json").open("r", encoding="utf-8") as cli_handle:
+                        cli_config = json.load(cli_handle)
+                    if isinstance(cli_config, dict) and isinstance(cli_config.get("file_change_display"), dict):
+                        supplied = cli_config["file_change_display"]
+        except (OSError, ValueError, TypeError):
+            pass
+    if supplied is None:
+        cli_config_path = pathlib.Path(__file__).resolve().parent.parent / "assets" / "cli_config.json"
+        try:
+            with cli_config_path.open("r", encoding="utf-8") as handle:
+                cli_config = json.load(handle)
+            if isinstance(cli_config, dict) and isinstance(cli_config.get("file_change_display"), dict):
+                supplied = cli_config["file_change_display"]
+        except (OSError, ValueError, TypeError):
+            pass
+        if supplied is None:
+            shai_config_path = pathlib.Path(__file__).resolve().parent.parent / "assets" / "shai_config.json"
+            try:
+                with shai_config_path.open("r", encoding="utf-8") as handle:
+                    shai_config = json.load(handle)
+                if isinstance(shai_config, dict) and isinstance(shai_config.get("file_change_display"), dict):
+                    supplied = shai_config["file_change_display"]
+            except (OSError, ValueError, TypeError):
+                pass
+    if isinstance(supplied, dict):
+        defaults.update(supplied)
     for key in ("max_diff_lines", "max_diff_chars", "preserve_head_lines", "preserve_tail_lines"):
         value = defaults.get(key)
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:

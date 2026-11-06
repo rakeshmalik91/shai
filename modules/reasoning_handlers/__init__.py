@@ -21,9 +21,26 @@ CONFIG_FILE = pathlib.Path(__file__).resolve().parents[2] / "assets" / "shai_con
 
 def _display_settings():
     try:
-        with CONFIG_FILE.open("r", encoding="utf-8") as handle:
-            config = json.load(handle)
-        settings = config.get("reasoning_display", {})
+        settings = None
+        # Check cli_config.json first where reasoning_display is canonically stored
+        cli_config_file = CONFIG_FILE.parent / "cli_config.json"
+        if cli_config_file.is_file():
+            try:
+                with cli_config_file.open("r", encoding="utf-8") as handle:
+                    cli_config = json.load(handle)
+                if isinstance(cli_config, dict) and isinstance(cli_config.get("reasoning_display"), dict):
+                    settings = cli_config["reasoning_display"]
+            except (OSError, ValueError, TypeError):
+                pass
+        # Fallback to CONFIG_FILE (e.g. shai_config.json or monkeypatched CONFIG_FILE in tests)
+        if settings is None and CONFIG_FILE.is_file():
+            try:
+                with CONFIG_FILE.open("r", encoding="utf-8") as handle:
+                    config = json.load(handle)
+                if isinstance(config, dict) and isinstance(config.get("reasoning_display"), dict):
+                    settings = config["reasoning_display"]
+            except (OSError, ValueError, TypeError):
+                pass
         if not isinstance(settings, dict):
             return True, MAX_DISPLAY_CHARS
         enabled = settings.get("enabled", True) is True

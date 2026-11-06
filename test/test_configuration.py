@@ -51,6 +51,33 @@ class ConfigTests(unittest.TestCase):
         self.config_path.write_text(json.dumps(["not", "a", "dict"]), encoding="utf-8")
         self.assertEqual(agent.load_config(), {})
 
+    def test_load_config_merges_split_config_files(self):
+        self.write_config({"provider": "kilo-free", "model": "cohere/north-mini-code:free"})
+        split_file = pathlib.Path(self.temp_dir.name) / "context_window_config.json"
+        split_file.write_text(json.dumps({
+            "model_context_windows": {"kilo-free::cohere/north-mini-code:free": 256000}
+        }), encoding="utf-8")
+        loaded = agent.load_config()
+        self.assertIn("model_context_windows", loaded)
+        self.assertEqual(loaded["model_context_windows"]["kilo-free::cohere/north-mini-code:free"], 256000)
+
+    def test_load_config_preserves_explicit_overrides_over_split_configs(self):
+        self.write_config({
+            "provider": "kilo-free",
+            "model": "cohere/north-mini-code:free",
+            "model_context_windows": {"kilo-free::cohere/north-mini-code:free": 500000}
+        })
+        split_file = pathlib.Path(self.temp_dir.name) / "context_window_config.json"
+        split_file.write_text(json.dumps({
+            "model_context_windows": {
+                "kilo-free::cohere/north-mini-code:free": 256000,
+                "other::model": 128000
+            }
+        }), encoding="utf-8")
+        loaded = agent.load_config()
+        self.assertEqual(loaded["model_context_windows"]["kilo-free::cohere/north-mini-code:free"], 500000)
+        self.assertEqual(loaded["model_context_windows"]["other::model"], 128000)
+
     def test_load_api_timeout_seconds_defaults_and_validation(self):
         # Default when missing
         self.write_config({})
@@ -193,6 +220,51 @@ class ConfigTests(unittest.TestCase):
         self.assertLessEqual(settings["max_read_file_lines"], 500)
         self.assertLessEqual(settings["max_invalid_argument_attempts_per_tool"], 5)
         self.assertLessEqual(settings["default_read_file_lines"], settings["max_read_file_lines"])
+
+    def test_save_approval_settings_does_not_leak_split_configs_into_shai_config(self):
+        self.write_config({"provider": "kilo-free", "model": "test-model"})
+        # Place sibling split config files in the same directory
+        (pathlib.Path(self.temp_dir.name) / "context_window_config.json").write_text(
+            json.dumps({"model_context_windows": {"kilo-free::test-model": 128000}}),
+            encoding="utf-8"
+        )
+        (pathlib.Path(self.temp_dir.name) / "cli_config.json").write_text(
+            json.dumps({"tool_call_display": {"show_parameters": True}}),
+            encoding="utf-8"
+        )
+        agent.save_approval_settings({"all": True, "tools": {"run_checks": True}})
+        saved = json.loads(self.config_path.read_text(encoding="utf-8"))
+        self.assertEqual(saved["provider"], "kilo-free")
+        self.assertEqual(saved["model"], "test-model")
+        self.assertTrue(saved["approve"]["all"])
+        # Crucial check: split files must not be copied/leaked into shai_config.json
+        self.assertNotIn("model_context_windows", saved)
+        self.assertNotIn("tool_call_display", saved)
+
+    def test_provider_selection_load_config_preserves_shai_config_overrides(self):
+        from modules import provider_selection
+        orig_config_file = provider_selection.CONFIG_FILE
+        provider_selection.CONFIG_FILE = self.config_path
+        try:
+            self.write_config({
+                "providers": {
+                    "kilo-free": {"timeout_seconds": 99}
+                }
+            })
+            (pathlib.Path(self.temp_dir.name) / "provider_config.json").write_text(
+                json.dumps({
+                    "providers": {
+                        "kilo-free": {"timeout_seconds": 300, "auth_type": "bearer"}
+                    }
+                }),
+                encoding="utf-8"
+            )
+            loaded = provider_selection.load_config()
+            self.assertIn("providers", loaded)
+            self.assertEqual(loaded["providers"]["kilo-free"]["timeout_seconds"], 99)
+            self.assertEqual(loaded["providers"]["kilo-free"]["auth_type"], "bearer")
+        finally:
+            provider_selection.CONFIG_FILE = orig_config_file
 
 
 if __name__ == "__main__":

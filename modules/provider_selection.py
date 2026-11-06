@@ -81,17 +81,28 @@ PROVIDERS = DEFAULT_PROVIDERS
 
 
 
+def _merge_config_section(base, extra):
+    if not isinstance(base, dict) or not isinstance(extra, dict):
+        return
+    for k, v in extra.items():
+        if k not in base:
+            base[k] = v
+        elif isinstance(base[k], dict) and isinstance(v, dict):
+            _merge_config_section(base[k], v)
+
+
 def load_config():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
-            data = data if isinstance(data, dict) else {}
+        if not isinstance(data, dict):
+            return {}
         for filename in ("provider_config.json", "context_window_config.json", "cli_config.json", "logging_config.json", "command_config.json"):
             try:
                 with (CONFIG_FILE.parent / filename).open("r", encoding="utf-8") as handle:
                     section = json.load(handle)
                 if isinstance(section, dict):
-                    data.update(section)
+                    _merge_config_section(data, section)
             except (OSError, ValueError, TypeError):
                 pass
         return data

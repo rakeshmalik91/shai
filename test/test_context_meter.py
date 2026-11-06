@@ -122,6 +122,22 @@ class ContextMeterTests(unittest.TestCase):
             "context limit unknown", format_context_status(250, None)
         )
 
+    def test_fallback_to_assets_context_window_config_for_known_models(self):
+        # Even with empty config, default model context limits from assets are resolved
+        self.assertEqual(
+            get_context_window("kilo-free", "cohere/north-mini-code:free", {}), 256000
+        )
+        self.assertEqual(
+            get_context_window("gemini", "gemini-3.5-flash", None), 1048576
+        )
+
+    def test_thinking_context_status_known_for_default_model(self):
+        limit = get_context_window("kilo-free", "cohere/north-mini-code:free", {})
+        status = format_context_status(1200, limit)
+        self.assertNotIn("limit unknown", status)
+        self.assertIn("256,000", status)
+        self.assertIn("0.5%", status)
+
 
 if __name__ == "__main__":
     unittest.main()

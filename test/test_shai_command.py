@@ -113,6 +113,24 @@ class ShaiCommandTests(unittest.TestCase):
                 "show git status", "agent", config_path=config_path
             ))
 
+    def test_shai_command_can_be_disabled_in_command_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cmd_cfg = Path(directory) / "command_config.json"
+            cmd_cfg.write_text(json.dumps({"shai_command": {"enabled": False}}))
+            self.assertIsNone(resolve_shai_command(
+                "show git status", "agent", config_path=cmd_cfg
+            ))
+
+    def test_shai_command_resolves_sibling_command_config_when_given_shai_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            shai_cfg = Path(directory) / "shai_config.json"
+            cmd_cfg = Path(directory) / "command_config.json"
+            shai_cfg.write_text("{}", encoding="utf-8")
+            cmd_cfg.write_text(json.dumps({"shai_command": {"enabled": False}}), encoding="utf-8")
+            self.assertIsNone(resolve_shai_command(
+                "show git status", "agent", config_path=shai_cfg
+            ))
+
     def test_malformed_command_registry_returns_none(self):
         with tempfile.TemporaryDirectory() as directory:
             reg_path = Path(directory) / "bad_registry.json"

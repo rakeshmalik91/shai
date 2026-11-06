@@ -42,6 +42,6 @@ and approval policy.
 Press Ctrl+D while Shai is processing to cancel the current iteration
 and return to the chat prompt.
 
-Configure shai_command, os_command, max_tool_call_iterations,
-tool_safeguards, retry, and granular approval policy in shai_config.json.
+Configure os_command and shai_command in command_config.json;
+max_tool_call_iterations, tool_safeguards, retry, and granular approval policy in shai_config.json.
 """

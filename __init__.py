@@ -67,6 +67,16 @@ DEFAULT_TOOL_SAFEGUARDS = {
 }
 
 
+def _merge_config_section(base, extra):
+    if not isinstance(base, dict) or not isinstance(extra, dict):
+        return
+    for k, v in extra.items():
+        if k not in base:
+            base[k] = v
+        elif isinstance(base[k], dict) and isinstance(v, dict):
+            _merge_config_section(base[k], v)
+
+
 def load_config():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as handle:
@@ -80,10 +90,10 @@ def load_config():
             "logging_config.json",
         ):
             try:
-                with (SCRIPT_DIR / "assets" / filename).open("r", encoding="utf-8") as extra:
+                with (CONFIG_FILE.parent / filename).open("r", encoding="utf-8") as extra:
                     section = json.load(extra)
                 if isinstance(section, dict):
-                    value.update(section)
+                    _merge_config_section(value, section)
             except (FileNotFoundError, OSError, ValueError, TypeError):
                 pass
         return value

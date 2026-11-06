@@ -97,6 +97,22 @@ class FileChangeDisplayTests(unittest.TestCase):
             output = captured.getvalue()
             self.assertIn("+ line", output)
 
+    def test_load_settings_reads_from_cli_config_when_config_path_none(self):
+        settings = load_settings()
+        # assets/cli_config.json defines max_diff_lines=160, max_diff_chars=16000
+        self.assertEqual(settings["max_diff_lines"], 160)
+        self.assertEqual(settings["max_diff_chars"], 16000)
+        self.assertTrue(settings["enabled"])
+
+    def test_load_settings_reads_from_sibling_cli_config_when_given_shai_config(self):
+        with tempfile.TemporaryDirectory() as root:
+            shai_cfg = Path(root) / "shai_config.json"
+            cli_cfg = Path(root) / "cli_config.json"
+            shai_cfg.write_text("{}", encoding="utf-8")
+            cli_cfg.write_text('{"file_change_display":{"max_diff_lines":45}}', encoding="utf-8")
+            settings = load_settings(shai_cfg)
+            self.assertEqual(settings["max_diff_lines"], 45)
+
 
 if __name__ == "__main__":
     unittest.main()

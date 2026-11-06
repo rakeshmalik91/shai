@@ -58,18 +58,32 @@ DEFAULT_API_TIMEOUT_SECONDS = 300
 LOGGER = get_logger("shai.chat")
 
 
+def _merge_config_section(base, extra):
+    if not isinstance(base, dict) or not isinstance(extra, dict):
+        return
+    for k, v in extra.items():
+        if k not in base:
+            base[k] = v
+        elif isinstance(base[k], dict) and isinstance(v, dict):
+            _merge_config_section(base[k], v)
+
+
 def load_config():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as handle:
             value = json.load(handle)
         if not isinstance(value, dict):
             return {}
-        for filename in ("provider_config.json", "command_config.json"):
+        for filename in (
+            "provider_config.json", "command_config.json",
+            "context_window_config.json", "cli_config.json",
+            "logging_config.json",
+        ):
             try:
-                with (SCRIPT_DIR / "assets" / filename).open("r", encoding="utf-8") as extra:
+                with (CONFIG_FILE.parent / filename).open("r", encoding="utf-8") as extra:
                     section = json.load(extra)
                 if isinstance(section, dict):
-                    value.update(section)
+                    _merge_config_section(value, section)
             except (OSError, ValueError, TypeError):
                 pass
         return value
@@ -436,7 +450,9 @@ def main():
                 max_recent_tool_cycles=history_limit("max_recent_tool_cycles", 6)
             )
         history_store.save(history, provider=provider, model=model)
-        context_limit = get_context_window(provider, model, load_config())
+        route = resolve_routed_model("chat", ROOT, provider, model)
+        effective_provider, effective_model = route["provider"], route["model"]
+        context_limit = get_context_window(effective_provider, effective_model, load_config())
         estimated_prompt_tokens = estimate_messages_tokens(history)
         context_status = format_context_status(
             estimated_prompt_tokens, context_limit
@@ -444,7 +460,7 @@ def main():
         LOGGER.debug(
             "Chat context estimate provider=%s model=%s estimated_prompt_tokens=%d "
             "context_limit=%s history_messages=%d",
-            provider, model, estimated_prompt_tokens, context_limit, len(history)
+            effective_provider, effective_model, estimated_prompt_tokens, context_limit, len(history)
         )
         print("\n[Shai] {}".format(context_status))
         spinner = Spinner("Shai is thinking | " + context_status)

@@ -1,6 +1,6 @@
 {
   "provider": "kilo-free",
-  "model": "cohere/north-mini-code:free",
+  "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
   "max_tool_call_iterations": 500,
   "api_timeout_seconds": 300,
   "approve": {

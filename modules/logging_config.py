@@ -165,15 +165,23 @@ def get_logger(name):
 
 
 def load_logging_config(config):
-    settings = config.get("logging", {}) if isinstance(config, dict) else {}
+    settings = {}
     config_path = pathlib.Path(__file__).resolve().parent.parent / "assets" / "logging_config.json"
     try:
         with config_path.open("r", encoding="utf-8") as handle:
             dedicated = json.load(handle)
         if isinstance(dedicated, dict):
-            settings = dedicated
+            settings.update(dedicated)
     except (OSError, ValueError, TypeError):
         pass
+    if isinstance(config, dict):
+        if "logging" in config and isinstance(config["logging"], dict):
+            settings.update(config["logging"])
+        else:
+            for k in ("enabled", "log_dir", "log_file", "log_level", "max_bytes", "backup_count",
+                      "console_level", "enable_console", "per_run_file", "newest_first", "retain_files"):
+                if k in config:
+                    settings[k] = config[k]
     if not settings.get("enabled", True):
         return {"enabled": False}
     level_map = {
@@ -220,10 +228,14 @@ def init_default_logging(config=None):
         return _default_logger
     if config is None:
         try:
-            with (SCRIPT_DIR / "assets" / "shai_config.json").open("r", encoding="utf-8") as handle:
+            with (SCRIPT_DIR / "assets" / "logging_config.json").open("r", encoding="utf-8") as handle:
                 config = json.load(handle)
         except (OSError, ValueError, TypeError):
-            config = {}
+            try:
+                with (SCRIPT_DIR / "assets" / "shai_config.json").open("r", encoding="utf-8") as handle:
+                    config = json.load(handle)
+            except (OSError, ValueError, TypeError):
+                config = {}
     settings = load_logging_config(config)
     if not settings.get("enabled", True):
         null_logger = logging.getLogger("shai")

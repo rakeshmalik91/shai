@@ -36,6 +36,16 @@ def _enabled(config_path=None):
         with path.open("r", encoding="utf-8") as handle:
             config = json.load(handle)
         settings = config.get("shai_command", {}) if isinstance(config, dict) else {}
+        if not settings and path.name != "command_config.json":
+            split_path = path.parent / "command_config.json"
+            if split_path.is_file():
+                try:
+                    with split_path.open("r", encoding="utf-8") as split_handle:
+                        split_config = json.load(split_handle)
+                    if isinstance(split_config, dict) and "shai_command" in split_config:
+                        settings = split_config.get("shai_command", {})
+                except (OSError, ValueError, TypeError):
+                    pass
         return not isinstance(settings, dict) or settings.get("enabled", True) is True
     except (OSError, ValueError, TypeError):
         # Preserve command behavior if an older installation has no feature key.

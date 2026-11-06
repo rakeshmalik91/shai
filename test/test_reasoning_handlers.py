@@ -2,6 +2,7 @@ import contextlib
 import io
 import pathlib
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -84,6 +85,25 @@ class ReasoningHandlerTests(unittest.TestCase):
         logged = " ".join(str(call) for call in debug.call_args_list)
         self.assertIn("Checked the failing path.", logged)
         self.assertNotIn("PRIVATE RAW CHAIN", logged)
+
+    def test_display_settings_reads_from_cli_config(self):
+        enabled, max_chars = reasoning_handlers._display_settings()
+        # assets/cli_config.json sets reasoning_display: {"enabled": True, "max_chars": 6000}
+        self.assertTrue(enabled)
+        self.assertEqual(max_chars, 6000)
+
+    def test_display_settings_respects_custom_cli_config(self):
+        with tempfile.TemporaryDirectory() as td:
+            cli_cfg = pathlib.Path(td) / "cli_config.json"
+            cli_cfg.write_text('{"reasoning_display": {"enabled": false, "max_chars": 1234}}', encoding="utf-8")
+            orig_cfg = reasoning_handlers.CONFIG_FILE
+            reasoning_handlers.CONFIG_FILE = pathlib.Path(td) / "shai_config.json"
+            try:
+                enabled, max_chars = reasoning_handlers._display_settings()
+                self.assertFalse(enabled)
+                self.assertEqual(max_chars, 1234)
+            finally:
+                reasoning_handlers.CONFIG_FILE = orig_cfg
 
 
 if __name__ == "__main__":

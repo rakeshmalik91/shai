@@ -68,7 +68,7 @@ class DefaultCliInteractionHandler(InteractionHandler):
     def confirm_action(self, prompt: str, category: str | None = None, tool: str | None = None) -> bool:
         answer = self._prompt(prompt).lower()
         if answer in ("a", "all"):
-            from modules.engine.configuration import load_approval_settings, save_approval_settings
+            from modules.engine.agent_runtime import load_approval_settings, save_approval_settings
             settings = load_approval_settings()
             settings["all"] = True
             save_approval_settings(settings)

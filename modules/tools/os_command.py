@@ -291,7 +291,7 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
                        root, settings, confirm, runner):
     """Validate, preview, approve and execute one allowlisted command."""
     if not isinstance(settings, dict) or settings.get("enabled") is not True:
-        return {"error": "os_command is disabled in shai_config.json."}
+        return {"error": "os_command is disabled in command_config.json."}
     configured_commands = settings.get("commands", {})
     if not isinstance(configured_commands, dict):
         return {"error": "Invalid os_command.commands configuration; expected an object."}

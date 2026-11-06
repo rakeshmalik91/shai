@@ -73,6 +73,18 @@ class LoggingConfigTests(unittest.TestCase):
             finally:
                 logging_config.SCRIPT_DIR = original_script_dir
 
+    def test_load_logging_config_caller_overrides_dedicated_asset(self):
+        # Caller-supplied logging overrides take precedence over assets/logging_config.json
+        settings = logging_config.load_logging_config({"logging": {"log_level": "WARNING", "retain_files": 42}})
+        self.assertEqual(settings["log_level"], logging.WARNING)
+        self.assertEqual(settings["retain_files"], 42)
+
+    def test_init_default_logging_reads_logging_config_asset(self):
+        settings = logging_config.load_logging_config(None)
+        # Default in assets/logging_config.json is log_level=DEBUG, retain_files=10
+        self.assertEqual(settings["log_level"], logging.DEBUG)
+        self.assertEqual(settings["retain_files"], 10)
+
 
 if __name__ == "__main__":
     unittest.main()

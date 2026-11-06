@@ -47,6 +47,32 @@ def get_context_window(provider, model, config=None):
         value = config.get("context_window_tokens")
         if isinstance(value, int) and not isinstance(value, bool) and value > 0:
             return value
+
+    # Fallback to assets/context_window_config.json when not present in config
+    try:
+        import pathlib
+        cfg_path = pathlib.Path(__file__).resolve().parents[1] / "assets" / "context_window_config.json"
+        if cfg_path.is_file():
+            with cfg_path.open("r", encoding="utf-8") as handle:
+                fallback_cfg = json.load(handle)
+            if isinstance(fallback_cfg, dict):
+                fallback_overrides = fallback_cfg.get("model_context_window_overrides", {})
+                if isinstance(fallback_overrides, dict):
+                    val = fallback_overrides.get(key)
+                    if isinstance(val, int) and not isinstance(val, bool) and val > 0:
+                        return val
+                fallback_mapping = fallback_cfg.get("model_context_windows", {})
+                if isinstance(fallback_mapping, dict):
+                    val = fallback_mapping.get(key)
+                    if isinstance(val, int) and not isinstance(val, bool) and val > 0:
+                        return val
+                if fallback_cfg.get("provider") == provider and fallback_cfg.get("model") == model:
+                    val = fallback_cfg.get("context_window_tokens")
+                    if isinstance(val, int) and not isinstance(val, bool) and val > 0:
+                        return val
+    except (OSError, ValueError, TypeError):
+        pass
+
     return None
 
 
