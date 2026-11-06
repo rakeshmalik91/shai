@@ -8,7 +8,7 @@ This document provides a complete overview of the Shai project structure, includ
 .
 ├── .gitignore
 ├── .lectra-project.json
-├── .shai/                    # Project-local runtime data and configuration
+├── .shai/                    # Project-local runtime data, logs and configuration
 │   ├── .gitignore
 │   ├── history.json
 │   ├── task.json
@@ -22,7 +22,6 @@ This document provides a complete overview of the Shai project structure, includ
 ├── chat.py                   # Entry point: Chat mode
 ├── assets/                   # Runtime and command JSON configuration
 ├── docs/                     # Documentation
-├── logs/                     # Diagnostic logs
 ├── modules/                  # Core implementation modules
 ├── pytest.ini
 ├── requirements.txt
@@ -161,7 +160,7 @@ This document provides a complete overview of the Shai project structure, includ
 | `assets/command_config.json` | Shai commands, OS commands and execution policy |
 | `.shai/history.json` | Conversation history per project |
 | `.shai/task.json` | Task plan state |\n| `.shai/backup_config.json` | Project-specific backup cleanup settings |\n| `.shai/shai_backups/` | Automatic backups of edited files |
-| `logs/` | Diagnostic logs (when enabled) |
+| `.shai/logs/` | Diagnostic logs (when enabled) |
 | `setup_keys.sh` | User-created shell file for API keys (not committed) |
 
 ## Module Dependency Overview

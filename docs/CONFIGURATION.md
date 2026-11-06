@@ -8,7 +8,7 @@ Shai configuration is stored under `assets/` and split by responsibility:
 - `assets/command_config.json` — Shai slash-command and OS command settings (`shai_command`, `os_command`).
 - `assets/context_window_config.json` — per-model context limits and active context token limit.
 - `assets/cli_config.json` — terminal/CLI presentation, tool-call display, reasoning display, and file-change display.
-- `assets/logging_config.json` — log level, output location, rotation, retention, and console logging.
+- `assets/logging_config.json` — log level, output location (`.shai/logs/` by default), rotation, retention, and console logging.
 - `assets/command_registry.json` — natural-language command registry.
 
 Runtime configuration loaders merge the split files for consumers that need a unified view. Provider/model selection metadata remains in the core configuration; provider-specific endpoint and authentication overrides belong in `provider_config.json`. Context-window values, CLI presentation settings, and logging settings are persisted only to their dedicated files.
@@ -114,3 +114,11 @@ If this file is missing or invalid, ShAI uses the safe defaults shown above.
 The former `<project-root>/.shai_backups/` directory is migrated into the new
 location during backup cleanup. Only the generated backup directory is ignored
 by Git; `.shai/backup_config.json` remains available for project-specific policy.
+
+## Logging location
+
+Diagnostic logs are written to `<Shai-root>/.shai/logs/` by default.
+The legacy `logs/` configuration value is treated as `.shai/logs/`, and
+existing files in the old root-level `logs/` directory are moved into the
+canonical directory when logging initializes. A custom absolute or relative
+`log_dir` remains supported.

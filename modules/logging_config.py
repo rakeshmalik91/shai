@@ -10,11 +10,12 @@ import logging
 import json
 import os
 import pathlib
+import shutil
 import threading
 from typing import Optional
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent.parent
-DEFAULT_LOG_DIR = SCRIPT_DIR / "logs"
+DEFAULT_LOG_DIR = SCRIPT_DIR / ".shai" / "logs"
 DEFAULT_LOG_FILE = "shai.log"
 DEFAULT_RETAIN_FILES = 10
 DEFAULT_LOG_LEVEL = logging.DEBUG
@@ -79,6 +80,33 @@ def _prune_run_logs(log_dir, log_file, retain_files):
             pass
 
 
+def _migrate_legacy_logs(log_dir):
+    """Move legacy root-level logs/ into the canonical .shai/logs/ directory."""
+    log_dir = pathlib.Path(log_dir)
+    legacy_dir = SCRIPT_DIR / "logs"
+    canonical_dir = SCRIPT_DIR / ".shai" / "logs"
+    try:
+        if log_dir.resolve() != canonical_dir.resolve() or not legacy_dir.is_dir():
+            return
+        canonical_dir.mkdir(parents=True, exist_ok=True)
+        for source in legacy_dir.iterdir():
+            destination = canonical_dir / source.name
+            if destination.exists():
+                continue
+            try:
+                shutil.move(str(source), str(destination))
+            except OSError:
+                # Keep the original file if it cannot safely be migrated.
+                continue
+        try:
+            legacy_dir.rmdir()
+        except OSError:
+            pass
+    except OSError:
+        # Logging must still initialize even if legacy migration is unavailable.
+        pass
+
+
 def setup_logging(
     log_dir: Optional[pathlib.Path] = None,
     log_file: Optional[pathlib.Path] = None,
@@ -95,6 +123,7 @@ def setup_logging(
     if log_dir is None:
         log_dir = DEFAULT_LOG_DIR
     log_dir = pathlib.Path(log_dir)
+    _migrate_legacy_logs(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
     if log_file is None:
         log_file = DEFAULT_LOG_FILE
@@ -152,9 +181,14 @@ def load_logging_config(config):
         "WARNING": logging.WARNING, "ERROR": logging.ERROR,
         "CRITICAL": logging.CRITICAL,
     }
-    log_dir = pathlib.Path(settings.get("log_dir", "logs"))
-    if not log_dir.is_absolute():
-        log_dir = SCRIPT_DIR / log_dir
+    configured_log_dir = pathlib.Path(settings.get("log_dir", ".shai/logs"))
+    if not configured_log_dir.is_absolute():
+        # Treat the historical "logs" setting as the new canonical location.
+        if configured_log_dir == pathlib.Path("logs"):
+            configured_log_dir = pathlib.Path(".shai") / "logs"
+        log_dir = SCRIPT_DIR / configured_log_dir
+    else:
+        log_dir = configured_log_dir
     log_file = pathlib.Path(settings.get("log_file", DEFAULT_LOG_FILE))
     if log_file.is_absolute():
         try:

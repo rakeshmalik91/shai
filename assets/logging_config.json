@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "log_dir": "logs",
+  "log_dir": ".shai/logs",
   "log_file": "shai.log",
   "log_level": "DEBUG",
   "per_run_file": true,
