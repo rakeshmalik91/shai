@@ -402,9 +402,23 @@ DEFAULT_COMMIT_DIFF_SECTION_WITHOUT_DIFF = "Changes:\n{changes}\n"
 
 
 
+def _load_os_command_settings():
+    """Load OS command policy from its dedicated split configuration file."""
+    command_file = CONFIG_FILE.parent / "command_config.json"
+    try:
+        with command_file.open("r", encoding="utf-8") as handle:
+            config = json.load(handle)
+        if not isinstance(config, dict):
+            return {}
+        settings = config.get("os_command", {})
+        return settings if isinstance(settings, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
 def os_command(executable, args, cwd=".", timeout_seconds=None):
     """Run one allowlisted OS command through the bounded execution boundary."""
-    settings = load_config().get("os_command", {})
+    settings = _load_os_command_settings()
     LOGGER.info("os_command request executable=%s cwd=%s argument_count=%s",
                 executable, cwd, len(args) if isinstance(args, list) else "invalid")
 
@@ -446,7 +460,8 @@ def os_command(executable, args, cwd=".", timeout_seconds=None):
             raise IterationInterrupted()
         if choice in ("1", "2", "3"):
             try:
-                with CONFIG_FILE.open("r", encoding="utf-8") as handle:
+                command_config_file = CONFIG_FILE.parent / "command_config.json"
+                with command_config_file.open("r", encoding="utf-8") as handle:
                     persisted = json.load(handle)
                 git_profile = persisted.setdefault("os_command", {}).setdefault("commands", {}).setdefault("git", {})
                 if choice == "1":
@@ -463,13 +478,13 @@ def os_command(executable, args, cwd=".", timeout_seconds=None):
                 else:
                     git_profile["allow_unrestricted"] = True
                     scope_label = "all Git commands"
-                temporary = CONFIG_FILE.with_name(CONFIG_FILE.name + ".tmp")
+                temporary = command_config_file.with_name(command_config_file.name + ".tmp")
                 with temporary.open("w", encoding="utf-8") as handle:
                     json.dump(persisted, handle, indent=2, ensure_ascii=False)
                     handle.write("\n")
-                temporary.replace(CONFIG_FILE)
+                temporary.replace(command_config_file)
                 print("[Shai] Whitelisted {}. Retrying the command.".format(scope_label))
-                settings = load_config().get("os_command", {})
+                settings = _load_os_command_settings()
                 result = execute_os_command(
                     executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
                     root=ROOT, settings=settings, confirm=approve,

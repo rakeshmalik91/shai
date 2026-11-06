@@ -209,3 +209,13 @@ retried. Explicit blacklist rules (`blocked_subcommands`, forbidden options,
 option prefixes, and argument patterns) are evaluated first and cannot be
 bypassed by any whitelist choice. The approval preview also displays the full
 resolved command, including injected Git options.
+
+
+## Configuration source of truth
+
+All `os_command` enablement and execution policy is read from
+`assets/command_config.json` under the top-level `os_command` object.
+The legacy `assets/shai_config.json` file is not consulted for command
+enablement. Interactive Git whitelist choices are persisted back to
+`assets/command_config.json` (never to the core configuration file), then the
+policy is reloaded before the blocked command is retried.
