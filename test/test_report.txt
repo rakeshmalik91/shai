@@ -1,15 +1,15 @@
 SHAI TEST REPORT
 ========================================================================
 Status: PASSED
-Started: 2026-11-06T04:31:28.517298+00:00
-Finished: 2026-11-06T04:32:33.457207+00:00
-Duration: 64.94 seconds
+Started: 2026-11-06T08:42:53.995480+00:00
+Finished: 2026-11-06T08:43:11.864105+00:00
+Duration: 17.87 seconds
 Python: 3.9.16
 
 UNITTEST
 ------------------------------------------------------------------------
 Status: PASSED
-Run: 224 | Failures: 0 | Errors: 0 | Skipped: 0
+Run: 230 | Failures: 0 | Errors: 0 | Skipped: 0
 test_approval_settings_support_category_and_tool_overrides (test.test_agent.ConfigTests) ... ok
 test_global_approval_applies_when_category_is_not_explicitly_denied (test.test_agent.ConfigTests) ... ok
 test_invalid_iteration_limit_uses_default (test.test_agent.ConfigTests) ... ok
@@ -70,6 +70,12 @@ test_stderr_and_stdout_are_both_drained (test.test_bounded_execution.BoundedOutp
 test_anthropic_response_extracts_text (test.test_chat.ChatTests) ... ok
 test_model_command_switches_provider_without_api_call (test.test_chat.ChatTests) ... ok
 test_provider_switch_keeps_text_and_removes_provider_specific_content (test.test_chat.ChatTests) ... ok
+test_anthropic_style_response_is_supported (test.test_commit_message_routing.CommitMessageRoutingTests) ... ok
+test_disabled_llm_does_not_call_router (test.test_commit_message_routing.CommitMessageRoutingTests) ... ok
+test_explicit_commit_message_bypasses_model_generation (test.test_commit_message_routing.CommitMessageRoutingTests) ... ok
+test_failed_routed_request_returns_to_pattern_fallback (test.test_commit_message_routing.CommitMessageRoutingTests) ... ok
+test_llm_commit_generation_uses_shared_commit_message_role_router (test.test_commit_message_routing.CommitMessageRoutingTests) ... ok
+test_message_only_command_path_invokes_message_generator (test.test_commit_message_routing.CommitMessageRoutingTests) ... ok
 test_tool_safeguards_invalid_boolean_flags (test.test_configuration.ConfigTests)
 Test that invalid boolean flags are normalized. ... ok
 test_discloses_unknown_limit_instead_of_fabricating_percentage (test.test_context_meter.ContextMeterTests) ... ok
@@ -237,7 +243,7 @@ test_read_only_dispatch_and_schemas_are_shared (test.test_tools_module.SharedToo
 test_root_configuration_and_safe_path (test.test_tools_module.SharedToolsModuleTests) ... ok
 
 ----------------------------------------------------------------------
-Ran 224 tests in 9.829s
+Ran 230 tests in 10.413s
 
 OK
 

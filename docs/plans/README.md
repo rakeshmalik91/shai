@@ -15,8 +15,9 @@ live in `docs/`:
 
 ## Remaining plans
 
-- [`MODEL_ROUTING_PLAN.md`](MODEL_ROUTING_PLAN.md) — connect specialist roles
-  and implement bounded runtime failover.
+- [`MODEL_ROUTING_PLAN.md`](MODEL_ROUTING_PLAN.md) — define task/model
+  suitability, add capability-aware filtering, connect remaining specialist
+  roles, and implement bounded runtime failover and availability controls.
 - [`EXECUTION_FLOW_ARCHITECTURE.md`](EXECUTION_FLOW_ARCHITECTURE.md) — future
   refactor of session lifecycle, state machine, orchestration, event flow, and
   terminal presentation.

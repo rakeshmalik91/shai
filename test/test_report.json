@@ -1,12 +1,12 @@
 {
   "status": "passed",
-  "started_at": "2026-11-06T04:31:28.517298+00:00",
-  "finished_at": "2026-11-06T04:32:33.457207+00:00",
-  "duration_seconds": 64.94,
+  "started_at": "2026-11-06T08:42:53.995480+00:00",
+  "finished_at": "2026-11-06T08:43:11.864105+00:00",
+  "duration_seconds": 17.87,
   "python_version": "3.9.16",
   "unittest": {
     "success": true,
-    "tests_run": 224,
+    "tests_run": 230,
     "failures": 0,
     "errors": 0,
     "skipped": 0,
@@ -249,6 +249,30 @@
       },
       {
         "test": "test_provider_switch_keeps_text_and_removes_provider_specific_content (test.test_chat.ChatTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_anthropic_style_response_is_supported (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_disabled_llm_does_not_call_router (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_explicit_commit_message_bypasses_model_generation (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_failed_routed_request_returns_to_pattern_fallback (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_llm_commit_generation_uses_shared_commit_message_role_router (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_message_only_command_path_invokes_message_generator (test.test_commit_message_routing.CommitMessageRoutingTests)",
         "status": "passed"
       },
       {

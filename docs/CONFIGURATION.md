@@ -174,8 +174,13 @@ Discovery results are cached briefly per project/provider. Invalid candidates
 are skipped; missing roles, empty lists, unsupported versions, and exhausted
 candidate lists fall back to the normal provider/model selected in Shai.
 
-Currently, Chat requests use the `chat` role, and Agent requests use
-`orchestrator`. The remaining roles are available in the routing schema for
-task-specific call sites as those workflows are split into independent model
-requests. Routing does not change the default model saved by `/model`, provider
-credentials, endpoint configuration, or context-window overrides.
+Chat requests use the `chat` role, Agent requests use `orchestrator`, and
+commit-message generation from `/commit` and `/commit --message-only` uses
+`commit_message`. The other roles are available for future task-specific call
+sites as those workflows are split into independent model requests. Routing
+does not change the default model saved by `/model`, provider credentials,
+endpoint configuration, or context-window overrides.
+
+Legacy `commit_message.provider` and `commit_message.model` fields are ignored
+for model selection; the existing enable/prompt/pattern settings remain
+separate.
