@@ -159,7 +159,11 @@
         ],
         "forbidden_argument_patterns": [],
         "approved_commands": [],
-        "approved_subcommands": []
+        "approved_subcommands": [
+          "config",
+          "log",
+          "commit"
+        ]
       },
       "python3": {
         "enabled": true,
