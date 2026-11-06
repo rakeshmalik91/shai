@@ -1,6 +1,4 @@
 {
-  "provider": "kilo-free",
-  "model": "cohere/north-mini-code:free",
   "max_tool_call_iterations": 500,
   "api_timeout_seconds": 300,
   "approve": {
@@ -16,13 +14,6 @@
       "edit_file": true,
       "os_command": false
     }
-  },
-  "commit_message": {
-    "provider": "",
-    "model": "",
-    "enabled": true,
-    "pattern": "{type}: {summary} {changes}",
-    "prompt": "Generate a concise, conventional commit message for the following changes.\\nFollow the format: <type>: <summary>\\n\\nTypes: feat, fix, docs, test, chore, refactor, style, perf, ci, build\\n\\n{diff_section}\\nReturn only the commit message, nothing else."
   },
   "tool_safeguards": {
     "duplicate_call_detection": true,

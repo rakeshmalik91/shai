@@ -2,7 +2,7 @@
 
 **Status:** Implemented (initial routing integration)  
 **Scope:** ShAI agent runtime  
-**Configuration location:** `.Shai/model_routing.json`
+**Configuration location:** `.shai/model_routing.json`
 
 ## 1. Objective
 
@@ -14,9 +14,9 @@ The configuration is project-specific. A project's routing preferences must not 
 
 ## 2. Design principles
 
-1. **Default-first reliability:** the default model already configured by ShAI remains authoritative as the fallback.
+1. **Default-first reliability:** the project default model in `.shai/model_routing.json` remains authoritative as the fallback.
 2. **Fail closed to the default:** a missing, malformed, unsupported, or invalid routing configuration must never prevent the agent from running. ShAI falls back to the default configured model.
-3. **Project isolation:** read routing configuration only from the active project's `.Shai` directory.
+3. **Project isolation:** read routing configuration only from the active project's `.shai` directory.
 4. **Explicit task identity:** callers identify the task role; the routing layer resolves the model.
 5. **Provider-neutral routing:** a route identifies a model using the same provider/model representation already understood by ShAI's provider configuration.
 6. **No hidden model substitution:** log the requested role, selected model, and fallback reason without exposing secrets.
@@ -29,23 +29,22 @@ Use this project-local file:
 
 ```text
 <project-root>/
-└── .Shai/
+└── .shai/
     └── model_routing.json
 ```
 
-The `.Shai` directory name is intentional and case-sensitive on filesystems that distinguish case.
+The directory name is `.shai` (lowercase).
 
-The global/default model remains configured through ShAI's existing core configuration. Do not duplicate or redefine that default in the project routing file.
+The project default provider/model pair is stored in the same `.shai/model_routing.json` file as role routes.
 
 Resolution precedence:
 
-1. Load the default model from the existing ShAI configuration.
-2. Look for `.Shai/model_routing.json` under the active project root.
-3. If the file is absent, invalid, unreadable, or contains an invalid route, use the default model.
-4. If the file is valid but a requested role is not configured, use the default model.
-5. If the selected route's provider/model cannot be resolved or is unavailable at runtime, fall back to the default model when possible.
+1. Load `.shai/model_routing.json` under the active project root.
+2. Read its `default` provider/model pair and role-specific candidate lists.
+3. If the file is absent or invalid, use the last interactive provider/model selection when available.
+4. If a requested role is not configured or no candidate is available, use the project default pair.
 
-Do not search parent directories, the user's home directory, or another project's `.Shai` directory for routing configuration. This avoids accidental cross-project inheritance.
+Do not search parent directories, the user's home directory, or another project's `.shai` directory for routing configuration. This avoids accidental cross-project inheritance.
 
 ## 4. Proposed configuration schema
 
@@ -148,7 +147,7 @@ It returns the selected model and routing metadata. It does not instantiate prov
 4. Check candidates in that order using the provider adapter's availability mechanism.
 5. Select the first candidate reported available.
 6. If a candidate is unavailable, record the reason and continue to the next candidate.
-7. If no specialist candidate is available, select the default model from existing ShAI configuration.
+7. If no specialist candidate is available, select the project default model from `.shai/model_routing.json`.
 
 A missing role or empty candidate list goes directly to the default model.
 
@@ -182,7 +181,7 @@ If the selected candidate fails during the actual request:
 
 The default configured model remains the final fallback when:
 
-- Project `.Shai` directory or routing file is missing.
+- Project `.shai` directory or routing file is missing.
 - Routing file cannot be read, is malformed, or has an unsupported schema version.
 - `models` is missing or is not an object.
 - Requested role is missing or unknown.
@@ -201,10 +200,10 @@ If the default model itself is unavailable, surface the normal provider error. D
 - Add a dedicated model-routing configuration module.
 - Define the supported role registry and schema version.
 - Resolve the active project root consistently.
-- Load `.Shai/model_routing.json`.
+- Load `.shai/model_routing.json`.
 - Validate the document, role candidate lists, candidate objects, and priorities independently.
 - Implement priority-ordered availability checks, bounded runtime failover, and default-model fallback for every missing/invalid/exhausted case.
-- Keep the existing default model configuration unchanged.
+- Keep the default provider/model pair in `.shai/model_routing.json`.
 - Add safe diagnostics for invalid configuration.
 
 ### Phase 2 — Runtime integration
@@ -242,21 +241,21 @@ Expose enough diagnostic information to answer: "Which model handled this task, 
 
 ### Phase 4 — Documentation and migration
 
-- Document `.Shai/model_routing.json` and all supported roles.
+- Document `.shai/model_routing.json` and all supported roles.
 - Provide a sample configuration with placeholder model identifiers.
 - Explain that omitted roles use the default.
 - Explain candidate priority, availability probes/cache/cooldown, runtime failover, and all invalid-config fallback behavior.
-- Document project isolation and the case-sensitive `.Shai` directory.
+- Document project isolation and the lowercase `.shai` directory.
 - Do not migrate or copy global settings into project files automatically.
 - Ensure generated project-local configuration is treated as local state and is not committed by default; document how a team may deliberately version-control it if desired.
 
 ## 7. Testing plan
 
-Tests must be deterministic and must never prompt for interactive input. Use temporary project roots, temporary `.Shai` directories, mocked provider registries, and fake model clients.
+Tests must be deterministic and must never prompt for interactive input. Use temporary project roots, temporary `.shai` directories, mocked provider registries, and fake model clients.
 
 ### Configuration tests
 
-- Missing `.Shai` directory uses default.
+- Missing `.shai` directory uses default.
 - Missing file uses default.
 - Empty file and malformed JSON use default.
 - Invalid JSON root, version, or `models` type uses default.
@@ -276,7 +275,7 @@ Tests must be deterministic and must never prompt for interactive input. Use tem
 ### Project isolation tests
 
 - Project A's routing is not used in Project B.
-- Parent-directory `.Shai` files are not inherited.
+- Parent-directory `.shai` files are not inherited.
 - Home-directory configuration is not inherited.
 - Relative and absolute project-root handling resolves to the same active project.
 - Symlinked project roots follow the repository's established project-root/security policy.
@@ -304,8 +303,8 @@ Tests must be deterministic and must never prompt for interactive input. Use tem
 
 The feature is ready when:
 
-1. Routing configuration exists only at `<project-root>/.Shai/model_routing.json`.
-2. The global/default model remains defined by the existing ShAI configuration.
+1. Routing configuration exists only at `<project-root>/.shai/model_routing.json`.
+2. The project default model is defined in `.shai/model_routing.json`.
 3. A missing or invalid routing file never prevents startup or ordinary model calls.
 4. A missing role, malformed role list, or exhausted candidate list resolves to the default configured model; an invalid individual candidate is skipped while lower-priority candidates remain eligible.
 5. A valid route for one role does not get discarded because a different role entry is invalid.
@@ -319,7 +318,7 @@ The feature is ready when:
 
 ## 9. Decisions to preserve during implementation
 
-- Use `.Shai` exactly as specified; do not silently substitute `.shai`.
+- Use `.shai` exactly as specified; do not silently substitute `.shai`.
 - Keep generic/global provider and default-model configuration separate from project-specific routing.
 - Do not make the project routing file a second source of provider credentials or provider definitions.
 - Do not silently choose a random model if a route is invalid.
@@ -329,9 +328,8 @@ The feature is ready when:
 
 ## Implementation notes
 
-The initial implementation adds `assets/model_routing.json` as the tracked
-empty template and `.Shai/model_routing.json` as the active project's ignored
-override. `modules/model_routing.py` validates roles/candidates, sorts by
+The implementation stores the default provider/model pair and role routing
+configuration together in `.shai/model_routing.json`, which is allowlisted in Git. `modules/model_routing.py` validates roles/candidates, sorts by
 priority, checks discovered provider models, caches discovery briefly, and
 falls back to the configured default. Chat requests are integrated with the
 `chat` role; Agent requests are integrated with `orchestrator`.

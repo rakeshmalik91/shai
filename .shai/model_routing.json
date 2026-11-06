@@ -1,5 +1,9 @@
 {
   "version": 1,
+  "default": {
+    "provider": "kilo-free",
+    "model": "cohere/north-mini-code:free"
+  },
   "models": {
     "orchestrator": [
     ],

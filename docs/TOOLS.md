@@ -106,7 +106,7 @@ Shared read-only tools (project listing/reading/search, Git inspection, AST/code
 
 ## Configuration
 
-`assets/shai_config.json` controls core provider/model selection, approval behaviour, safeguards, test execution, logging, history limits and display settings. Provider-specific endpoint/auth overrides are in `assets/provider_config.json`; command execution and Git policy are in `assets/command_config.json`. API keys belong in environment variables, not this file.
+`assets/shai_config.json` controls approval behaviour, safeguards, test execution, logging, history limits and display settings. The project default provider/model pair and task-role routing are stored in `.shai/model_routing.json`. Provider-specific endpoint/auth overrides are in `assets/provider_config.json`; command execution and Git policy are in `assets/command_config.json`. API keys belong in environment variables, not this file.
 
 ## Context meter
 

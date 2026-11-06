@@ -11,7 +11,7 @@ class ModelRoutingTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.project = pathlib.Path(self.temp.name)
-        self.route_file = self.project / ".Shai" / "model_routing.json"
+        self.route_file = self.project / ".shai" / "model_routing.json"
         self.route_file.parent.mkdir()
         self.original_template = model_routing.TEMPLATE_FILE
         self.template = self.project / "template.json"
@@ -98,11 +98,22 @@ class ModelRoutingTests(unittest.TestCase):
         self.assertEqual([c["model"] for c in candidates], ["good"])
 
 
-    def test_project_routing_file_is_gitignored_and_template_is_tracked(self):
+    def test_project_routing_file_and_default_model_are_project_local(self):
         ignore = (self.project / ".gitignore")
-        ignore.write_text(".Shai/\\n", encoding="utf-8")
-        self.assertIn(".Shai/", ignore.read_text(encoding="utf-8"))
+        ignore.write_text(".shai/\n!.shai/model_routing.json\n", encoding="utf-8")
+        self.assertIn(".shai/", ignore.read_text(encoding="utf-8"))
         self.assertTrue(model_routing.TEMPLATE_FILE.exists())
+
+    def test_project_default_model_is_loaded_from_same_file(self):
+        self.route_file.write_text(json.dumps({
+            "version": 1,
+            "default": {"provider": "ollama", "model": "qwen2.5:14b"},
+            "models": {"code": []},
+        }), encoding="utf-8")
+        config = model_routing.load_routing_config(self.project)
+        self.assertEqual(config["default"], {
+            "provider": "ollama", "model": "qwen2.5:14b"
+        })
 
     def test_discovery_is_cached_per_project_and_provider(self):
         self.write_routes({"chat": [

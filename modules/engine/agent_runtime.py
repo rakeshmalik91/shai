@@ -646,7 +646,7 @@ def main():
     init_default_logging(load_config())
     LOGGER.info("Starting Shai coding agent root=%s api_timeout=%ss",
                 ROOT, API_TIMEOUT_SECONDS)
-    PROVIDER, MODEL = initialize_provider(auto_select=True)
+    PROVIDER, MODEL = initialize_provider(auto_select=True, project_root=ROOT)
     LOGGER.info("Selected provider=%s model=%s", PROVIDER, MODEL)
 
     cleanup_old_backups()
@@ -694,7 +694,7 @@ def main():
             if user_text in ("/model", "/switch", "/switch-model"):
                 old_provider, old_model = PROVIDER, MODEL
                 try:
-                    new_provider, new_model = initialize_provider()
+                    new_provider, new_model = initialize_provider(project_root=ROOT)
                 except (KeyboardInterrupt, EOFError):
                     print("\n[Shai] Model switch cancelled; keeping {} / {}.".format(
                         old_provider, old_model
