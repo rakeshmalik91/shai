@@ -9,7 +9,6 @@ import urllib.request
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent.parent
 CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
-MODEL_CONFIG_FILE = SCRIPT_DIR / ".shai" / "model_routing.json"
 
 MODEL_CONTEXT_WINDOWS = {}
 
@@ -176,47 +175,21 @@ def provider_timeout(provider, fallback=300):
     return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else fallback
 
 
-def _model_config_path(project_root=None):
-    """Return the project-local model routing/configuration file."""
-    if project_root is None:
-        return pathlib.Path(MODEL_CONFIG_FILE)
-    base = pathlib.Path(project_root).expanduser().resolve()
-    return base / ".shai" / "model_routing.json"
-
-
-def load_default_model(project_root=None):
-    """Read the project's default provider/model pair."""
-    path = _model_config_path(project_root)
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        default = data.get("default", {}) if isinstance(data, dict) else {}
-        if isinstance(default, dict):
-            return default.get("provider"), default.get("model")
-    except (OSError, ValueError, TypeError):
-        pass
-    return None, None
-
-
-def save_config(provider, model, context_window_tokens=None, project_root=None):
-    """Persist the default provider/model in .shai/model_routing.json."""
-    model_path = _model_config_path(project_root)
+def save_config(provider, model, context_window_tokens=None):
+    """Persist provider/model in core config and context limits separately."""
     config = {}
-    if model_path.exists():
+    if CONFIG_FILE.exists():
         try:
-            config = json.loads(model_path.read_text(encoding="utf-8"))
+            config = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
             config = {}
-    if not isinstance(config, dict):
-        config = {}
-    config.setdefault("version", 1)
-    config["default"] = {"provider": provider, "model": model}
-    config.setdefault("models", {})
-    model_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = model_path.with_name(model_path.name + ".tmp")
+    config["provider"] = provider
+    config["model"] = model
+    temporary = CONFIG_FILE.with_name(CONFIG_FILE.name + ".tmp")
     with temporary.open("w", encoding="utf-8") as handle:
         json.dump(config, handle, indent=2, ensure_ascii=False)
         handle.write("\n")
-    temporary.replace(model_path)
+    temporary.replace(CONFIG_FILE)
 
     context_path = CONFIG_FILE.parent / "context_window_config.json"
     context = {}
@@ -378,7 +351,7 @@ def choose_model(models, preferred=None):
         print("Invalid selection. Enter a number from the list.")
 
 
-def initialize_provider(auto_select=False, project_root=None):
+def initialize_provider(auto_select=False):
     """Prompt for provider, then model, on every invocation.
 
     Provider 0 reuses the last provider/model pair and skips the model prompt.
@@ -387,7 +360,9 @@ def initialize_provider(auto_select=False, project_root=None):
     if valid (provider exists and model is available), otherwise fall back
     to interactive selection.
     """
-    saved_provider, saved_model = load_default_model(project_root)
+    saved = load_config()
+    saved_provider = saved.get("provider")
+    saved_model = saved.get("model")
 
     # Auto-select: try to use saved provider/model without prompting
     if auto_select and saved_provider in PROVIDERS and saved_model:
@@ -448,7 +423,7 @@ def initialize_provider(auto_select=False, project_root=None):
     preferred = saved_model if saved_provider == provider else None
     model = choose_model(models, preferred)
     context_limit = MODEL_CONTEXT_WINDOWS.get(model)
-    save_config(provider, model, context_limit, project_root=project_root)
+    save_config(provider, model, context_limit)
     context_limit = get_saved_context_window(provider, model) or context_limit
     if context_limit:
         print("Model context window: {:,} tokens".format(context_limit))

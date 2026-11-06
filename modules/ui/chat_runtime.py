@@ -317,7 +317,7 @@ def main():
     init_default_logging(load_config())
     LOGGER.info("Starting Shai chat api_timeout=%ss", API_TIMEOUT_SECONDS)
     try:
-        provider, model = initialize_provider(auto_select=True, project_root=pathlib.Path.cwd())
+        provider, model = initialize_provider(auto_select=True)
     except (KeyboardInterrupt, EOFError):
         print("\nSetup cancelled.")
         return
@@ -359,7 +359,7 @@ def main():
         if user_text in ("/model", "/switch", "/switch-model"):
             old_provider, old_model = provider, model
             try:
-                provider, model = initialize_provider(project_root=pathlib.Path.cwd())
+                provider, model = initialize_provider()
                 LOGGER.info("Provider/model switched provider=%s model=%s",
                             provider, model)
             except (KeyboardInterrupt, EOFError):

@@ -174,12 +174,6 @@ class ConversationHistory:
     def _write(self):
         """Write atomically and restrict the history file to the current user."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        ignore_file = self.path.parent / ".gitignore"
-        if not ignore_file.exists():
-            try:
-                ignore_file.write_text("*\n!.gitignore\n", encoding="utf-8")
-            except OSError:
-                pass
         fd, temporary = tempfile.mkstemp(
             prefix=".history-", suffix=".tmp", dir=str(self.path.parent)
         )

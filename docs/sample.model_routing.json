@@ -1,8 +1,9 @@
 {
   "version": 1,
-  "default": {
-    "provider": "YOUR_PROVIDER",
-    "model": "YOUR_DEFAULT_MODEL"
+  "availability": {
+    "cache_seconds": 30,
+    "probe_timeout_seconds": 5,
+    "failure_cooldown_seconds": 60
   },
   "models": {
     "orchestrator": [

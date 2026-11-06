@@ -9,7 +9,6 @@ This document provides a complete overview of the Shai project structure, includ
 ├── .gitignore
 ├── .lectra-project.json
 ├── .shai/                    # Project-local runtime data, logs and configuration
-│   ├── .gitignore
 │   ├── history.json
 │   ├── task.json
 │   ├── project_access.json    # User-approved path grants (ignored by Git)
@@ -30,7 +29,7 @@ This document provides a complete overview of the Shai project structure, includ
 ├── assets/shai_config.json         # Core runtime configuration
 ├── assets/project_access_config.json # Generic project path access policy
 ├── assets/provider_config.json    # Provider overrides
-├── .shai/model_routing.json      # Tracked model-routing template
+├── assets/model_routing.json      # Tracked model-routing template
 ├── assets/command_config.json     # Command and execution configuration
 └── test/                     # Unit tests
 ```
@@ -240,6 +239,6 @@ compact permission bits: `r` read, `w` write (including truncate), `x` execute,
 stdin. See `docs/CONFIGURATION.md`.
 
 
-Project-specific default provider/model selection and role routes live in
-`.shai/model_routing.json`. That file is explicitly allowlisted for Git; other
-`.shai/` state remains ignored.
+Project-specific model routes live in `.Shai/model_routing.json`. The
+`.Shai/` directory is Git-ignored; `assets/model_routing.json` is the
+version-controlled template with all supported roles initially unconfigured.

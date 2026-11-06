@@ -48,7 +48,7 @@ flowchart TD
     Loop --> LLM
     ChatLoop --> LLM
 
-    Config[assets/shai_config.json + split runtime configs + assets/project_access_config.json + .shai/project_access.json + .shai/model_routing.json] --> Agent
+    Config[assets/shai_config.json + split runtime configs + assets/project_access_config.json + .shai/project_access.json] --> Agent
     Config --> Chat
     Config --> SharedModules
     History[.shai/history.json] --> ConvHist\n    Backups[.shai/shai_backups/] --> FileEditing

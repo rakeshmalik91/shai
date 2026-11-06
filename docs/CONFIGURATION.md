@@ -13,7 +13,7 @@ Shai configuration is stored under `assets/` and split by responsibility:
 - `assets/logging_config.json` — log level, output location (`.shai/logs/` by default), rotation, retention, and console logging.
 - `assets/command_registry.json` — natural-language command registry.
 
-Runtime configuration loaders merge the split files for consumers that need a unified view. The project default provider/model pair is stored in `.shai/model_routing.json`; provider-specific endpoint and authentication overrides belong in `provider_config.json`. Context-window values, CLI presentation settings, and logging settings are persisted only to their dedicated files.
+Runtime configuration loaders merge the split files for consumers that need a unified view. Provider/model selection metadata remains in the core configuration; provider-specific endpoint and authentication overrides belong in `provider_config.json`. Context-window values, CLI presentation settings, and logging settings are persisted only to their dedicated files.
 
 
 ## Project path access policy
@@ -128,13 +128,15 @@ canonical directory when logging initializes. A custom absolute or relative
 
 ## Model routing
 
-`.shai/model_routing.json` is the project-local model configuration. It stores
-both the default provider/model pair and prioritized candidates for each task
-role. Shai updates the `default` pair when a model is selected. The file is
-allowlisted for Git commits; other files under `.shai/` remain ignored.
+`assets/model_routing.json` is the tracked routing template. It declares every
+supported task category with an empty candidate list, so routing is disabled
+until a project configures candidates. The active project's override is `.Shai/model_routing.json`. This specific
+file is intentionally committed with the project so the team's routing policy
+is shared. Other files under `.Shai/` remain Git-ignored. The root `.gitignore`
+uses `.Shai/*` with an exception for `.Shai/model_routing.json`.
 
-For a populated example, see `docs/sample.model_routing.json`. Copy its
-`default` and `models` entries into `.shai/model_routing.json` and replace every
+For a populated example, see `assets/model_routing.sample.json`. Copy its
+`models` entries into `.Shai/model_routing.json` and replace every
 `YOUR_*_MODEL` placeholder with an exact model identifier returned by that
 provider's model discovery. The Ollama examples also require those models to
 be installed locally.
@@ -145,7 +147,6 @@ tried first:
 ```json
 {
   "version": 1,
-  "default": {"provider": "YOUR_PROVIDER", "model": "YOUR_DEFAULT_MODEL"},
   "models": {
     "orchestrator": [
       {"provider": "ollama", "model": "qwen2.5:14b", "priority": 1},
@@ -176,5 +177,5 @@ candidate lists fall back to the normal provider/model selected in Shai.
 Currently, Chat requests use the `chat` role, and Agent requests use
 `orchestrator`. The remaining roles are available in the routing schema for
 task-specific call sites as those workflows are split into independent model
-requests. The `default` pair is the fallback used by all roles and is saved by `/model`, provider
+requests. Routing does not change the default model saved by `/model`, provider
 credentials, endpoint configuration, or context-window overrides.

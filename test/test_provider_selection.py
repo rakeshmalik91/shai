@@ -16,13 +16,10 @@ class ProviderSelectionTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.original_config_file = selection.CONFIG_FILE
-        self.original_model_config_file = selection.MODEL_CONFIG_FILE
         selection.CONFIG_FILE = pathlib.Path(self.temp_dir.name) / "shai_config.json"
-        selection.MODEL_CONFIG_FILE = pathlib.Path(self.temp_dir.name) / ".shai" / "model_routing.json"
 
     def tearDown(self):
         selection.CONFIG_FILE = self.original_config_file
-        selection.MODEL_CONFIG_FILE = self.original_model_config_file
         self.temp_dir.cleanup()
 
     def test_kilo_free_only_returns_free_models(self):
@@ -132,11 +129,9 @@ class ProviderSelectionTests(unittest.TestCase):
         )
 
     def test_provider_zero_reuses_saved_provider_and_model(self):
-        selection.MODEL_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        selection.MODEL_CONFIG_FILE.write_text(json.dumps({
-            "version": 1,
-            "default": {"provider": "kilo-free", "model": "provider/model-a:free"},
-            "models": {},
+        selection.CONFIG_FILE.write_text(json.dumps({
+            "provider": "kilo-free",
+            "model": "provider/model-a:free",
         }), encoding="utf-8")
         with mock.patch("builtins.input", return_value="0"), mock.patch("builtins.print"):
             result = selection.initialize_provider()
@@ -149,14 +144,12 @@ class ProviderSelectionTests(unittest.TestCase):
             "retry": {"max_retries": 4},
         }), encoding="utf-8")
         selection.save_config("kilo-free", "provider/model-a:free")
-        saved = json.loads(selection.MODEL_CONFIG_FILE.read_text(encoding="utf-8"))
-        self.assertEqual(saved["default"]["provider"], "kilo-free")
-        self.assertEqual(saved["default"]["model"], "provider/model-a:free")
-        self.assertEqual(saved["models"], {})
-        core = json.loads(selection.CONFIG_FILE.read_text(encoding="utf-8"))
-        self.assertTrue(core["yes_to_all"])
-        self.assertEqual(core["max_tool_call_iterations"], 100)
-        self.assertEqual(core["retry"]["max_retries"], 4)
+        saved = json.loads(selection.CONFIG_FILE.read_text(encoding="utf-8"))
+        self.assertEqual(saved["provider"], "kilo-free")
+        self.assertEqual(saved["model"], "provider/model-a:free")
+        self.assertTrue(saved["yes_to_all"])
+        self.assertEqual(saved["max_tool_call_iterations"], 100)
+        self.assertEqual(saved["retry"]["max_retries"], 4)
 
 
 if __name__ == "__main__":

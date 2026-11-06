@@ -152,8 +152,8 @@ Generic project path policy lives in `assets/project_access_config.json`; user-a
 
 ### Model routing
 
-Task-based model routing is configured per project in `.shai/model_routing.json`.
-The same file stores the project default provider/model pair and prioritized
-role candidates. It is project-local; `.shai/model_routing.json` is allowlisted
-for Git commits while other `.shai/` state remains ignored. See
+Task-based model routing is configured per project in `.Shai/model_routing.json`.
+Start from `assets/model_routing.json`, which lists all supported categories
+with empty candidate lists, or inspect `assets/model_routing.sample.json` for
+an example. `.Shai/model_routing.json` is committed; other `.Shai/` state is ignored. See
 `docs/CONFIGURATION.md` for setup and fallback behavior.

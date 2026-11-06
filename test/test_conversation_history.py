@@ -69,6 +69,7 @@ class ConversationHistoryTests(unittest.TestCase):
             )
             self.assertTrue(store.path.is_file())
             self.assertEqual(json.loads(store.path.read_text())["version"], 1)
+            self.assertFalse((Path(root) / ".shai" / ".gitignore").exists())
 
 
 if __name__ == "__main__":
