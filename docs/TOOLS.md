@@ -96,6 +96,10 @@ These are internal capabilities rather than model-callable tools:
 - Provider-specific reasoning-summary extraction.
 - Run-based diagnostic logs with sensitive API payload fields redacted.
 
+## Tool registry and module organization
+
+The canonical model-facing tool definitions (names, descriptions, JSON parameter schemas, and chat availability) are stored in `assets/tools_registry.json`. Agent and Chat load declarations from this JSON registry at startup; Python modules provide the implementations and bind them by tool name. `modules/tools/registry.py` validates and loads the registry. Keep tool declarations out of Python lists so schemas are maintained in one place.
+
 ## Tool module organization
 
 Shared read-only tools (project listing/reading/search, Git inspection, AST/code navigation, project/test maps and test-failure inspection) live in `modules/tools/` and are exported through its package facade. Agent-only `os_command` lives in `modules/tools/os_command.py`. The coding agent keeps write, commit, push, test execution, task-plan and `os_command` actions in `modules/engine/agent_runtime.py`, where approval, backups, timeouts and execution safeguards are enforced.

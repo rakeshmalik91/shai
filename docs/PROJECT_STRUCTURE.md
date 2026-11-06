@@ -79,7 +79,8 @@ This document provides a complete overview of the Shai project structure, includ
 | Module | Responsibility |
 |--------|----------------|
 | `shai_command.py` | Deterministic natural-language routing for Shai slash commands |
-| `aliases.py` | Command aliases loaded from `assets/command_registry.json` |
+| `aliases.py` | Command aliases loaded from `assets/command_registry.json
+- `assets/tools_registry.json` — canonical model-facing tool schemas and availability` |
 | `definitions.py` | Command definitions |
 | `help.py` | Help system |
 | `registry.py` | Slash-command normalization and registry facade |

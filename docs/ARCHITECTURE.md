@@ -221,3 +221,8 @@ Path rules use project-relative globs, explicit deny always wins, and
 canonicalization prevents traversal and symlink escapes. Access checks are
 separate from interactive/configured approvals: approval cannot grant a
 path permission. See `docs/CONFIGURATION.md`.
+
+
+## Tool registry
+
+Model-facing tool schemas are defined in `assets/tools_registry.json` and loaded by `modules/tools/registry.py`. Agent and Chat share this source of truth; Python dispatch tables continue to bind tool names to their implementation functions.

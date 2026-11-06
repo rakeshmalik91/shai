@@ -2,7 +2,9 @@
 
 Shai configuration is stored under `assets/` and split by responsibility:
 
-- `assets/shai_config.json` — core agent, runtime, retry, approval, and safeguard settings.
+- `assets/tools_registry.json` stores model-facing tool definitions and chat availability.
+
+`assets/shai_config.json` — core agent, runtime, retry, approval, and safeguard settings.
 - `assets/project_access_config.json` — generic project path access defaults and administrator-authored path rules.
 - `assets/provider_config.json` — provider endpoint/authentication overrides under `providers`.
 - `assets/command_config.json` — Shai slash-command and OS command settings (`shai_command`, `os_command`).
