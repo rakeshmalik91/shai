@@ -1,6 +1,6 @@
-# Shai
+# ShAI
 
-Shai is a lightweight terminal AI assistant with two modes:
+ShAI is a lightweight terminal AI assistant with two modes:
 
 - **Agent** works with files in a selected project, inspects Git changes, edits code and runs checks.
 - **Chat** provides a regular conversation without local project tools.
