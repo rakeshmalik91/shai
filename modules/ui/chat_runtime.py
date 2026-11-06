@@ -309,7 +309,8 @@ def history_for_new_provider(history):
 
 
 def main():
-    init_default_logging(load_config())
+    global ROOT
+    init_default_logging(load_config(), project_root=ROOT)
     LOGGER.info("Starting Shai chat api_timeout=%ss", API_TIMEOUT_SECONDS)
     try:
         provider, model = initialize_provider(auto_select=True)
@@ -406,9 +407,9 @@ def main():
             except Exception as error:
                 print("Error: Invalid path '{}': {}".format(new_path, error))
                 continue
-            global ROOT
             ROOT = new_root
             configure_tools_root(ROOT)
+            init_default_logging(load_config(), project_root=ROOT)
             history_store = ConversationHistory(ROOT, "chat", SYSTEM_PROMPT)
             history = history_store.load()
             history_store.save(history, provider=provider, model=model)

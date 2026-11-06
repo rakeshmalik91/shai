@@ -873,7 +873,7 @@ class ToolSelectionFailure(Exception):
 def main():
     global PROVIDER, MODEL, ROOT
 
-    init_default_logging(load_config())
+    init_default_logging(load_config(), project_root=ROOT)
     LOGGER.info("Starting Shai coding agent root=%s api_timeout=%ss",
                 ROOT, API_TIMEOUT_SECONDS)
     PROVIDER, MODEL = initialize_provider(auto_select=True)

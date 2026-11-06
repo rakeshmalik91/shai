@@ -52,7 +52,7 @@ flowchart TD
     Config --> Chat
     Config --> SharedModules
     History[.shai/history.json] --> ConvHist
-    Logs[logs/] --> Logging
+    Logs[.Shai/logs/] --> Logging
 
     style Agent fill:#e1f5fe
     style Chat fill:#f3e5f5
@@ -130,7 +130,7 @@ Reasoning handlers expose provider-supplied summaries when available. They do no
 - `assets/shai_config.json`: core runtime configuration and last-used provider/model; `assets/project_access_config.json`: generic project path access policy; `assets/provider_config.json`: provider overrides; `assets/command_config.json`: command policies.
 - `.shai/history.json`: conversation history in the selected working project.
 - `.shai/project_access.json`: user-approved path grants scoped to that project (ignored by Git).
-- `logs/`: diagnostic logs when file logging is enabled.
+- `.Shai/logs/`: project-local diagnostic logs when file logging is enabled.
 - `setup_keys.sh`: optional user-created shell file for API-key environment variables; keep it private and do not commit it.
 
 ## Tests

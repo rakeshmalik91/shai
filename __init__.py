@@ -1892,7 +1892,7 @@ def history_for_new_provider(history):
 def main():
     global PROVIDER, MODEL
 
-    init_default_logging(load_config())
+    init_default_logging(load_config(), project_root=ROOT)
     LOGGER.info("Starting Shai coding agent root=%s api_timeout=%ss",
                 ROOT, API_TIMEOUT_SECONDS)
     PROVIDER, MODEL = initialize_provider()
