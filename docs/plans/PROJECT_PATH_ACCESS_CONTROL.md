@@ -1,92 +1,51 @@
-# Roadmap: Project File and Path Access Control
+# Project File and Path Access Control
 
-## Goal
+## Status
 
-Make project-file access explicit and configurable. Users should be able to
-control which paths Shai may view, edit, truncate or delete, with safe defaults
-and narrower per-path exceptions.
+Implemented. Generic policy lives in the `project_access` section of
+`assets/shai_config.json`; user-approved project-specific grants live in
+`.shai/project_access.json`. Enforcement is provided by `modules.tools.common` across filesystem tools, code inspection,
+file editing and controlled command execution.
 
-## Proposed policy model
+## Policy model
 
-Use ordered path rules with a default policy. Rules should be evaluated against
-canonical, resolved paths relative to the configured project root.
+See `docs/CONFIGURATION.md` for the full schema and semantics. The supported
+permissions are `view`, `edit`, `truncate`, `delete`, and `execute`. Generic
+rules are project-relative glob patterns; generic explicit denies win over
+other generic allows. Project-local user grants are evaluated last and can
+resolve a generic block. The default policy permits view/edit/execute and
+denies truncate/delete.
 
-```json
-{
-  "project_access": {
-    "default": {
-      "view": true,
-      "edit": true,
-      "delete": false,
-      "truncate": false
-    },
-    "paths": [
-      {
-        "path": "src/**",
-        "view": true,
-        "edit": true,
-        "delete": false,
-        "truncate": false
-      },
-      {
-        "path": "secrets/**",
-        "view": false,
-        "edit": false,
-        "delete": false,
-        "truncate": false
-      },
-      {
-        "path": "docs/generated/**",
-        "view": true,
-        "edit": false,
-        "delete": false,
-        "truncate": false
-      }
-    ]
-  }
-}
-```
+## Enforcement
 
-This is a proposal for a future release; it does not change current file access.
+- Canonicalize paths and reject absolute paths, parent traversal and symlink
+  escapes.
+- Centralize decisions in `access_decision`, `require_access`, and
+  `load_access_policy`.
+- Filter directory listings and recursively prune denied directories during
+  search.
+- Require `view` for file inspection and AST/project inspection.
+- Require `edit` for patch, line replacement and full-file replacement.
+- Require `truncate` for high-risk content reductions, independently of user
+  approval.
+- Require `execute` for controlled command working directories and Python
+  execution targets; Git pathspecs require `view`.
+- Approval settings cannot override path policy.
+- Interactive blocks ask for exact path/folder, parent, level-2 parent, or deny,
+  followed by read/write/delete/exec/all capability selection.
+- User grants persist under the active project's `.shai/project_access.json`;
+  non-interactive runs never prompt.
 
-## Permission definitions
+## Deliberate limitations
 
-- `view`: list, stat, read and search file contents.
-- `edit`: create or modify existing file contents without reducing them to
-  empty content.
-- `truncate`: replace a file with empty content or remove a substantial
-  portion of its contents. Treat truncation as more sensitive than ordinary
-  editing.
-- `delete`: remove a file or directory. Directory deletion should be a separate
-  high-risk operation and should not be inferred from file deletion permission.
+`delete` is reserved for future delete operations; there is currently no
+general-purpose delete tool. This policy does not claim to sandbox arbitrary
+Python test code or provide OS-level filesystem isolation. Controlled command
+execution remains subject to its separate executable/argument allowlists.
 
-## Rule semantics
+## Verification
 
-- Paths are relative to the project root unless explicitly documented otherwise.
-- Resolve symlinks before checking permissions; a path inside the project that
-  points outside must not bypass the policy.
-- Deny rules should take precedence over broad allow rules.
-- Define and test rule ordering and glob semantics; avoid ambiguous last-match
-  behaviour.
-- Apply the same policy to `list_files`, `read_file`, `search_files`, edits,
-  patches, line replacements, command execution and future delete tools.
-- A parent directory listing must not leak names of descendants hidden by a
-  `view=false` rule.
-- Reject absolute paths and `..` traversal unless a future explicit external
-  workspace mapping is added.
-
-## User experience
-
-- Explain which rule denied an operation and which permission was missing.
-- Add a `/access` or `/permissions` command to inspect the effective policy.
-- Provide a dry-run policy diagnostic for a given path and operation.
-- Keep approvals separate from access control: approval cannot grant a
-  permission that the path policy denies.
-
-## Acceptance criteria
-
-- Every file operation checks the same central policy function.
-- Symlink and traversal tests prove the project boundary cannot be escaped.
-- Hidden paths do not leak through directory listing or recursive search.
-- Edit, truncate and delete are independently enforceable.
-- A denied tool call returns a concise, actionable reason without retry loops.
+Run `python3 -m unittest discover -s test -v`. The dedicated access-control
+tests cover deny precedence, traversal, symlink escapes, hidden listings,
+recursive search, malformed configuration, interactive scope/capability grants,
+non-interactive denial and permission diagnostics.

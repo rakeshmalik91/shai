@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from modules.engine.process_control import IterationInterrupted
+from modules.tools.common import require_access, ProjectAccessDenied
 
 
 class OSCommandRejected(ValueError):
@@ -221,6 +222,7 @@ def _validate_git_path(value, root):
             raise OSCommandRejected("Git pathspec resolves outside the project directory.")
         if any(part == ".git" or part.startswith(".env") or part in (".ssh", ".aws", "credentials.json", "secrets.json") for part in resolved.parts):
             raise OSCommandRejected("Git pathspec resolves to a protected path.")
+        require_access(value, "view", root=project_root)
         if resolved.exists() and resolved.is_dir():
             raise OSCommandRejected("Git pathspec must identify a file, not a directory.")
 
@@ -251,6 +253,7 @@ def _validate_python_args(args, profile, root):
             value = tail[index + 1]
             if token in ("-s", "-t"):
                 _safe_project_path(root, value, "Python test path")
+                require_access(value, "execute", root=root)
             elif not re.fullmatch(r"[A-Za-z0-9_*?.-]+", value):
                 raise OSCommandRejected("Invalid unittest filename pattern.")
             index += 2
@@ -262,6 +265,7 @@ def _validate_python_args(args, profile, root):
         # Pytest node IDs may contain ::; validate only their file component.
         path_part = token.split("::", 1)[0]
         _safe_project_path(root, path_part, "Python target")
+        require_access(path_part, "execute", root=root)
         index += 1
     return args
 
@@ -301,6 +305,7 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
     project_root = Path(root).resolve()
     try:
         working_directory = _safe_project_path(project_root, cwd, "cwd")
+        require_access(cwd, "execute", root=project_root)
         if not working_directory.is_dir():
             raise OSCommandRejected("cwd must resolve to an existing project directory.")
         if executable == "git":
@@ -319,7 +324,7 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
             maximum = 120
         maximum = min(maximum, 120)  # hard runtime ceiling; config cannot remove it
         timeout = min(timeout, maximum)
-    except (OSCommandRejected, OSError, ValueError) as error:
+    except (OSCommandRejected, ProjectAccessDenied, OSError, ValueError) as error:
         response = {"error": str(error)}
         if isinstance(error, OSCommandRejected) and error.whitelistable:
             response.update({"status": "whitelist_required", "whitelist_scope": error.whitelist_scope})

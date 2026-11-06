@@ -49,6 +49,7 @@ Shai uses `shai_config.json` for all settings. Key sections:
 - **retry** — retry/backoff settings for API requests
 - **shai_command** — enable deterministic natural-language routing to registered Shai slash commands
 - **os_command** — enable restricted, bounded OS command profiles in Agent mode
+- **project_access** — generic path access defaults and rules; per-project user grants are saved under `.shai/project_access.json`
 
 See [Provider configuration](docs/PROVIDERS.md) and [Commands reference](docs/COMMANDS.md) for details.
 
@@ -134,3 +135,5 @@ test/             # Unit tests
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+Generic project path policy lives in `assets/shai_config.json`; user-approved project-specific grants are stored in `.shai/project_access.json`. See `docs/CONFIGURATION.md`.

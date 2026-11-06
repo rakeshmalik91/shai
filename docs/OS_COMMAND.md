@@ -219,3 +219,15 @@ The legacy `assets/shai_config.json` file is not consulted for command
 enablement. Interactive Git whitelist choices are persisted back to
 `assets/command_config.json` (never to the core configuration file), then the
 policy is reloaded before the blocked command is retried.
+
+
+## Project path access policy
+
+The command profile allowlist is not the only path boundary. Before execution,
+Shai also checks `execute` permission for the canonical working directory and
+Python test/compile targets. Explicit Git pathspecs require `view`. These
+checks use generic rules from the `project_access` section of
+`assets/shai_config.json` plus user-approved project-local grants in
+`.shai/project_access.json`. They cannot be bypassed by command whitelisting or
+approval. Absolute paths, parent
+traversal and symlink escapes remain rejected. See `docs/CONFIGURATION.md`.

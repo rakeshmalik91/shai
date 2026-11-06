@@ -154,3 +154,17 @@ backward compatibility and is migrated to `approve.all` when saved.
 `file_delete` and Git approval categories are reserved for the corresponding
 operations as they are introduced or wired into commands. Current tools do not
 expose a general-purpose delete-file or arbitrary shell command.
+
+
+## Project path permissions
+
+All project file tools use generic rules in the `project_access` section of
+`assets/shai_config.json` and user-approved grants in
+`.shai/project_access.json`. `view` controls reads, listings, searches and
+inspection; `edit` controls ordinary modifications (existing files also need
+`view` for safe diff previews); `truncate` separately gates high-risk reductions; `execute` gates controlled command working
+directories and Python targets. `delete` is reserved for future deletion
+tools. Interactive blocks ask for the exact file/folder, parent, or level-2
+parent scope and read/write/delete/exec/all capabilities. Denied entries are
+filtered from directory listings and recursive discovery. See
+`docs/CONFIGURATION.md` for the full flow.

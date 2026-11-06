@@ -43,6 +43,7 @@ from modules.terminal_style import colorize
 from modules.tools.os_command import execute_os_command, parse_os_command_line, OSCommandRejected
 from modules.tools import (
     configure_root as configure_tools_root,
+    require_access, ProjectAccessDenied,
     FUNCTIONS_READ_ONLY, TOOL_DISPATCH_READ_ONLY,
 )
 from modules.provider_selection import (
@@ -308,7 +309,7 @@ Rules:
 # -------------------------------------------------------------------
 
 IGNORED_PROJECT_DIRS = {
-    ".git", ".shai_backups", ".venv", "venv", "node_modules",
+    ".shai_backups", ".venv", "venv", "node_modules",
     "__pycache__", ".pytest_cache", ".mypy_cache", ".idea"
 }
 

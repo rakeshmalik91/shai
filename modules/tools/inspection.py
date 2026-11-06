@@ -2,10 +2,34 @@
 import ast
 import pathlib
 from . import common
-from .common import safe_path
+from .common import safe_path, require_access, ProjectAccessDenied
+
+def _visible(path):
+    try:
+        require_access(path.relative_to(common.ROOT).as_posix(), "view")
+        return True
+    except (ValueError, ProjectAccessDenied):
+        return False
+
+def _walk_visible_files(root, pattern="*"):
+    """Walk without descending into denied directories or following symlinks."""
+    import os
+    for directory, dirnames, filenames in os.walk(str(root), followlinks=False):
+        current = pathlib.Path(directory)
+        kept = []
+        for name in dirnames:
+            child = current / name
+            if not child.is_symlink() and _visible(child):
+                kept.append(name)
+        dirnames[:] = kept
+        for name in filenames:
+            child = current / name
+            if _visible(child) and child.match(pattern):
+                yield child
 def get_file_outline(path):
     """Return top-level imports, classes, functions and methods with line ranges."""
     target = safe_path(path)
+    require_access(path, "view")
     if not target.is_file():
         return "Expected a Python source file."
     try:
@@ -41,10 +65,11 @@ def find_symbol(symbol, path="."):
     if not symbol or not isinstance(symbol, str):
         return "symbol must be a non-empty string."
     target = safe_path(path)
+    require_access(path, "view")
     if not target.exists():
         return "Path does not exist."
     results = []
-    files = [target] if target.is_file() else [f for f in target.rglob("*.py") if f.is_file()]
+    files = [target] if target.is_file() else list(_walk_visible_files(target, "*.py"))
     for file_path in files:
         try:
             text = file_path.read_text(encoding="utf-8")
@@ -74,10 +99,11 @@ def find_references(symbol, path="."):
     if not symbol or not isinstance(symbol, str):
         return "symbol must be a non-empty string."
     target = safe_path(path)
+    require_access(path, "view")
     if not target.exists():
         return "Path does not exist."
     results = []
-    files = [target] if target.is_file() else [f for f in target.rglob("*.py") if f.is_file()]
+    files = [target] if target.is_file() else list(_walk_visible_files(target, "*.py"))
     for file_path in files:
         try:
             text = file_path.read_text(encoding="utf-8")
@@ -95,22 +121,22 @@ def find_references(symbol, path="."):
 def get_project_map(path="."):
     """Summarize project directories, file types and likely Python entry points."""
     target = safe_path(path)
+    require_access(path, "view")
     if not target.is_dir():
         return "Project map path must be a directory."
     summary = []
     py_files = 0
     total_files = 0
-    for entry in target.rglob("*"):
-        if entry.is_file():
-            total_files += 1
-            if entry.suffix == ".py":
-                py_files += 1
+    for entry in _walk_visible_files(target):
+        total_files += 1
+        if entry.suffix == ".py":
+            py_files += 1
     summary.append("Project root: {}".format(target))
     summary.append("Total files: {}".format(total_files))
     summary.append("Python files: {}".format(py_files))
     # Find likely entry points
     entry_points = []
-    for entry in target.rglob("*.py"):
+    for entry in _walk_visible_files(target, "*.py"):
         if entry.is_file():
             try:
                 text = entry.read_text(encoding="utf-8")
@@ -128,15 +154,14 @@ def get_project_map(path="."):
 def get_test_map(path="."):
     """List test files and heuristically map their names to likely source modules."""
     target = safe_path(path)
+    require_access(path, "view")
     if not target.is_dir():
         return "Test map path must be a directory."
     test_files = []
-    for entry in target.rglob("test_*.py"):
-        if entry.is_file():
-            test_files.append(str(entry.relative_to(common.ROOT)))
-    for entry in target.rglob("*_test.py"):
-        if entry.is_file():
-            test_files.append(str(entry.relative_to(common.ROOT)))
+    for entry in _walk_visible_files(target, "test_*.py"):
+        test_files.append(str(entry.relative_to(common.ROOT)))
+    for entry in _walk_visible_files(target, "*_test.py"):
+        test_files.append(str(entry.relative_to(common.ROOT)))
     if not test_files:
         return "No test files found (looking for test_*.py or *_test.py)."
     result = ["Test files found:"]

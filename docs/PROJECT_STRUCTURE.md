@@ -11,15 +11,15 @@ This document provides a complete overview of the Shai project structure, includ
 ├── .shai/                    # Runtime data (history, task state)
 │   ├── .gitignore
 │   ├── history.json
-│   └── task.json
+│   ├── task.json
+│   └── project_access.json     # User-approved path grants (ignored by Git)
 ├── .shai_backups/            # Automatic backups of edited files
 ├── LICENSE
 ├── README.md
 ├── __init__.py
 ├── agent.py                  # Entry point: Coding agent mode
 ├── chat.py                   # Entry point: Chat mode
-├── assets/                   # JSON command registry
-├── assets/                   # JSON command registry
+├── assets/                   # Runtime and command JSON configuration
 ├── docs/                     # Documentation
 ├── logs/                     # Diagnostic logs
 ├── modules/                  # Core implementation modules
@@ -27,9 +27,9 @@ This document provides a complete overview of the Shai project structure, includ
 ├── requirements.txt
 ├── run_all_tests.sh
 ├── setup_keys.sample.sh
-├── assets/shai_config.json          # Core runtime configuration
-├── assets/provider_config.json     # Provider overrides
-├── assets/command_config.json      # Command and execution configuration
+├── assets/shai_config.json         # Core runtime + generic project_access policy
+├── assets/provider_config.json    # Provider overrides
+├── assets/command_config.json     # Command and execution configuration
 └── test/                     # Unit tests
 ```
 
@@ -216,3 +216,17 @@ chat.py
 - `cli_config.json`: terminal interface and display preferences.
 - `logging_config.json`: logging behaviour and retention.
 - `command_registry.json`: natural-language command registry.
+
+## Project path access control
+
+All project-path decisions are centralized in `modules/tools/common.py`.
+Filesystem tools and code-inspection tools require `view`; file mutation
+operations require `edit`, with a separate `truncate` check for high-risk
+content reductions. Controlled command execution checks `execute` for its
+working directory and Python targets, and `view` for Git pathspecs.
+
+Generic rules live in the `project_access` section of
+`assets/shai_config.json`. User-approved per-project grants are stored in the
+active project's `.shai/project_access.json` (ignored by Git). Interactive
+blocks ask for the exact file/folder, parent, or level-2 parent scope and the
+read/write/delete/exec/all capabilities. See `docs/CONFIGURATION.md`.

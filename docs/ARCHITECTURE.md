@@ -48,7 +48,7 @@ flowchart TD
     Loop --> LLM
     ChatLoop --> LLM
 
-    Config[assets/shai_config.json + provider_config.json + command_config.json] --> Agent
+    Config[assets/shai_config.json + split runtime configs + .shai/project_access.json] --> Agent
     Config --> Chat
     Config --> SharedModules
     History[.shai/history.json] --> ConvHist
@@ -129,6 +129,7 @@ Reasoning handlers expose provider-supplied summaries when available. They do no
 
 - `assets/shai_config.json`: core runtime configuration and last-used provider/model; `assets/provider_config.json`: provider overrides; `assets/command_config.json`: command policies.
 - `.shai/history.json`: conversation history in the selected working project.
+- `.shai/project_access.json`: user-approved path grants scoped to that project (ignored by Git).
 - `logs/`: diagnostic logs when file logging is enabled.
 - `setup_keys.sh`: optional user-created shell file for API-key environment variables; keep it private and do not commit it.
 
@@ -205,3 +206,18 @@ The shared read-only project tools are divided by responsibility:
 ### Configuration compatibility
 
 The configuration now includes `shai_command` and `os_command` sections. Existing installations without these keys retain the default Shai command-routing behavior; `os_command` remains disabled unless explicitly enabled in configuration. The checked-in example enables the reviewed Git/Python profiles. See [OS command configuration](OS_COMMAND.md).
+
+
+## Project path access control
+
+All project-path decisions are centralized in `modules/tools/common.py`.
+Filesystem tools and code-inspection tools require `view`; file mutation
+operations require `edit`, with a separate `truncate` check for high-risk
+content reductions. Controlled command execution checks `execute` for its
+working directory and Python targets, and `view` for Git pathspecs.
+
+Generic policy is stored in the `project_access` section of `assets/shai_config.json`; user-approved project-specific grants are stored in `.shai/project_access.json`.
+Path rules use project-relative globs, explicit deny always wins, and
+canonicalization prevents traversal and symlink escapes. Access checks are
+separate from interactive/configured approvals: approval cannot grant a
+path permission. See `docs/CONFIGURATION.md`.
