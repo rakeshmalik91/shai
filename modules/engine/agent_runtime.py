@@ -8,7 +8,6 @@ import platform
 import urllib.request
 import urllib.error
 import pathlib
-import subprocess
 import signal
 import socket
 import difflib
@@ -26,7 +25,7 @@ import _thread
 from modules.ui.spinner import Spinner
 from modules.ui.chat_runtime import extract_anthropic_response, response_text
 from modules.commands.registry import normalize_command
-from modules.commands.natural_language import resolve_natural_language_command
+from modules.commands.shai_command import resolve_shai_command
 from modules.commands.help import HELP_TEXT
 from modules.engine import (
     configuration, project_inspection, task_plan, git_operations,
@@ -40,6 +39,7 @@ from modules.engine.process_control import (
 )
 
 from modules.terminal_style import colorize
+from modules.tools.os_command import execute_os_command, parse_os_command_line, OSCommandRejected
 from modules.tools import (
     configure_root as configure_tools_root,
     FUNCTIONS_READ_ONLY, TOOL_DISPATCH_READ_ONLY,
@@ -401,6 +401,35 @@ DEFAULT_COMMIT_DIFF_SECTION_WITHOUT_DIFF = "Changes:\n{changes}\n"
 
 
 
+def os_command(executable, args, cwd=".", timeout_seconds=None):
+    """Run one allowlisted OS command through the bounded execution boundary."""
+    settings = load_config().get("os_command", {})
+    LOGGER.info("os_command request executable=%s cwd=%s argument_count=%s",
+                executable, cwd, len(args) if isinstance(args, list) else "invalid")
+
+    def approve(preview):
+        if approval_granted("execution", "os_command", include_all=False):
+            LOGGER.info("os_command approved by explicit configuration")
+            return True
+        STATUS.suspend_line()
+        print("\n[Shai] os_command approval required:")
+        print(preview)
+        try:
+            answer = input("Run this exact command? [y/N]: ").strip().lower()
+        except EOFError:
+            raise IterationInterrupted()
+        return answer in ("y", "yes")
+
+    result = execute_os_command(
+        executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
+        root=ROOT, settings=settings, confirm=approve,
+        runner=run_bounded_interruptible_command,
+    )
+    LOGGER.info("os_command result executable=%s status=%s exit_code=%s",
+                executable, result.get("status", "rejected"), result.get("exit_code"))
+    return result
+
+
 # -------------------------------------------------------------------
 # Tool declarations
 # -------------------------------------------------------------------
@@ -640,7 +669,32 @@ FUNCTIONS = [
                 "required": ["steps"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "os_command",
+            "description": (
+                "Run a tightly allowlisted operating-system command in the project. "
+                "This is NOT a shell: use executable=git with read-only subcommands "
+                "(status, diff, log, branch --show-current, rev-parse, show), or "
+                "executable=python3 with -m pytest, -m unittest discover, or -m compileall. "
+                "No pipes, redirects, shell expansion, scripts, arbitrary executables, "
+                "network commands, or privileged operations are supported."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "executable": {"type": "string", "enum": ["git", "python3"]},
+                    "args": {"type": "array", "items": {"type": "string"}, "maxItems": 40},
+                    "cwd": {"type": "string", "default": "."},
+                    "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 120}
+                },
+                "required": ["executable", "args"]
+            }
+        }
     }
+
 ]
 
 TOOL_DISPATCH = {
@@ -660,7 +714,8 @@ TOOL_DISPATCH = {
     "inspect_test_failure": inspect_test_failure,
     "get_project_map": get_project_map,
     "get_test_map": get_test_map,
-    "update_task_plan": update_task_plan
+    "update_task_plan": update_task_plan,
+    "os_command": os_command
 }
 
 
@@ -771,7 +826,7 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /project /exec /exit")
+    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /project /os-command (legacy alias: /exec) /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
 
     # Mode: "agent" (with tools) or "ask" (chat only, no tools)
@@ -784,7 +839,7 @@ def main():
             if not user_text:
                 continue
 
-            natural_command = resolve_natural_language_command(user_text, mode)
+            natural_command = resolve_shai_command(user_text, mode)
             if natural_command:
                 print("[Shai] Interpreted as {}.".format(natural_command))
                 user_text = natural_command
@@ -929,30 +984,22 @@ def main():
                     print("\n[Shai] Command interrupted.")
                 continue
 
-            if user_text.startswith("/exec "):
-                cmd = user_text[len("/exec "):].strip()
-                if not cmd:
-                    print("[Shai] Usage: /exec <command>")
+            if user_text.startswith(("/os-command ", "/exec ")) or user_text in ("/os-command", "/exec"):
+                if mode != "agent":
+                    print("[Shai] os_command is available only in code mode. Switch with /code first.")
                     continue
+                command_text = user_text.split(None, 1)[1] if len(user_text.split(None, 1)) > 1 else ""
                 try:
-                    result = subprocess.run(
-                        cmd,
-                        shell=True,
-                        cwd=str(ROOT),
-                        capture_output=True,
-                        text=True,
-                        timeout=60
-                    )
-                    if result.stdout:
-                        print(result.stdout.rstrip())
-                    if result.stderr:
-                        print(colorize(result.stderr.rstrip(), "error"), file=sys.stderr)
-                    if result.returncode != 0:
-                        print(colorize("[Shai] Command exited with code {}".format(result.returncode), "warning"))
-                except subprocess.TimeoutExpired:
-                    print(colorize("[Shai] Command timed out after 60 seconds", "error"))
+                    executable, arguments = parse_os_command_line(command_text)
+                    result = os_command(executable, arguments)
+                    print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+                except IterationInterrupted:
+                    print("\n[Shai] OS command interrupted.")
+                except OSCommandRejected as error:
+                    print(colorize("[Shai] {}".format(error), "error"))
                 except Exception as error:
-                    print(colorize("[Shai] Command failed: {}".format(error), "error"))
+                    LOGGER.exception("Manual os_command failed")
+                    print(colorize("[Shai] OS command failed: {}".format(error), "error"))
                 continue
 
             try:

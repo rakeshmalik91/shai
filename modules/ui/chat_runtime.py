@@ -21,7 +21,7 @@ import urllib.parse
 import urllib.request
 
 from modules.terminal_style import colorize
-from modules.commands.natural_language import resolve_natural_language_command
+from modules.commands.shai_command import resolve_shai_command
 from modules.commands.registry import normalize_command
 from modules.ui.spinner import Spinner
 from modules.provider_selection import (
@@ -333,7 +333,7 @@ def main():
 
         if not user_text:
             continue
-        natural_command = resolve_natural_language_command(user_text, "chat")
+        natural_command = resolve_shai_command(user_text, "chat")
         if natural_command:
             print("[Shai] Interpreted as {}.".format(natural_command))
             user_text = natural_command

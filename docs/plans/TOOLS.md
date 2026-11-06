@@ -43,11 +43,12 @@ The eight priority tools and `replace_lines` are registered in the model-facing 
 
 1. [LLM clarification questions](LLM_CLARIFICATION_QUESTIONS.md) — pause to
    resolve ambiguity, collect answers and resume the same task.
-2. [Controlled command-line execution](CONTROLLED_COMMAND_EXECUTION.md) —
-   allowlisted `git`, `grep`, `sed`, `python` and related commands in a bounded
-   project environment.
+2. [OS command sandboxing](OS_COMMAND_SANDBOX.md) — stronger OS-level isolation,
+   network restrictions, and a reviewed process sandbox for untrusted test code.
 3. [Project path access control](PROJECT_PATH_ACCESS_CONTROL.md) — independent
    view, edit, truncate and delete permissions with per-path rules.
 
-These are roadmap specifications only; none of the three capabilities is
-represented as implemented in the current tool registry.
+The restricted `os_command` capability is implemented and documented in
+[`../OS_COMMAND.md`](../OS_COMMAND.md). The remaining items describe future
+hardening or additional capabilities; they are not enabled by the current
+runtime.

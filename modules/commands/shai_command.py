@@ -1,16 +1,13 @@
-"""Natural-language aliases for registered Shai commands.
-
-This resolver is deliberately conservative: it only maps a complete, explicit
-phrase from the JSON registry. It never constructs command arguments and never
-executes a command itself.
-"""
+"""Deterministic natural-language routing for Shai's own slash commands."""
 import json
 import logging
 import re
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
-_REGISTRY_PATH = Path(__file__).resolve().parents[2] / "assets" / "command_registry.json"
+ROOT = Path(__file__).resolve().parents[2]
+REGISTRY_PATH = ROOT / "assets" / "command_registry.json"
+CONFIG_PATH = ROOT / "shai_config.json"
 
 _POLITE_PREFIXES = (
     "could you please ", "could you ", "would you please ", "would you ",
@@ -25,7 +22,7 @@ _NEGATIVE_OR_META = re.compile(
 
 
 def _load_registry(path=None):
-    registry_path = Path(path) if path else _REGISTRY_PATH
+    registry_path = Path(path) if path else REGISTRY_PATH
     with registry_path.open("r", encoding="utf-8") as handle:
         data = json.load(handle)
     if not isinstance(data, dict) or not isinstance(data.get("commands"), list):
@@ -33,17 +30,27 @@ def _load_registry(path=None):
     return data
 
 
+def _enabled(config_path=None):
+    path = Path(config_path) if config_path else CONFIG_PATH
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            config = json.load(handle)
+        settings = config.get("shai_command", {}) if isinstance(config, dict) else {}
+        return not isinstance(settings, dict) or settings.get("enabled", True) is True
+    except (OSError, ValueError, TypeError):
+        # Preserve command behavior if an older installation has no feature key.
+        return True
+
+
 def _normalize_phrase(value):
     value = str(value or "").strip().lower()
     value = re.sub(r"`([^`]*)`", r"\1", value)
     value = re.sub(r"[/_]+", " ", value)
     value = re.sub(r"[^a-z0-9\s-]", " ", value)
-    value = re.sub(r"\s+", " ", value).strip()
-    return value
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def _strip_politeness(value):
-    value = value.strip()
     changed = True
     while changed:
         changed = False
@@ -59,56 +66,45 @@ def _strip_politeness(value):
     return value
 
 
-def resolve_natural_language_command(text, mode, registry_path=None):
-    """Return a canonical slash command for a clear registry phrase, else None.
-
-    No fuzzy or partial matching is used. This prevents ordinary discussion,
-    quoted examples, and vague requests from accidentally invoking commands.
-    """
-    if not isinstance(text, str):
+def resolve_shai_command(text, mode, registry_path=None, config_path=None):
+    """Resolve an exact, explicit phrase to a slash command; otherwise return None."""
+    if not _enabled(config_path) or not isinstance(text, str):
         return None
     raw = text.strip()
-    if not raw or raw.startswith("/"):
+    if not raw or raw.startswith("/") or _NEGATIVE_OR_META.search(raw):
         return None
-    if _NEGATIVE_OR_META.search(raw):
-        return None
-
     phrase = _strip_politeness(_normalize_phrase(raw))
     if not phrase:
         return None
-
     try:
         registry = _load_registry(registry_path)
     except (OSError, ValueError, json.JSONDecodeError) as error:
-        LOGGER.error("Natural-language command registry unavailable: %s", error)
+        LOGGER.error("Shai command registry unavailable: %s", error)
         return None
 
     matches = []
     for item in registry["commands"]:
-        if not isinstance(item, dict) or mode not in item.get("modes", []):
+        if not isinstance(item, dict) or item.get("enabled", True) is not True:
+            continue
+        if mode not in item.get("modes", []):
             continue
         triggers = item.get("triggers", [])
-        if not isinstance(triggers, list):
-            continue
-        if phrase in {_normalize_phrase(trigger) for trigger in triggers}:
+        if isinstance(triggers, list) and phrase in {
+            _normalize_phrase(trigger) for trigger in triggers
+        }:
             matches.append(item)
-
     if len(matches) != 1:
         if len(matches) > 1:
-            LOGGER.warning("Ambiguous natural-language command phrase=%r ids=%s",
-                           phrase, [item.get("id") for item in matches])
+            LOGGER.warning("Ambiguous Shai command phrase=%r ids=%s", phrase,
+                           [item.get("id") for item in matches])
         return None
-
     command = matches[0].get("slash_command")
     if not isinstance(command, str) or not command.startswith("/"):
-        LOGGER.error("Invalid slash_command in registry entry id=%r",
-                     matches[0].get("id"))
+        LOGGER.error("Invalid slash_command in registry entry id=%r", matches[0].get("id"))
         return None
-    LOGGER.info("Natural-language command matched id=%s mode=%s",
-                matches[0].get("id"), mode)
+    LOGGER.info("Shai command matched id=%s mode=%s", matches[0].get("id"), mode)
     return command
 
 
 def load_command_registry(registry_path=None):
-    """Public read-only registry accessor for help, diagnostics, and tests."""
     return _load_registry(registry_path)

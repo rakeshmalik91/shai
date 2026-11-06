@@ -1,15 +1,22 @@
 # Shai — Execution Flow Architecture
 
+> **Status: Future refactoring plan.** The `shai_command` and `os_command`
+> capabilities described in this repository are implemented; the broader
+> session/state-machine/event-driven orchestration refactor in this document is
+> not yet implemented. Keep this document in `docs/plans/` until those changes
+> are completed and verified.
+
+
 ## 1. Purpose
 
 This document proposes an improved end-to-end execution flow for Shai. It
 complements:
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — current system structure and module
+- [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — current system structure and module
   responsibilities.
-- [`COMMAND_TRIGGERING.md`](COMMAND_TRIGGERING.md) — mapping natural language
+- [`../SHAI_COMMAND.md`](../SHAI_COMMAND.md) — mapping natural language
   to existing commands.
-- [`CONTROLLED_COMMAND_EXECUTION.md`](CONTROLLED_COMMAND_EXECUTION.md) —
+- [`../OS_COMMAND.md`](../OS_COMMAND.md) —
   security policy and process execution boundaries.
 
 The goal is not to replace Shai's existing capabilities or change its public
@@ -29,7 +36,8 @@ proposed module or interface already exists.
 ## 2. Problems this design addresses
 
 The current architecture already has useful boundaries: separate agent and
-chat runtimes, shared read-only tools, bounded process execution, safeguards,
+chat runtimes, shared read-only tools, bounded process execution through
+`os_command`, safeguards,
 task tracking, context metering, and live status rendering.
 
 The next improvement should focus on the flow between those components.
@@ -126,7 +134,7 @@ flowchart TD
 | Tool policy gate | Availability, mode, approval, risk decisions | Tool implementation |
 | Tool dispatcher | Resolving and invoking registered handlers | Model prompting or direct terminal UI |
 | Tool handlers | One bounded capability each | Agent-loop continuation |
-| Controlled execution service | Validated subprocess lifecycle | Natural-language intent recognition |
+| `os_command` / controlled execution service | Validated subprocess lifecycle | `shai_command` intent recognition |
 | Task plan manager | Task state and completion criteria | Deciding whether a model response is valid |
 | Event publisher | Emitting lifecycle events | Owning workflow state |
 | Status presenter | Rendering current state | Deciding execution success |

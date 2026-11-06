@@ -22,7 +22,6 @@ flowchart TD
 
     subgraph ChatMode["Chat Mode (chat.py)"]
         Chat --> ChatLoop[Conversation Loop]
-        ChatLoop --> SharedTools[Shared Read-Only Tools]
     end
 
     subgraph SharedModules["Shared Modules"]
@@ -33,12 +32,11 @@ flowchart TD
         FileDisplay[modules/file_change_display.py]
         Reasoning[modules/reasoning_handlers/]
         ContextMeter[modules/context_meter.py]
-        ToolsMod[modules/tools.py\nShared Read-Only Tools]
+        ToolsMod[modules/tools/\nShared Read-Only Tools]
     end
 
     Loop --> SharedModules
     ChatLoop --> SharedModules
-    SharedTools --> ToolsMod
 
     Discovery --> ProjectDir[(Project Directory)]
     Reading --> ProjectDir
@@ -69,16 +67,16 @@ flowchart TD
 The ASCII diagram above shows the high-level flow. Key points:
 
 - **Two entry points**: `agent.py` (coding agent with tools) and `chat.py` (conversation only)
-- **Shared modules** provide provider selection, conversation history, safeguards, logging, reasoning handlers, context metering, and read-only tools
+- **Shared modules** provide provider selection, conversation history, safeguards, logging, reasoning handlers, and context metering
 - **Agent mode** adds mutating tools (editing, verification, Git, task management) with approval and bounded execution
-- **Chat mode** uses only shared read-only tools from `modules/tools.py`
+- **Chat mode** provides conversation without local project or OS command tools
 - **Configuration** (`shai_config.json`), history (`.shai/history.json`), and logs are persistent data
 
 ## Entry points
 
 - **`agent.py`** manages the coding-agent loop, tool schemas, local tool execution, approvals, safeguards and verification.
 - **`chat.py`** provides conversational mode without local file, Git or command-execution tools.
-- **`modules/tools.py`** owns the shared read-only project-inspection tool implementations, schemas and dispatch used by chat mode and imported by agent mode. It receives the active project root through `configure_root()`; agent-only mutating and verification tools remain registered in `agent.py` because they depend on approval and bounded-execution policies.
+- **`modules/tools/`** owns shared read-only project-inspection tool implementations, schemas and dispatch. The Agent runtime imports these tools and separately registers editing, verification, task-management and `os_command` capabilities.
 
 The project root is the first command-line argument to `agent.py`; if omitted, the current working directory is used.
 
@@ -119,7 +117,7 @@ When a model returns a text-only response while the task plan still has pending 
 | `modules/file_change_display.py` | Bounded diff previews. |
 | `modules/reasoning_handlers/` | Provider-specific extraction and display of supported reasoning summaries. |
 | `modules/context_meter.py` | Prompt-token estimation, provider usage normalization and context-window percentage formatting. |
-| `modules/tools.py` | Shared read-only project tools, schemas, dispatch and project-root configuration. |
+| `modules/tools/` | Shared read-only project tools, schemas, dispatch and project-root configuration. |
 
 ## Provider integration
 
@@ -184,10 +182,13 @@ to operate on the live implementation.
 
 ### Command organization
 
-`modules/commands/` separates command aliases, canonical command descriptions,
-help text, and command normalization. The interactive agent loop consumes the
+`modules/commands/` separates the `shai_command` natural-language resolver, command aliases, canonical command descriptions, help text, and command normalization. The canonical command registry lives in `assets/command_registry.json`. The interactive agent loop consumes the
 normalizer while preserving command arguments such as `/project <path>` and
-`/exec <command>`.
+`/os-command <executable> <args...>` (with `/exec` retained as a legacy alias).
+
+### Controlled OS command execution
+
+`os_command` is registered only for Agent mode. It is implemented in `modules/tools/os_command.py` and uses `modules/engine/process_control.py`. It is not a shell: the current allowlist is limited to read-only Git inspection and approved Python verification modules. It validates project-relative paths, invokes argument arrays with `shell=False`, requires approval for Python test execution, and bounds time and output. `/exec` is only a legacy alias for `/os-command`; the former `shell=True` path has been removed. See [OS command documentation](OS_COMMAND.md).
 
 ### Tool organization
 
@@ -199,12 +200,8 @@ The shared read-only project tools are divided by responsibility:
 - `modules/tools/inspection.py`: AST outlines, symbol/reference lookup,
   project/test maps, and test-failure inspection.
 - `modules/tools/schemas.py`: read-only tool schemas and dispatch registry.
-- `modules/tools/__init__.py` and `modules/tools.py`: stable compatibility
-  exports for existing imports.
+- `modules/tools/__init__.py`: package exports for shared read-only tools.
 
 ### Configuration compatibility
 
-No configuration values, defaults, keys, or configuration files were changed.
-Both runtime modules resolve `shai_config.json` from the project root, exactly
-as before. The configuration file in the refactor archive is byte-for-byte
-identical to the supplied source archive.
+The configuration now includes `shai_command` and `os_command` sections. Existing installations without these keys retain the default Shai command-routing behavior; `os_command` remains disabled unless explicitly enabled in configuration. The checked-in example enables the reviewed Git/Python profiles. See [OS command configuration](OS_COMMAND.md).

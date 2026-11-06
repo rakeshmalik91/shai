@@ -14,7 +14,7 @@ Available when running `python3 agent.py [project-path]`.
 |---------|---------|-------------|
 | `/code` | — | Switch to **code mode** (agent with full tool access). Default mode. |
 | `/ask` | — | Switch to **ask mode** (chat only, no tools). |
-| `/read-only` | `/ro` | Switch to **read-only mode** (chat with read-only tools: list, read, search, Git status/diff, code navigation). |
+| `/read-only` | `/ro` | Switch to **read-only mode** (Agent mode with read-only project tools: list, read, search, Git status/diff, and code navigation). |
 
 ### Provider & Model
 
@@ -56,11 +56,24 @@ Available when running `python3 agent.py [project-path]`.
 
 > **Note:** Git operations require approval unless the session approval setting permits them.
 
-### Shell Execution
+### Controlled OS Command Execution
 
-| Command | Description |
-|---------|-------------|
-| `/exec <command>` | Execute a shell command in the project root directory. Runs with a 60-second timeout. Captures and displays stdout/stderr. Example: `/exec python -m pytest` |
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `/os-command <executable> <args...>` | `/exec` (legacy) | Run a command through the `os_command` allowlist. This is not a shell. |
+
+Examples:
+
+```text
+/os-command git status --short --branch
+/os-command git diff --stat
+/os-command python3 -m pytest -q
+```
+
+Only approved Git inspection subcommands and Python verification modules are
+supported. Python test execution requires approval by default. Pipes,
+redirections, shell expansion, arbitrary scripts, network commands, privileged
+commands, and Git mutations are rejected. See [os_command](OS_COMMAND.md).
 
 ---
 
@@ -77,7 +90,7 @@ Available when running `python3 chat.py`.
 | `/exit` | — | Exit Shai. |
 | `Ctrl+D` | — | Exit Shai (at prompt). |
 
-> Chat mode does **not** have access to project tools, Git operations, or task management.
+> Chat mode does **not** have access to project tools, Git operations, `os_command`, or task management.
 
 ---
 
@@ -98,7 +111,9 @@ Commands and behavior can be customized via `shai_config.json`:
 - `max_tool_call_iterations` — Maximum tool calls per agent iteration (default: 80)
 - `tool_safeguards` — Enable/disable safeguards (repeat detection, history compaction, etc.)
 - `retry` — API retry settings (count, backoff, jitter, retryable statuses)
-- `approval` — Session approval behavior (`ask`, `auto`, `never`)
+- `approve` — Granular tool/category approval settings
+- `shai_command` — Enable/disable natural-language routing to registered Shai commands
+- `os_command` — Enable/disable command profiles and set timeout/output limits
 - `tool_call_display` — Tool call display settings (`show_parameters`, `max_argument_chars`)
 
 See `shai_config.json` for the full configuration schema.
@@ -123,7 +138,7 @@ Agent Mode:          Chat Mode:
 /commit [--message-only]
 /push
 /commit-push
-/exec <command>
+/os-command <executable> <args...> (legacy alias: /exec)
 /exit
 ```
 
@@ -133,4 +148,6 @@ Agent Mode:          Chat Mode:
 
 - [Existing Tools](TOOLS.md) — Model-callable tools available in Agent mode
 - [Architecture](ARCHITECTURE.md) — Project architecture overview
-- [Tools Roadmap](plans/TOOLS_ROADMAP.md) — Planned tool additions
+- [shai_command](SHAI_COMMAND.md) — Natural-language slash-command routing
+- [os_command](OS_COMMAND.md) — Controlled OS command execution
+- [Tools Roadmap](plans/TOOLS.md) — Planned tool additions

@@ -13,7 +13,8 @@
     "git_push": false,
     "tools": {
       "run_checks": true,
-      "edit_file": true
+      "edit_file": true,
+      "os_command": false
     }
   },
   "commit_message": {
@@ -190,6 +191,42 @@
       "key_env": null,
       "models_filter": "ollama",
       "timeout_seconds": 300
+    }
+  },
+  "shai_command": {
+    "enabled": true
+  },
+  "os_command": {
+    "enabled": true,
+    "default_timeout_seconds": 30,
+    "max_timeout_seconds": 120,
+    "max_stdout_bytes": 24576,
+    "max_stderr_bytes": 8192,
+    "preserve_output_head_bytes": 4096,
+    "preserve_output_tail_bytes": 4096,
+    "terminate_child_processes": true,
+    "commands": {
+      "git": {
+        "enabled": true,
+        "subcommands": [
+          "status",
+          "diff",
+          "log",
+          "branch",
+          "rev-parse",
+          "show"
+        ],
+        "requires_approval": false
+      },
+      "python3": {
+        "enabled": true,
+        "modules": [
+          "pytest",
+          "unittest",
+          "compileall"
+        ],
+        "requires_approval": true
+      }
     }
   }
 }

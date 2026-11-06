@@ -98,17 +98,20 @@ def _terminate_process_tree(process, process_group):
         process.wait()
 
 def run_bounded_interruptible_command(
-    command, cwd, timeout, output_settings
+    command, cwd, timeout, output_settings, env=None
 ):
-    """Run a command with bounded stdout/stderr, timeout and Ctrl+D support."""
+    """Run an argument-vector process with bounded output, timeout and Ctrl+D support."""
     terminate_children = output_settings["terminate_child_processes"]
     process_group = bool(terminate_children and hasattr(os, "killpg"))
     popen_options = {
         "cwd": str(cwd),
         "stdout": subprocess.PIPE,
         "stderr": subprocess.PIPE,
-        "bufsize": 0
+        "bufsize": 0,
+        "shell": False
     }
+    if env is not None:
+        popen_options["env"] = env
     if process_group:
         popen_options["start_new_session"] = True
 
@@ -142,11 +145,11 @@ def run_bounded_interruptible_command(
     readers = [
         threading.Thread(
             target=drain, args=(process.stdout, stdout_capture),
-            name="shai-test-stdout", daemon=True
+            name="shai-command-stdout", daemon=True
         ),
         threading.Thread(
             target=drain, args=(process.stderr, stderr_capture),
-            name="shai-test-stderr", daemon=True
+            name="shai-command-stderr", daemon=True
         )
     ]
     for reader in readers:

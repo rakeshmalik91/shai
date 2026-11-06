@@ -50,6 +50,25 @@ are backed up before atomic replacement.
 
 These tools do not commit, push or rewrite Git history.
 
+## Controlled OS command execution
+
+| Tool | Parameters | Purpose |
+|---|---|---|
+| `os_command` | `executable`, `args`, optional `cwd`, optional `timeout_seconds` | Run one allowlisted OS command using an argument vector and the bounded process runner. |
+
+`os_command` is available only in Agent/code mode. The current profiles permit
+read-only Git inspection (`status`, summary/path-scoped `diff`, `log`,
+`branch --show-current`, `rev-parse`, metadata-only `show`) and Python verification modules (`pytest`, `unittest`,
+`compileall`). Arbitrary executables, scripts, Git mutations, network commands,
+privileged operations, and shell syntax are rejected. Python test execution
+requires approval by default because project tests can execute arbitrary code.
+
+The tool uses `shell=False`, a project-contained working directory, argument
+validation, a minimal child environment, timeout and output limits, and
+process-group cleanup where supported. This is not a complete OS sandbox and
+does not enforce network isolation for Python test code. See
+[os_command implementation and configuration](OS_COMMAND.md).
+
 ## Verification and debugging
 
 | Tool | Parameters | Purpose |
@@ -58,9 +77,11 @@ These tools do not commit, push or rewrite Git history.
 | `verify_changes` | `path`, `test_check` | Run Python compilation and optionally `unittest` or `pytest` as a combined verification pass. |
 | `inspect_test_failure` | `output` | Extract likely failing tests, assertions, exception types and traceback context from supplied output. It does not run tests. |
 
-Verification and command execution require approval unless the `execution`
-category or the specific tool override permits them. Execution is bounded by
-configured timeout and output limits.
+The existing `run_checks` and `verify_changes` tools require approval unless
+the `execution` category or a specific tool override permits them. `os_command`
+uses its per-profile approval setting; Git inspection profiles are read-only,
+while Python test execution requires approval by default. All process execution
+is bounded by configured timeout and output limits.
 
 ## Safeguards and supporting capabilities
 
@@ -77,7 +98,7 @@ These are internal capabilities rather than model-callable tools:
 
 ## Tool module organization
 
-Shared read-only tools (project listing/reading/search, Git inspection, AST/code navigation, project/test maps and test-failure inspection) live in `modules/tools.py`. Both entry points use the same schemas and dispatch registry. The coding agent keeps write, commit, push, test execution and task-plan actions in `agent.py`, where approval, backups, timeouts and execution safeguards are enforced.
+Shared read-only tools (project listing/reading/search, Git inspection, AST/code navigation, project/test maps and test-failure inspection) live in `modules/tools/` and are exported through its package facade. Agent-only `os_command` lives in `modules/tools/os_command.py`. The coding agent keeps write, commit, push, test execution, task-plan and `os_command` actions in `modules/engine/agent_runtime.py`, where approval, backups, timeouts and execution safeguards are enforced.
 
 ## Configuration
 

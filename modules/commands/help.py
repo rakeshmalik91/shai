@@ -1,2 +1,46 @@
-"""Help text for the coding-agent CLI."""
-HELP_TEXT = "\nExamples:\n  Show my Git status.\n  Switch to read-only mode.\n  Show my task list.\n  Explain the project structure.\n  Find where the login screen is implemented.\n  Fix the bug in main.py.\n  Add error handling to the API client.\n  Review my current Git changes.\n  Run the Python tests.\n\nCommands:\n  /model   - Switch provider and model\n  /switch  - Alias for /model\n  /status  - Git status\n  /files   - List project files\n  /diff    - Show Git diff\n  /reset   - Clear conversation history\n  /ask     - Switch to ask mode (chat only, no tools)\n  /read-only - Switch to read-only mode (chat with read-only tools)\n  /ro      - Alias for /read-only\n  /code    - Switch to code mode (agent with tools)\n  /todo    - Show current task plan\n  /task    - Alias for /todo\n  /commit  - Commit staged changes with generated message (use --message-only to only generate message)\n  /push    - Push commits to remote\n  /commit-push - Commit and push in one command\n  /project - Switch project folder\n  /exec    - Execute a shell command (e.g., /exec python -m pytest)\n  /exit    - Exit Shai\n\nNatural-language command phrases are also supported. The canonical\ncommand registry is stored in assets/command_registry.json.\n\nPress Ctrl+D while Shai is processing to cancel the current iteration\nand return to the chat prompt.\n\nConfigure max_tool_call_iterations, tool_safeguards, retry, and granular\napproval policy in shai_config.json. Approval precedence is:\napprove.tools.<tool> -> approve.<category> -> approve.all -> prompt.\nType 'a' or 'all' at a normal approval prompt to set approve.all=true.\nHigh-risk file truncation/deletion still requires explicit approval unless\nits category or tool is explicitly enabled in config.\n"
+"""User-facing command help."""
+HELP_TEXT = """
+Examples:
+  Show my Git status.
+  Switch to read-only mode.
+  Show my task list.
+  Explain the project structure.
+  Find where the login screen is implemented.
+  Fix the bug in main.py.
+  Review my current Git changes.
+  Run the Python tests.
+
+Commands:
+  /model   - Switch provider and model
+  /switch  - Alias for /model
+  /status  - Git status
+  /files   - List project files
+  /diff    - Show Git diff
+  /reset   - Clear conversation history
+  /ask     - Switch to ask mode (chat only, no tools)
+  /read-only - Switch to read-only mode (read-only project tools)
+  /ro      - Alias for /read-only
+  /code    - Switch to code mode (agent with tools)
+  /todo    - Show current task plan
+  /task    - Alias for /todo
+  /commit  - Commit staged changes (use --message-only to only generate a message)
+  /push    - Push commits to remote
+  /commit-push - Commit and push in one command
+  /project - Switch project folder
+  /os-command - Run a controlled, allowlisted OS command (legacy alias: /exec)
+  /exit    - Exit Shai
+
+Natural-language requests can select known Shai commands through the
+shai_command feature. Its canonical registry is assets/command_registry.json.
+
+The os_command tool is available only in Agent mode. It is not a shell: only
+allowlisted Git inspection and Python verification profiles are supported.
+All execution uses argument arrays, project-root checks, time/output limits,
+and approval policy.
+
+Press Ctrl+D while Shai is processing to cancel the current iteration
+and return to the chat prompt.
+
+Configure shai_command, os_command, max_tool_call_iterations,
+tool_safeguards, retry, and granular approval policy in shai_config.json.
+"""

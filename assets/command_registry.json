@@ -312,15 +312,17 @@
       "risk": "local"
     },
     {
-      "id": "exec",
-      "slash_command": "/exec",
-      "description": "Execute a shell command",
+      "id": "os_command",
+      "slash_command": "/os-command",
+      "description": "Run an allowlisted OS command without a shell; only approved Git inspection and Python verification profiles are supported",
       "modes": [
         "agent"
       ],
-      "aliases": [],
+      "aliases": [
+        "/exec"
+      ],
       "triggers": [],
-      "risk": "privileged"
+      "risk": "execution"
     },
     {
       "id": "exit",

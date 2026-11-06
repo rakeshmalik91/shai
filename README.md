@@ -47,7 +47,8 @@ Shai uses `shai_config.json` for all settings. Key sections:
 - **tool_safeguards** — per-tool timeouts (git_status, git_diff, etc.)
 - **approve** — granular approval policy (tools, categories, global)
 - **retry** — retry/backoff settings for API requests
-- **natural_language_commands** — (planned) enable LLM-triggered commands
+- **shai_command** — enable deterministic natural-language routing to registered Shai slash commands
+- **os_command** — enable restricted, bounded OS command profiles in Agent mode
 
 See [Provider configuration](docs/PROVIDERS.md) and [Commands reference](docs/COMMANDS.md) for details.
 
@@ -91,6 +92,7 @@ Choose a provider/model when prompted. Shai remembers the last selection. During
 | `/push` | Push commits to remote |
 | `/commit-push` | Commit and push in one command |
 | `/project` | Switch project folder |
+| `/os-command` (`/exec` legacy alias) | Run an allowlisted command profile; not a shell |
 | `/exit` | Exit Shai |
 
 Press `Ctrl+D` while Shai is processing to cancel the current iteration and return to the chat prompt.
@@ -111,8 +113,10 @@ sh ./run_all_tests.sh
 - [Project architecture](docs/ARCHITECTURE.md)
 - [Provider configuration](docs/PROVIDERS.md)
 - [Terminal output formatting](docs/TERMINAL_OUTPUT.md)
-- [Future tools roadmap](docs/plans/TOOLS_ROADMAP.md)
-- [Natural language command triggering roadmap](ROADMAP.md)
+- [Future tools roadmap](docs/plans/TOOLS.md)
+- [shai_command reference](docs/SHAI_COMMAND.md)
+- [os_command reference](docs/OS_COMMAND.md)
+- [Execution-flow refactoring plan](docs/plans/EXECUTION_FLOW_ARCHITECTURE.md)
 
 ## Project Structure
 
@@ -121,7 +125,8 @@ agent.py          # Main agent entry point (CLI, modes, commands)
 chat.py           # Chat mode entry point
 shai_config.json  # Configuration (providers, safeguards, approvals, etc.)
 requirements.txt  # Optional test dependencies only
-modules/          # Core modules (tools, history, providers, logging, etc.)
+assets/           # JSON command registry
+modules/          # Core modules (tools, commands, history, providers, logging, etc.)
 docs/             # Documentation
 test/             # Unit tests
 ```

@@ -18,6 +18,8 @@ This document provides a complete overview of the Shai project structure, includ
 ├── __init__.py
 ├── agent.py                  # Entry point: Coding agent mode
 ├── chat.py                   # Entry point: Chat mode
+├── assets/                   # JSON command registry
+├── assets/                   # JSON command registry
 ├── docs/                     # Documentation
 ├── logs/                     # Diagnostic logs
 ├── modules/                  # Core implementation modules
@@ -34,7 +36,7 @@ This document provides a complete overview of the Shai project structure, includ
 | File | Description |
 |------|-------------|
 | `agent.py` | Coding agent with full tool access (editing, Git, verification, task management) |
-| `chat.py` | Conversational mode with read-only project inspection tools |
+| `chat.py` | Conversational mode without local project or OS command tools |
 
 ## Core Modules (`modules/`)
 
@@ -50,7 +52,7 @@ This document provides a complete overview of the Shai project structure, includ
 | `provider_selection.py` | Provider definitions, API keys, model discovery, selection, persistence |
 | `reasoning_handlers/` | Provider-specific reasoning summary extraction |
 | `terminal_style.py` | Terminal styling utilities |
-| `tools/` | Shared read-only project inspection tools |
+| `tools/` | Shared read-only project inspection tools used by Agent mode |
 
 ### Engine Modules (`modules/engine/`) - Agent Mode Implementation
 
@@ -62,7 +64,7 @@ This document provides a complete overview of the Shai project structure, includ
 | `git_operations.py` | Git operations, commit-message generation |
 | `history_recovery.py` | Tool-history repair, recovery notes |
 | `model_orchestration.py` | Model request loop, continuation orchestration |
-| `process_control.py` | Process control utilities |
+| `process_control.py` | Bounded subprocess execution, output capture, timeout and interruption |
 | `project_inspection.py` | Filesystem navigation, source inspection, verification |
 | `provider_api.py` | Provider request construction, retries, history sanitation |
 | `task_plan.py` | Task-plan persistence and continuation |
@@ -73,10 +75,11 @@ This document provides a complete overview of the Shai project structure, includ
 
 | Module | Responsibility |
 |--------|----------------|
-| `aliases.py` | Command aliases |
+| `shai_command.py` | Deterministic natural-language routing for Shai slash commands |
+| `aliases.py` | Command aliases loaded from `assets/command_registry.json` |
 | `definitions.py` | Command definitions |
 | `help.py` | Help system |
-| `registry.py` | Command registry |
+| `registry.py` | Slash-command normalization and registry facade |
 
 ### Reasoning Handlers (`modules/reasoning_handlers/`)
 
@@ -90,7 +93,7 @@ This document provides a complete overview of the Shai project structure, includ
 | `openai_compatible.py` | OpenAI-compatible APIs |
 | `openrouter.py` | OpenRouter |
 
-### Tools (`modules/tools/`) - Shared Read-Only Tools
+### Tools (`modules/tools/`) - Shared Tools and Controlled OS Execution
 
 | Module | Responsibility |
 |--------|----------------|
@@ -98,6 +101,7 @@ This document provides a complete overview of the Shai project structure, includ
 | `filesystem.py` | Filesystem operations |
 | `git.py` | Git read operations |
 | `inspection.py` | Code inspection (AST-based) |
+| `os_command.py` | Agent-only allowlisted OS command execution; no shell |
 | `schemas.py` | Tool schemas |
 
 ### UI (`modules/ui/`)
