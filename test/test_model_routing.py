@@ -97,10 +97,32 @@ class ModelRoutingTests(unittest.TestCase):
         )
         self.assertEqual([c["model"] for c in candidates], ["good"])
 
+    def test_candidate_validation_rejects_booleans_and_missing_keys(self):
+        items = [
+            {"provider": "ollama", "model": "test", "priority": True},  # boolean priority
+            {"provider": "", "model": "test", "priority": 1},           # empty provider
+            {"provider": "ollama", "model": "", "priority": 1},           # empty model
+            {"model": "test", "priority": 1},                            # missing provider
+            {"provider": "ollama", "priority": 1},                        # missing model
+            "not_a_dict",                                                 # non-dict
+            {"provider": "ollama", "model": "valid", "priority": 1},     # valid
+        ]
+        valid = model_routing._valid_candidates(items)
+        self.assertEqual(len(valid), 1)
+        self.assertEqual(valid[0]["model"], "valid")
+
+    def test_candidate_deduplication_preserves_first_occurrence(self):
+        items = [
+            {"provider": "ollama", "model": "qwen", "priority": 1},
+            {"provider": "ollama", "model": "qwen", "priority": 2},
+        ]
+        valid = model_routing._valid_candidates(items)
+        self.assertEqual(len(valid), 1)
+        self.assertEqual(valid[0]["priority"], 1)
 
     def test_project_routing_file_is_gitignored_and_template_is_tracked(self):
         ignore = (self.project / ".gitignore")
-        ignore.write_text(".shai/*\\n!.shai/model_routing.json\\n", encoding="utf-8")
+        ignore.write_text(".shai/*\n!.shai/model_routing.json\n", encoding="utf-8")
         ignore_rules = ignore.read_text(encoding="utf-8")
         self.assertIn(".shai/*", ignore_rules)
         self.assertIn("!.shai/model_routing.json", ignore_rules)
@@ -117,6 +139,24 @@ class ModelRoutingTests(unittest.TestCase):
                 provider_registry={"ollama": {}}, model_discovery=discover,
             )
         self.assertEqual(discover.call_count, 1)
+
+    def test_clear_availability_cache_forces_rediscovery(self):
+        self.write_routes({"chat": [
+            {"provider": "ollama", "model": "qwen", "priority": 1}
+        ]})
+        discover = mock.Mock(return_value=["qwen"])
+        model_routing.resolve_model(
+            "chat", self.project, "openrouter", "default",
+            provider_registry={"ollama": {}}, model_discovery=discover,
+        )
+        self.assertEqual(discover.call_count, 1)
+
+        model_routing.clear_availability_cache()
+        model_routing.resolve_model(
+            "chat", self.project, "openrouter", "default",
+            provider_registry={"ollama": {}}, model_discovery=discover,
+        )
+        self.assertEqual(discover.call_count, 2)
 
 
 if __name__ == "__main__":

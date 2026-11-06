@@ -34,10 +34,34 @@ class PriorityToolTests(unittest.TestCase):
         self.assertIn("method run", result)
         self.assertIn("function start", result)
 
+    def test_get_file_outline_syntax_error_and_empty_file(self):
+        self.write("broken.py", "def broken(:\n    pass\n")
+        syntax_res = agent.get_file_outline("broken.py")
+        self.assertIn("Syntax error", syntax_res)
+
+        self.write("empty.py", "# only comments\n")
+        empty_res = agent.get_file_outline("empty.py")
+        self.assertIn("No top-level declarations found", empty_res)
+
+        with self.assertRaises(ValueError):
+            agent.get_file_outline("missing.py")
+
     def test_find_symbol_and_references(self):
         self.write("sample.py", "def target():\n    return 1\n\ndef caller():\n    return target()\n")
         self.assertIn("function target", agent.find_symbol("target", "."))
         self.assertIn("return target()", agent.find_references("target", "."))
+
+    def test_find_symbol_edge_cases(self):
+        self.assertIn("symbol must be a non-empty string", agent.find_symbol("", "."))
+        self.assertIn("symbol must be a non-empty string", agent.find_symbol(None, "."))
+        self.write("sample.py", "value = 42\n")
+        self.assertIn("No Python definition found for 'missing'", agent.find_symbol("missing", "."))
+
+    def test_find_references_edge_cases(self):
+        self.assertIn("symbol must be a non-empty string", agent.find_references("", "."))
+        self.assertIn("symbol must be a non-empty string", agent.find_references(None, "."))
+        self.write("sample.py", "hello = 1\n")
+        self.assertIn("No matches found", agent.find_references("nonexistent_symbol_xyz", "."))
 
     def test_get_project_map_and_test_map(self):
         self.write("agent.py", "def main(): pass\n")
@@ -52,6 +76,10 @@ class PriorityToolTests(unittest.TestCase):
         self.assertIn("FAIL: test_example", result)
         self.assertIn("AssertionError", result)
 
+    def test_inspect_test_failure_empty_output(self):
+        result = agent.inspect_test_failure("Everything passed with 0 errors!")
+        self.assertIn("No common test failure markers found", result)
+
     def test_update_task_plan_validates_and_formats(self):
         result = agent.update_task_plan([
             {"title": "Inspect code", "status": "completed"},
@@ -61,6 +89,12 @@ class PriorityToolTests(unittest.TestCase):
         self.assertIn("[~] Run tests", result)
         self.assertEqual(len(agent.TASK_PLAN), 2)
 
+    def test_update_task_plan_input_validation(self):
+        self.assertIn("steps must be a non-empty array", agent.update_task_plan("not a list"))
+        self.assertIn("steps must be a non-empty array", agent.update_task_plan([]))
+        self.assertIn("needs a non-empty title", agent.update_task_plan([{"status": "pending"}]))
+        self.assertIn("needs a non-empty title", agent.update_task_plan([{"title": "", "status": "pending"}]))
+
     def test_replace_lines_uses_line_numbers_and_approval(self):
         self.write("sample.py", "first = 1\nsecond = 2\nthird = 3\n")
         with mock.patch.object(agent, "confirm_action", return_value=True), \
@@ -69,6 +103,21 @@ class PriorityToolTests(unittest.TestCase):
             result = agent.replace_lines("sample.py", 2, 2, "second = 20")
         self.assertIn("Successfully replaced lines 2-2", result)
 
+    def test_replace_lines_bounds_and_validations(self):
+        self.write("sample.py", "line 1\nline 2\n")
+        # end_line < start_line
+        self.assertIn("greater than or equal to start_line", agent.replace_lines("sample.py", 2, 1, "x"))
+        # start_line < 1
+        self.assertIn("start_line must be a positive 1-based line number", agent.replace_lines("sample.py", 0, 1, "x"))
+        # end_line exceeds total lines
+        self.assertIn("exceeds file length", agent.replace_lines("sample.py", 1, 10, "x"))
+        # missing file
+        self.assertIn("Target file does not exist", agent.replace_lines("missing.py", 1, 1, "x"))
+        # user rejects approval
+        with mock.patch.object(agent, "confirm_action", return_value=False), \
+             mock.patch.object(agent, "print_change_preview"):
+            res = agent.replace_lines("sample.py", 1, 1, "line 1 changed")
+            self.assertIn("User declined line-range replacement", res)
 
     def test_verify_changes_runs_compile_and_unittest(self):
         fake_result = {

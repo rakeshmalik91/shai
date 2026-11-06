@@ -1,10 +1,8 @@
 # Shai — Execution Flow Architecture
 
-> **Status: Future refactoring plan.** The `shai_command` and `os_command`
-> capabilities described in this repository are implemented; the broader
-> session/state-machine/event-driven orchestration refactor in this document is
-> not yet implemented. Keep this document in `docs/plans/` until those changes
-> are completed and verified.
+> **Status: Active architectural blueprint (Phased implementation in progress).**
+> - **Delivered:** Domain module decomposition under `modules/engine/` (10 extracted modules + `agent_runtime.py` facade), restricted `os_command` execution, `shai_command` deterministic routing, centralized project path access control, and transient in-place tool status updates (`\r` + erase-line).
+> - **In Progress / Remaining:** Formal request session object (`session.py`), explicit lifecycle state machine, event-driven presenter bus, and unified model-turn/tool-result contracts.
 
 
 ## 1. Purpose
@@ -594,9 +592,10 @@ It must not:
 - Decide whether the agent should continue.
 - Prevent output when the terminal is non-interactive or too short.
 
-Retain the existing pinned terminal status region and compact fallback, but
-make the presenter consume normalized events rather than being called from
-many unrelated branches in the agent loop.
+Retain the delivered transient in-place tool activity line (`\r` + erase-line)
+and non-TTY compact fallback (per `docs/TERMINAL_OUTPUT.md`), but make the
+presenter consume normalized events rather than being called from many
+unrelated branches in the agent loop.
 
 ### Logging
 
@@ -879,27 +878,23 @@ implementations, without a real terminal or network connection.
 - Update architecture and developer documentation to describe implemented
   behavior, not aspirational behavior.
 
-## 16. Acceptance criteria
+## 16. Acceptance criteria and implementation progress
 
-The improved flow is ready when:
+Current verification status of execution-flow architecture goals:
 
-- [ ] A request has one identifiable session and request ID.
-- [ ] The lifecycle has explicit states and terminal outcomes.
-- [ ] Provider-specific responses are normalized before orchestration decisions.
-- [ ] Every tool call passes through one dispatcher and policy gate.
-- [ ] Tool handlers cannot recursively start the agent loop.
-- [ ] Tool failures and policy rejections remain distinguishable from success.
-- [ ] Mutations cannot be automatically retried after ambiguous outcomes.
-- [ ] Iteration, time, tool-call, output, and continuation budgets are enforced.
-- [ ] Task completion is evaluated independently of the model's final wording.
-- [ ] Context assembly and compaction have one clear owner.
-- [ ] UI rendering and logging do not control execution.
-- [ ] Cleanup runs after success, failure, cancellation, and timeout.
-- [ ] Chat mode cannot access agent-only tools.
-- [ ] Existing CLI, command, configuration, and compatibility behavior remains
-      intact.
-- [ ] The orchestrator is testable using fake providers and fake tools.
-- [ ] The full regression suite passes.
+- [x] **Domain module boundaries established:** Modular engine extracted into `modules/engine/` (`configuration`, `project_inspection`, `task_plan`, `git_operations`, `file_editing`, `provider_api`, `tool_execution`, `tool_presentation`, `history_recovery`, `model_orchestration`).
+- [x] **Compatibility entry points preserved:** `agent.py` and `modules/engine/agent_runtime.py` preserve existing CLI, interactive commands, and monkeypatch surfaces.
+- [x] **Chat mode isolation:** Chat mode cannot access agent-only tools, OS commands, or file mutations.
+- [x] **Controlled process runner:** Bounded output capture, stdout/stderr caps, timeouts, and process-tree termination implemented in `process_control.py`.
+- [x] **Project path access gates:** Centralized access policy and glob matching enforced in `modules/tools/common.py` prior to tool execution.
+- [x] **Transient terminal output:** Single carriage-return-updated activity line avoiding terminal-scroll lockouts on narrow terminals (e.g. iSH).
+- [ ] **Request session encapsulation:** Each user request has one identifiable session instance and unique request ID (`session.py`).
+- [ ] **Explicit lifecycle state machine:** Typed transition rules between `PREPARE`, `PROMPT_BUILD`, `AWAIT_MODEL`, `VALIDATE_RESPONSE`, `EXECUTE_TOOLS`, `EVALUATE_CONTINUATION`, `SUSPENDED`, and `FINALIZE`.
+- [ ] **Normalized model-turn representation:** Unified model response objects decouples provider-specific serialization from orchestrator decisions.
+- [ ] **Unified tool dispatcher:** Single gate ensuring all tool calls (read-only, mutating, OS commands) return standard `ToolResult` objects with typed error categories.
+- [ ] **Event-driven observability:** Event bus (`events/bus.py`) decouples UI presenters, live status, and logging from core loop branches.
+- [ ] **Independent task evaluation:** Continuation rules operate strictly on validated task-plan state without relying on model self-narration.
+- [ ] **Full mock testability:** Orchestrator can be comprehensively tested with fake provider and fake tool harnesses without terminal or network mocks.
 
 ## 17. Decisions to make before implementation
 

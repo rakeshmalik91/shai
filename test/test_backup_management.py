@@ -50,6 +50,18 @@ class BackupManagementTests(unittest.TestCase):
             {"enabled": True, "retention_days": 1},
         )
 
+    def test_backup_config_negative_retention_days_uses_default(self):
+        config_dir = self.project_root / ".shai"
+        config_dir.mkdir()
+        (config_dir / "backup_config.json").write_text(
+            json.dumps({"enabled": True, "retention_days": -5}),
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            agent.load_backup_config(),
+            {"enabled": True, "retention_days": 1},
+        )
+
     def test_backup_directory_is_nested_under_shai(self):
         backup_dir = agent._project_backup_dir()
         self.assertEqual(backup_dir, self.project_root / ".shai" / "shai_backups")
@@ -63,7 +75,6 @@ class BackupManagementTests(unittest.TestCase):
         self.assertTrue((new_dir / "file.py.20261106-010101.bak").exists())
         self.assertFalse(legacy.exists())
 
-
     def test_atomic_file_edit_creates_backup_under_shai(self):
         target = self.project_root / "sample.py"
         target.write_text("value = 1\n", encoding="utf-8")
@@ -74,6 +85,14 @@ class BackupManagementTests(unittest.TestCase):
             self.project_root / ".shai" / "shai_backups",
         )
         self.assertEqual(pathlib.Path(backup).read_text(encoding="utf-8"), "value = 1\n")
+
+    def test_atomic_replace_creates_new_file_without_backup(self):
+        target = self.project_root / "brand_new.py"
+        self.assertFalse(target.exists())
+        backup = agent._atomic_replace_file(target, "value = 100\n")
+        self.assertIsNone(backup)
+        self.assertTrue(target.exists())
+        self.assertEqual(target.read_text(encoding="utf-8"), "value = 100\n")
 
     def test_disabled_cleanup_still_migrates_legacy_directory(self):
         config_dir = self.project_root / ".shai"

@@ -71,6 +71,52 @@ class ConversationHistoryTests(unittest.TestCase):
             self.assertEqual(json.loads(store.path.read_text())["version"], 1)
             self.assertFalse((Path(root) / ".shai" / ".gitignore").exists())
 
+    def test_corrupt_history_file_recovers_to_empty(self):
+        with tempfile.TemporaryDirectory() as root:
+            history_file = Path(root) / ".shai" / "history.json"
+            history_file.parent.mkdir(parents=True, exist_ok=True)
+            history_file.write_text("CORRUPTED_JSON{:", encoding="utf-8")
+
+            store = ConversationHistory(root, "agent", "default system")
+            messages = store.load()
+            self.assertEqual(messages, [{"role": "system", "content": "default system"}])
+
+    def test_metadata_persistence_and_mode_isolation(self):
+        with tempfile.TemporaryDirectory() as root:
+            agent = ConversationHistory(root, "agent", "agent system")
+            chat = ConversationHistory(root, "chat", "chat system")
+
+            agent.save(agent.load(), provider="openrouter", model="claude")
+            chat.save(chat.load(), provider="ollama", model="llama")
+
+            self.assertEqual(agent.metadata().get("provider"), "openrouter")
+            self.assertEqual(agent.metadata().get("model"), "claude")
+            self.assertEqual(chat.metadata().get("provider"), "ollama")
+            self.assertEqual(chat.metadata().get("model"), "llama")
+
+    def test_add_input_ignores_whitespace_and_caps_history(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = ConversationHistory(root, "agent", "system", max_input_history=3)
+            store.add_input("")
+            store.add_input("   ")
+            store.add_input("one")
+            store.add_input("two")
+            store.add_input("three")
+            store.add_input("four")
+
+            data = json.loads(store.path.read_text(encoding="utf-8"))
+            self.assertEqual(data["input_history"], ["two", "three", "four"])
+
+    def test_load_returns_deep_copy(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = ConversationHistory(root, "agent", "system")
+            initial = store.load()
+            initial.append({"role": "user", "content": "mutation"})
+
+            fresh = store.load()
+            self.assertEqual(len(fresh), 1)
+            self.assertEqual(fresh[0]["role"], "system")
+
 
 if __name__ == "__main__":
     unittest.main()

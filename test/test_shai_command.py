@@ -1,4 +1,7 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from modules.commands.shai_command import (
     load_command_registry,
@@ -25,6 +28,22 @@ class ShaiCommandTests(unittest.TestCase):
                 self.assertEqual(
                     resolve_shai_command(phrase, mode), expected
                 )
+
+    def test_polite_prefixes_and_suffixes(self):
+        phrases = [
+            "could you please show git status for me",
+            "kindly show git status now",
+            "can you please show git status please",
+            "SHOW `GIT STATUS`",
+        ]
+        for phrase in phrases:
+            with self.subTest(phrase=phrase):
+                self.assertEqual(resolve_shai_command(phrase, "agent"), "/status")
+
+    def test_non_string_and_empty_inputs(self):
+        for invalid in (None, 123, True, False, [], {}, "", "   "):
+            with self.subTest(invalid=invalid):
+                self.assertIsNone(resolve_shai_command(invalid, "agent"))
 
     def test_chat_status_is_mode_specific(self):
         self.assertEqual(
@@ -77,7 +96,6 @@ class ShaiCommandTests(unittest.TestCase):
                          "/commit --message-only")
 
     def test_exec_is_canonical_and_os_command_is_legacy_alias(self):
-        from modules.commands.registry import normalize_command
         self.assertEqual(
             normalize_command("/exec git status"),
             "/exec git status"
@@ -87,11 +105,7 @@ class ShaiCommandTests(unittest.TestCase):
             "/exec git status"
         )
 
-
     def test_shai_command_can_be_disabled_in_config(self):
-        import json
-        import tempfile
-        from pathlib import Path
         with tempfile.TemporaryDirectory() as directory:
             config_path = Path(directory) / "shai_config.json"
             config_path.write_text(json.dumps({"shai_command": {"enabled": False}}))
@@ -99,6 +113,11 @@ class ShaiCommandTests(unittest.TestCase):
                 "show git status", "agent", config_path=config_path
             ))
 
+    def test_malformed_command_registry_returns_none(self):
+        with tempfile.TemporaryDirectory() as directory:
+            reg_path = Path(directory) / "bad_registry.json"
+            reg_path.write_text("INVALID_JSON")
+            self.assertIsNone(resolve_shai_command("show git status", "agent", registry_path=reg_path))
 
 
 if __name__ == "__main__":
