@@ -826,7 +826,7 @@ def main():
     print("Project:", ROOT)
     print("Provider:", PROVIDER)
     print("Model:", MODEL)
-    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /project /os-command (legacy alias: /exec) /exit")
+    print("Commands: /help /model /status /files /diff /reset /ask /code /todo /commit /push /commit-push /project /exec (legacy alias: /os-command) /exit")
     print("Press Ctrl+D during an iteration to stop it and return here.")
 
     # Mode: "agent" (with tools) or "ask" (chat only, no tools)
@@ -984,7 +984,7 @@ def main():
                     print("\n[Shai] Command interrupted.")
                 continue
 
-            if user_text.startswith(("/os-command ", "/exec ")) or user_text in ("/os-command", "/exec"):
+            if user_text.startswith(("/exec ", "/os-command ")) or user_text in ("/exec", "/os-command"):
                 if mode != "agent":
                     print("[Shai] os_command is available only in code mode. Switch with /code first.")
                     continue

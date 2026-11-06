@@ -9,15 +9,16 @@ operating-system commands. It is **not an interactive shell** and must not be
 expanded into unrestricted shell execution by passing command strings to a
 shell.
 
-The previous `/exec` implementation used `subprocess.run(..., shell=True)`.
-That path has been removed. `/exec` remains only as a compatibility alias for
-`/os-command`, and both use the same safe parser and execution policy.
+The canonical CLI command is `/exec`. The older `/os-command` spelling
+remains a backward-compatible alias. Both route to the same `os_command` tool
+and execution policy. Arguments are parsed into an array and executed with
+`shell=False`; this is not an interactive shell.
 
 ## Supported command profiles
 
 | Executable | Supported operations | Approval |
 |---|---|---|
-| `git` | `status`, summary/path-scoped `diff`, `log`, `branch --show-current`, `rev-parse`, metadata-only `show` | No per-run approval by default; only read-only subcommands are accepted |
+| `git` | `status`, summary/path-scoped `diff`, `log` (including `--oneline -10` and bounded pretty formats), `branch --show-current`, `rev-parse`, metadata-only `show` | No per-run approval by default; only read-only subcommands are accepted |
 | `python3` | `-m pytest`, `-m unittest discover`, `-m compileall` | Approval required by default |
 
 The executable is resolved by Shai; the model cannot supply an arbitrary
@@ -53,11 +54,11 @@ Example tool requests:
 The CLI equivalent is:
 
 ```text
-/os-command git status --short --branch
-/os-command python3 -m pytest -q
+/exec git status --short --branch
+/exec python3 -m pytest -q
 ```
 
-`/exec` is accepted as a legacy alias. Arguments are parsed with `shlex` and
+`/os-command` is accepted as a legacy alias. Arguments are parsed with `shlex` and
 passed as a list to a process runner; shell interpretation is never enabled.
 
 ## Validation and execution
@@ -80,7 +81,10 @@ Before a process starts, Shai:
 
 Git runs with system/global configuration disabled, pager/editor interaction
 suppressed, fsmonitor disabled, and external diff/textconv disabled for diff
-and show operations. Child processes receive a minimal environment rather than
+and show operations. To support repositories on shared or mounted filesystems
+whose owner differs from the current process, Shai passes
+`-c safe.directory=<canonical project root>` to that Git invocation only. It
+does not modify global Git configuration or trust additional directories. Child processes receive a minimal environment rather than
 the full parent environment.
 
 The project-root check is an application-level boundary, not a complete OS

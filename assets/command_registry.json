@@ -313,13 +313,13 @@
     },
     {
       "id": "os_command",
-      "slash_command": "/os-command",
+      "slash_command": "/exec",
       "description": "Run an allowlisted OS command without a shell; only approved Git inspection and Python verification profiles are supported",
       "modes": [
         "agent"
       ],
       "aliases": [
-        "/exec"
+        "/os-command"
       ],
       "triggers": [],
       "risk": "execution"

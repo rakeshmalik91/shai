@@ -93,13 +93,25 @@ def _validate_git_args(args, profile, root):
         index = 0
         while index < len(tail):
             token = tail[index]
-            if token in ("--oneline", "--decorate", "--no-decorate"):
+            if token in ("--oneline", "--decorate", "--no-decorate",
+                         "--pretty=oneline", "--pretty=short"):
                 index += 1
             elif token in ("-n", "--max-count"):
                 if index + 1 >= len(tail) or not tail[index + 1].isdigit():
                     raise OSCommandRejected("git log -n/--max-count requires a numeric limit.")
+                if int(tail[index + 1]) < 1 or int(tail[index + 1]) > 1000:
+                    raise OSCommandRejected("git log count must be between 1 and 1000.")
                 index += 2
+            elif re.fullmatch(r"-[1-9][0-9]{0,3}", token):
+                if int(token[1:]) > 1000:
+                    raise OSCommandRejected("git log count must be between 1 and 1000.")
+                index += 1
             elif re.fullmatch(r"--max-count=[1-9][0-9]{0,3}", token):
+                if int(token.split("=", 1)[1]) > 1000:
+                    raise OSCommandRejected("git log count must be between 1 and 1000.")
+                index += 1
+            elif token in ("--pretty=format:%h %s", "--pretty=format:%H %s",
+                           "--format=%h %s", "--format=%H %s"):
                 index += 1
             else:
                 raise OSCommandRejected("Unsupported git log argument.")
@@ -246,7 +258,11 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
     except (OSCommandRejected, OSError, ValueError) as error:
         return {"error": str(error)}
 
-    command = ([binary, "-c", "core.fsmonitor=false", "-c", "core.pager=cat"] + tokens
+    # Git's dubious-ownership check is intentionally satisfied per invocation,
+    # for this canonical project root only. Do not write safe.directory to the
+    # user's global Git configuration.
+    command = ([binary, "-c", "safe.directory={}".format(project_root),
+                "-c", "core.fsmonitor=false", "-c", "core.pager=cat"] + tokens
                if executable == "git" else [binary] + tokens)
     preview = "\n".join((
         "Executable: {}".format(binary),
@@ -305,5 +321,5 @@ def parse_os_command_line(value):
     except ValueError as error:
         raise OSCommandRejected("Could not parse command arguments: {}".format(error))
     if not parts:
-        raise OSCommandRejected("Usage: /os-command git status [options] or /os-command python3 -m pytest [options]")
+        raise OSCommandRejected("Usage: /exec git status [options] or /exec python3 -m pytest [options]")
     return parts[0], parts[1:]

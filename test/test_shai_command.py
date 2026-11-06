@@ -76,11 +76,15 @@ class ShaiCommandTests(unittest.TestCase):
         self.assertEqual(normalize_command("/commit --message-only"),
                          "/commit --message-only")
 
-    def test_legacy_exec_alias_normalizes_to_os_command(self):
+    def test_exec_is_canonical_and_os_command_is_legacy_alias(self):
         from modules.commands.registry import normalize_command
         self.assertEqual(
             normalize_command("/exec git status"),
-            "/os-command git status"
+            "/exec git status"
+        )
+        self.assertEqual(
+            normalize_command("/os-command git status"),
+            "/exec git status"
         )
 
 

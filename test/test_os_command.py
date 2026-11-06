@@ -56,8 +56,24 @@ class OSCommandTests(unittest.TestCase):
         result = self.execute("git", ["status", "--short", "--branch"])
         self.assertEqual(result["status"], "completed")
         self.assertEqual(self.calls[0][0][-3:], ["status", "--short", "--branch"])
+        self.assertIn("safe.directory={}".format(self.root), self.calls[0][0])
         self.assertEqual(self.calls[0][1], self.root)
         self.assertEqual(self.calls[0][4]["GIT_CONFIG_NOSYSTEM"], "1")
+
+    def test_git_log_accepts_last_ten_commits(self):
+        result = self.execute("git", ["log", "--oneline", "-10"])
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(self.calls[0][0][-3:], ["log", "--oneline", "-10"])
+
+    def test_git_log_accepts_safe_pretty_format(self):
+        result = self.execute("git", ["log", "--pretty=format:%h %s", "-10"])
+        self.assertEqual(result["status"], "completed")
+
+    def test_git_log_rejects_unbounded_or_unsafe_options(self):
+        for args in (["log", "-9999"], ["log", "--pretty=format:%H%n%an"]):
+            result = self.execute("git", args)
+            self.assertTrue("Unsupported git log argument" in result["error"] or "count must be between" in result["error"])
+        self.assertEqual(len(self.calls), 0)
 
     def test_git_diff_disables_external_diff_and_textconv(self):
         result = self.execute("git", ["diff", "--stat"])

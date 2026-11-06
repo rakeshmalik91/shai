@@ -27,7 +27,7 @@ Commands:
   /push    - Push commits to remote
   /commit-push - Commit and push in one command
   /project - Switch project folder
-  /os-command - Run a controlled, allowlisted OS command (legacy alias: /exec)
+  /exec - Run a controlled, allowlisted OS command (legacy alias: /os-command)
   /exit    - Exit Shai
 
 Natural-language requests can select known Shai commands through the

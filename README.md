@@ -92,7 +92,7 @@ Choose a provider/model when prompted. Shai remembers the last selection. During
 | `/push` | Push commits to remote |
 | `/commit-push` | Commit and push in one command |
 | `/project` | Switch project folder |
-| `/os-command` (`/exec` legacy alias) | Run an allowlisted command profile; not a shell |
+| `/exec` (`/exec` legacy alias) | Run an allowlisted command profile; not a shell |
 | `/exit` | Exit Shai |
 
 Press `Ctrl+D` while Shai is processing to cancel the current iteration and return to the chat prompt.

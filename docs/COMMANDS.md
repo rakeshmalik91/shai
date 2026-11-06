@@ -60,14 +60,14 @@ Available when running `python3 agent.py [project-path]`.
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `/os-command <executable> <args...>` | `/exec` (legacy) | Run a command through the `os_command` allowlist. This is not a shell. |
+| `/exec <executable> <args...>` | `/os-command` (legacy) | Run a command through the `os_command` allowlist. This is not a shell. |
 
 Examples:
 
 ```text
-/os-command git status --short --branch
-/os-command git diff --stat
-/os-command python3 -m pytest -q
+/exec git status --short --branch
+/exec git diff --stat
+/exec python3 -m pytest -q
 ```
 
 Only approved Git inspection subcommands and Python verification modules are
@@ -138,7 +138,7 @@ Agent Mode:          Chat Mode:
 /commit [--message-only]
 /push
 /commit-push
-/os-command <executable> <args...> (legacy alias: /exec)
+/exec <executable> <args...> (legacy alias: /os-command)
 /exit
 ```
 

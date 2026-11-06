@@ -184,11 +184,11 @@ to operate on the live implementation.
 
 `modules/commands/` separates the `shai_command` natural-language resolver, command aliases, canonical command descriptions, help text, and command normalization. The canonical command registry lives in `assets/command_registry.json`. The interactive agent loop consumes the
 normalizer while preserving command arguments such as `/project <path>` and
-`/os-command <executable> <args...>` (with `/exec` retained as a legacy alias).
+`/exec <executable> <args...>` (with `/exec` retained as a legacy alias).
 
 ### Controlled OS command execution
 
-`os_command` is registered only for Agent mode. It is implemented in `modules/tools/os_command.py` and uses `modules/engine/process_control.py`. It is not a shell: the current allowlist is limited to read-only Git inspection and approved Python verification modules. It validates project-relative paths, invokes argument arrays with `shell=False`, requires approval for Python test execution, and bounds time and output. `/exec` is only a legacy alias for `/os-command`; the former `shell=True` path has been removed. See [OS command documentation](OS_COMMAND.md).
+`os_command` is registered only for Agent mode. It is implemented in `modules/tools/os_command.py` and uses `modules/engine/process_control.py`. It is not a shell: the current allowlist is limited to read-only Git inspection and approved Python verification modules. It validates project-relative paths, invokes argument arrays with `shell=False`, requires approval for Python test execution, and bounds time and output. `/exec` is only a legacy alias for `/exec`; the former `shell=True` path has been removed. See [OS command documentation](OS_COMMAND.md).
 
 ### Tool organization
 
