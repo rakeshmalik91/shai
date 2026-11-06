@@ -1,11 +1,14 @@
 # Project File and Path Access Control
 
-## Status
+## Status: Implemented
 
-Implemented. Generic policy lives in
-`assets/project_access_config.json`; user-approved project-specific grants live in
-`.shai/project_access.json`. Enforcement is provided by `modules.tools.common` across filesystem tools, code inspection,
-file editing and controlled command execution.
+Generic policy lives in `assets/project_access_config.json`; user-approved
+project-specific grants live in `.shai/project_access.json`. Enforcement is
+centralized in `modules.tools.common` and applied by filesystem tools, code
+inspection, file editing, and controlled command execution.
+
+This document describes the current implementation, not a proposal. Future
+delete tooling and OS-level isolation are explicitly out of scope.
 
 ## Policy model
 

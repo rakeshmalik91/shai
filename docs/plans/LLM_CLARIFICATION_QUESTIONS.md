@@ -1,5 +1,7 @@
 # Roadmap: LLM Clarification Questions
 
+**Status: Not implemented.** No `ask_user` interaction or task-suspension/resumption flow is currently registered.
+
 ## Goal
 
 Allow Shai to pause before acting when the request, requirements, target files,
