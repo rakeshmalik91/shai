@@ -256,6 +256,11 @@ def get_saved_context_window(provider, model):
     """Return a persisted provider-reported or user-configured context limit."""
     config = load_config()
     key = "{}::{}".format(provider, model)
+    overrides = config.get("model_context_window_overrides", {})
+    if isinstance(overrides, dict):
+        value = overrides.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
     mapping = config.get("model_context_windows", {})
     if isinstance(mapping, dict):
         value = mapping.get(key)
@@ -364,11 +369,11 @@ def initialize_provider(auto_select=False):
         try:
             models = get_available_models(saved_provider)
             if saved_model in models:
-                context_limit = MODEL_CONTEXT_WINDOWS.get(saved_model)
+                context_limit = get_saved_context_window(saved_provider, saved_model) or MODEL_CONTEXT_WINDOWS.get(saved_model)
                 if context_limit:
                     print("Model context window: {:,} tokens".format(context_limit))
                 else:
-                    print("Model context window: unknown (configure it in shai_config.json if needed)")
+                    print("Model context window: unknown (configure it in context_window_config.json if needed)")
                 print("Selected: {} / {} (auto-selected)".format(saved_provider, saved_model))
                 return saved_provider, saved_model
             else:
@@ -419,9 +424,10 @@ def initialize_provider(auto_select=False):
     model = choose_model(models, preferred)
     context_limit = MODEL_CONTEXT_WINDOWS.get(model)
     save_config(provider, model, context_limit)
+    context_limit = get_saved_context_window(provider, model) or context_limit
     if context_limit:
         print("Model context window: {:,} tokens".format(context_limit))
     else:
-        print("Model context window: unknown (configure it in shai_config.json if needed)")
+        print("Model context window: unknown (configure it in context_window_config.json if needed)")
     print("Selected:", provider, "/", model)
     return provider, model

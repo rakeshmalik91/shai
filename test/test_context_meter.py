@@ -29,6 +29,15 @@ class ContextMeterTests(unittest.TestCase):
             get_context_window("kilo-free", "example:model", config), 65536
         )
 
+    def test_model_specific_override_takes_precedence_over_provider_metadata(self):
+        config = {
+            "model_context_windows": {"kilo-free::example:model": 65536},
+            "model_context_window_overrides": {"kilo-free::example:model": 98304},
+        }
+        self.assertEqual(
+            get_context_window("kilo-free", "example:model", config), 98304
+        )
+
     def test_does_not_guess_unknown_context_limit(self):
         self.assertIsNone(get_context_window("unknown", "model", {}))
 

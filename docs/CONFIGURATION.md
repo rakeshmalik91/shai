@@ -8,7 +8,7 @@ Shai configuration is stored under `assets/` and split by responsibility:
 - `assets/project_access_config.json` — generic project path access defaults and administrator-authored path rules.
 - `assets/provider_config.json` — provider endpoint/authentication overrides under `providers`.
 - `assets/command_config.json` — Shai slash-command and OS command settings (`shai_command`, `os_command`).
-- `assets/context_window_config.json` — per-model context limits and active context token limit.
+- `assets/context_window_config.json` — provider-reported per-model context limits, user-defined `model_context_window_overrides`, and the legacy active context token limit. Explicit model overrides take precedence over provider metadata.
 - `assets/cli_config.json` — terminal/CLI presentation, tool-call display, reasoning display, and file-change display.
 - `assets/logging_config.json` — log level, output location (`.shai/logs/` by default), rotation, retention, and console logging.
 - `assets/command_registry.json` — natural-language command registry.

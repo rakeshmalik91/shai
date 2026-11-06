@@ -9,5 +9,8 @@
     "openrouter::liquid/lfm-2.5-2.6b:free": 65536,
     "openrouter::nvidia/nemotron-3-ultra-550b-a55b:free": 1000000
   },
-  "context_window_tokens": 256000
+  "context_window_tokens": 256000,
+  "model_context_window_overrides": {
+    "ollama::llama3.2": 65536
+  }
 }

@@ -111,6 +111,23 @@ class ProviderSelectionTests(unittest.TestCase):
             131072
         )
 
+    def test_saved_model_context_override_is_preserved_and_preferred(self):
+        selection.CONFIG_FILE.write_text("{}", encoding="utf-8")
+        context_path = selection.CONFIG_FILE.parent / "context_window_config.json"
+        context_path.write_text(json.dumps({
+            "model_context_windows": {"kilo-free::vendor/model": 65536},
+            "model_context_window_overrides": {"kilo-free::vendor/model": 98304},
+        }), encoding="utf-8")
+        self.assertEqual(selection.get_saved_context_window(
+            "kilo-free", "vendor/model"
+        ), 98304)
+        selection.save_config("kilo-free", "vendor/model", 65536)
+        saved = json.loads(context_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            saved["model_context_window_overrides"]["kilo-free::vendor/model"],
+            98304,
+        )
+
     def test_provider_zero_reuses_saved_provider_and_model(self):
         selection.CONFIG_FILE.write_text(json.dumps({
             "provider": "kilo-free",

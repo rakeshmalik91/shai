@@ -32,6 +32,12 @@ def get_context_window(provider, model, config=None):
     """Resolve only explicit or provider-reported limits; never guess."""
     config = config if isinstance(config, dict) else {}
     key = "{}::{}".format(provider, model)
+    # Explicit user overrides always win over provider-reported metadata.
+    overrides = config.get("model_context_window_overrides", {})
+    if isinstance(overrides, dict):
+        value = overrides.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
     mapping = config.get("model_context_windows", {})
     if isinstance(mapping, dict):
         value = mapping.get(key)

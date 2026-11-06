@@ -124,17 +124,32 @@ selection in `assets/shai_config.json`; provider endpoint and authentication ove
 
 ## Context windows
 
-Context limits are captured from model metadata where available. You can
-override them with:
+Shai captures provider-reported context limits in `model_context_windows`.
+You can set a separate, explicit per-model override in
+`assets/context_window_config.json`. Overrides take precedence over metadata
+returned by the provider and are keyed by `provider::model`:
 
 ```json
 {
   "model_context_windows": {
     "ollama::llama3.2": 131072,
     "openrouter::provider/model:free": 131072
+  },
+  "model_context_window_overrides": {
+    "ollama::llama3.2": 65536,
+    "openrouter::provider/model:free": 98304
   }
 }
 ```
+
+`model_context_windows` is provider-discovered metadata; normally let Shai
+manage it. `model_context_window_overrides` is user-managed and is never
+replaced when model metadata is refreshed or a provider/model is selected.
+Values must be positive integer token counts. Remove an override entry to
+return to the provider-reported value. The legacy `context_window_tokens`
+setting remains supported for the currently selected model when no
+model-specific value is available.
+
 
 ## Troubleshooting
 
