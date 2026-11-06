@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "availability": {
+    "cache_seconds": 30,
+    "probe_timeout_seconds": 5,
+    "failure_cooldown_seconds": 60
+  },
+  "models": {
+    "orchestrator": [
+      {
+        "provider": "ollama",
+        "model": "qwen2.5:14b",
+        "priority": 1
+      },
+      {
+        "provider": "openrouter",
+        "model": "YOUR_ORCHESTRATOR_FALLBACK_MODEL",
+        "priority": 2
+      }
+    ],
+    "planner": [
+      {
+        "provider": "ollama",
+        "model": "qwen2.5:14b",
+        "priority": 1
+      },
+      {
+        "provider": "openrouter",
+        "model": "YOUR_PLANNING_FALLBACK_MODEL",
+        "priority": 2
+      }
+    ],
+    "code": [
+      {
+        "provider": "ollama",
+        "model": "qwen2.5-coder:14b",
+        "priority": 1
+      },
+      {
+        "provider": "openrouter",
+        "model": "YOUR_CODING_FALLBACK_MODEL",
+        "priority": 2
+      }
+    ],
+    "debug": [
+      {
+        "provider": "ollama",
+        "model": "qwen2.5-coder:14b",
+        "priority": 1
+      },
+      {
+        "provider": "openrouter",
+        "model": "YOUR_DEBUGGING_FALLBACK_MODEL",
+        "priority": 2
+      }
+    ],
+    "test": [
+      {
+        "provider": "ollama",
+        "model": "qwen2.5-coder:14b",
+        "priority": 1
+      },
+      {
+        "provider": "openrouter",
+        "model": "YOUR_TESTING_FALLBACK_MODEL",
+        "priority": 2
+      }
+    ],
+    "chat": [
+      {
+        "provider": "ollama",
+        "model": "qwen2.5:7b",
+        "priority": 1
+      },
+      {
+        "provider": "openrouter",
+        "model": "YOUR_CHAT_FALLBACK_MODEL",
+        "priority": 2
+      }
+    ],
+    "commit_message": [
+      {
+        "provider": "ollama",
+        "model": "qwen2.5:7b",
+        "priority": 1
+      }
+    ],
+    "review": [
+      {
+        "provider": "ollama",
+        "model": "qwen2.5-coder:14b",
+        "priority": 1
+      },
+      {
+        "provider": "openrouter",
+        "model": "YOUR_CODE_REVIEW_MODEL",
+        "priority": 2
+      }
+    ],
+    "documentation": [
+      {
+        "provider": "ollama",
+        "model": "qwen2.5:14b",
+        "priority": 1
+      }
+    ],
+    "research": [
+      {
+        "provider": "openrouter",
+        "model": "YOUR_RESEARCH_MODEL",
+        "priority": 1
+      },
+      {
+        "provider": "ollama",
+        "model": "qwen2.5:14b",
+        "priority": 2
+      }
+    ]
+  }
+}

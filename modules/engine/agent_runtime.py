@@ -46,6 +46,7 @@ from modules.tools import (
     require_access, ProjectAccessDenied,
     FUNCTIONS_READ_ONLY, TOOL_DISPATCH_READ_ONLY,
 )
+from modules.model_routing import resolve_model as resolve_routed_model
 from modules.provider_selection import (
     PROVIDERS, initialize_provider, get_available_models,
     get_provider_config, provider_api_key, build_provider_url,
@@ -99,6 +100,33 @@ for _engine_module in (
 ):
     _engine_module.install(globals())
 del _engine_module
+
+
+def _call_with_routed_model(messages, task_role, request_callable):
+    """Temporarily select a project route for one provider request."""
+    global PROVIDER, MODEL
+    default_provider, default_model = PROVIDER, MODEL
+    route = resolve_routed_model(task_role, ROOT, default_provider, default_model)
+    LOGGER.info(
+        "Agent model route role=%s provider=%s model=%s routed=%s reason=%s",
+        task_role, route["provider"], route["model"],
+        route["routed"], route["reason"]
+    )
+    try:
+        PROVIDER, MODEL = route["provider"], route["model"]
+        return request_callable(messages)
+    finally:
+        PROVIDER, MODEL = default_provider, default_model
+
+
+def api_request_for_role(messages, task_role="orchestrator"):
+    """Call the provider adapter using the project-selected task model."""
+    return _call_with_routed_model(messages, task_role, api_request)
+
+
+def api_request_with_role_retries(messages, task_role="orchestrator"):
+    """Use normal bounded retries with the selected task model."""
+    return _call_with_routed_model(messages, task_role, api_request_with_retries)
 
 DEFAULT_API_TIMEOUT_SECONDS = 300
 
@@ -851,7 +879,7 @@ def main():
                     LOGGER.info("Ask mode turn started provider=%s model=%s user_chars=%d history_messages=%d",
                                 PROVIDER, MODEL, len(user_text), len(history))
                     try:
-                        response = api_request(history)
+                        response = api_request_for_role(history, "chat")
                         log_and_display_usage(
                             LOGGER, response, get_provider_config(PROVIDER)["format"],
                             estimated_prompt_tokens, context_limit
@@ -907,7 +935,7 @@ def main():
                                 PROVIDER, MODEL, len(user_text), len(history))
                     try:
                         # Use api_request with read-only tools
-                        response = api_request(history, PROVIDER, MODEL)
+                        response = api_request_for_role(history, "orchestrator")
                         log_and_display_usage(
                             LOGGER, response, get_provider_config(PROVIDER)["format"],
                             estimated_prompt_tokens, context_limit
@@ -989,7 +1017,7 @@ def main():
                         spinner = Spinner("Shai is thinking | " + context_status)
                         spinner.start()
                         try:
-                            response = api_request(history, PROVIDER, MODEL)
+                            response = api_request_for_role(history, "orchestrator")
                             log_and_display_usage(
                                 LOGGER, response, get_provider_config(PROVIDER)["format"],
                                 estimated_prompt_tokens, context_limit

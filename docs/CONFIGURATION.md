@@ -124,3 +124,58 @@ The legacy `logs/` configuration value is treated as `.shai/logs/`, and
 existing files in the old root-level `logs/` directory are moved into the
 canonical directory when logging initializes. A custom absolute or relative
 `log_dir` remains supported.
+
+
+## Model routing
+
+`assets/model_routing.json` is the tracked routing template. It declares every
+supported task category with an empty candidate list, so routing is disabled
+until a project configures candidates. The active project's override is `.Shai/model_routing.json`. This specific
+file is intentionally committed with the project so the team's routing policy
+is shared. Other files under `.Shai/` remain Git-ignored. The root `.gitignore`
+uses `.Shai/*` with an exception for `.Shai/model_routing.json`.
+
+For a populated example, see `assets/model_routing.sample.json`. Copy its
+`models` entries into `.Shai/model_routing.json` and replace every
+`YOUR_*_MODEL` placeholder with an exact model identifier returned by that
+provider's model discovery. The Ollama examples also require those models to
+be installed locally.
+
+Each category accepts an ordered candidate list. Lower `priority` numbers are
+tried first:
+
+```json
+{
+  "version": 1,
+  "models": {
+    "orchestrator": [
+      {"provider": "ollama", "model": "qwen2.5:14b", "priority": 1},
+      {"provider": "openrouter", "model": "vendor/model:free", "priority": 2}
+    ],
+    "planner": [],
+    "code": [],
+    "debug": [],
+    "test": [],
+    "chat": [],
+    "commit_message": [],
+    "review": [],
+    "documentation": [],
+    "research": []
+  }
+}
+```
+
+Supported categories are `orchestrator`, `planner`, `code`, `debug`, `test`,
+`chat`, `commit_message`, `review`, `documentation`, and `research`. The
+project file overrides only the categories it defines; unspecified categories
+remain unconfigured. A candidate is selected only when its provider is
+registered and its model appears in that provider's discovered model list.
+Discovery results are cached briefly per project/provider. Invalid candidates
+are skipped; missing roles, empty lists, unsupported versions, and exhausted
+candidate lists fall back to the normal provider/model selected in Shai.
+
+Currently, Chat requests use the `chat` role, and Agent requests use
+`orchestrator`. The remaining roles are available in the routing schema for
+task-specific call sites as those workflows are split into independent model
+requests. Routing does not change the default model saved by `/model`, provider
+credentials, endpoint configuration, or context-window overrides.

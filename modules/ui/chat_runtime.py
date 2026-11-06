@@ -24,6 +24,7 @@ from modules.terminal_style import colorize
 from modules.commands.shai_command import resolve_shai_command
 from modules.commands.registry import normalize_command
 from modules.ui.spinner import Spinner
+from modules.model_routing import resolve_model as resolve_routed_model
 from modules.provider_selection import (
     PROVIDERS, initialize_provider, get_provider_config,
     provider_api_key, build_provider_url, build_provider_headers,
@@ -207,7 +208,11 @@ def choose_model(models, preferred=None):
         print("Invalid selection. Enter a number from the list.")
 
 
-def api_request(history, provider, model):
+def api_request(history, provider, model, task_role="chat"):
+    route = resolve_routed_model(task_role, ROOT, provider, model)
+    provider, model = route["provider"], route["model"]
+    LOGGER.info("Chat model role=%s provider=%s model=%s routed=%s reason=%s",
+                task_role, provider, model, route["routed"], route["reason"])
     LOGGER.debug("Chat API request provider=%s model=%s history_messages=%d",
                  provider, model, len(history))
     key = provider_api_key(provider)

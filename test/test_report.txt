@@ -1,15 +1,15 @@
 SHAI TEST REPORT
 ========================================================================
 Status: PASSED
-Started: 2026-11-06T03:36:14.969616+00:00
-Finished: 2026-11-06T03:36:26.200164+00:00
-Duration: 11.23 seconds
+Started: 2026-11-06T03:44:03.689496+00:00
+Finished: 2026-11-06T03:44:13.920583+00:00
+Duration: 10.23 seconds
 Python: 3.13.5
 
 UNITTEST
 ------------------------------------------------------------------------
 Status: PASSED
-Run: 215 | Failures: 0 | Errors: 0 | Skipped: 0
+Run: 224 | Failures: 0 | Errors: 0 | Skipped: 0
 test_approval_settings_support_category_and_tool_overrides (test.test_agent.ConfigTests.test_approval_settings_support_category_and_tool_overrides) ... ok
 test_global_approval_applies_when_category_is_not_explicitly_denied (test.test_agent.ConfigTests.test_global_approval_applies_when_category_is_not_explicitly_denied) ... ok
 test_invalid_iteration_limit_uses_default (test.test_agent.ConfigTests.test_invalid_iteration_limit_uses_default) ... ok
@@ -111,6 +111,15 @@ test_default_log_location_is_under_shai_and_migrates_legacy_logs (test.test_logg
 test_legacy_logs_config_value_resolves_under_shai (test.test_logging_config.LoggingConfigTests.test_legacy_logs_config_value_resolves_under_shai) ... ok
 test_newest_entries_are_at_top_and_per_run_files_retained (test.test_logging_config.LoggingConfigTests.test_newest_entries_are_at_top_and_per_run_files_retained) ... ok
 test_retention_keeps_only_last_n_run_logs (test.test_logging_config.LoggingConfigTests.test_retention_keeps_only_last_n_run_logs) ... ok
+test_all_supported_roles_have_unconfigured_template_entries (test.test_model_routing.ModelRoutingTests.test_all_supported_roles_have_unconfigured_template_entries) ... ok
+test_discovery_is_cached_per_project_and_provider (test.test_model_routing.ModelRoutingTests.test_discovery_is_cached_per_project_and_provider) ... ok
+test_invalid_project_version_does_not_enable_routes (test.test_model_routing.ModelRoutingTests.test_invalid_project_version_does_not_enable_routes) ... ok
+test_malformed_candidates_are_skipped_individually (test.test_model_routing.ModelRoutingTests.test_malformed_candidates_are_skipped_individually) ... ok
+test_priority_and_availability_choose_first_available_candidate (test.test_model_routing.ModelRoutingTests.test_priority_and_availability_choose_first_available_candidate) ... ok
+test_project_routes_override_template_by_role_only (test.test_model_routing.ModelRoutingTests.test_project_routes_override_template_by_role_only) ... ok
+test_project_routing_file_is_gitignored_and_template_is_tracked (test.test_model_routing.ModelRoutingTests.test_project_routing_file_is_gitignored_and_template_is_tracked) ... ok
+test_unavailable_or_invalid_candidate_uses_default (test.test_model_routing.ModelRoutingTests.test_unavailable_or_invalid_candidate_uses_default) ... ok
+test_unknown_role_uses_default (test.test_model_routing.ModelRoutingTests.test_unknown_role_uses_default) ... ok
 test_command_aliases_preserve_arguments (test.test_modular_architecture.ModularArchitectureTests.test_command_aliases_preserve_arguments) ... ok
 test_command_help_is_externalized (test.test_modular_architecture.ModularArchitectureTests.test_command_help_is_externalized) ... ok
 test_legacy_entry_points_resolve_to_runtime_modules (test.test_modular_architecture.ModularArchitectureTests.test_legacy_entry_points_resolve_to_runtime_modules) ... ok
@@ -228,7 +237,7 @@ test_read_only_dispatch_and_schemas_are_shared (test.test_tools_module.SharedToo
 test_root_configuration_and_safe_path (test.test_tools_module.SharedToolsModuleTests.test_root_configuration_and_safe_path) ... ok
 
 ----------------------------------------------------------------------
-Ran 215 tests in 0.594s
+Ran 224 tests in 0.553s
 
 OK
 
@@ -249,11 +258,11 @@ artifact_tool.rpc.client.RemoteError: Element ordering requires an owning elemen
 platform linux -- Python 3.13.5, pytest-9.0.2, pluggy-1.6.0 -- /opt/pyvenv/bin/python3
 cachedir: .pytest_cache
 metadata: {'Python': '3.13.5', 'Platform': 'Linux-6.18.57-x86_64-with-glibc2.41', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'anyio': '4.13.0', 'ddtrace': '4.4.0', 'Faker': '40.1.2', 'asyncio': '1.3.0', 'cov': '7.0.0', 'json-report': '1.5.0', 'metadata': '3.1.1'}, 'PLATFORM': 'linux/amd64', 'CI': 'true'}
-rootdir: /mnt/data/shai_context_override_work
+rootdir: /mnt/data/shai_model_routing_work
 configfile: pytest.ini
 plugins: anyio-4.13.0, ddtrace-4.4.0, Faker-40.1.2, asyncio-1.3.0, cov-7.0.0, json-report-1.5.0, metadata-3.1.1
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-[1mcollecting ... [0mcollected 215 items
+[1mcollecting ... [0mcollected 224 items
 
 test/test_agent.py::ConfigTests::test_approval_settings_support_category_and_tool_overrides [32mPASSED[0m[32m [  0%][0m
 test/test_agent.py::ConfigTests::test_global_approval_applies_when_category_is_not_explicitly_denied [32mPASSED[0m[32m [  0%][0m
@@ -265,195 +274,204 @@ test/test_agent.py::ConfigTests::test_retry_settings_validate_and_load [32mPASS
 test/test_agent.py::ConfigTests::test_risky_approval_does_not_inherit_global_all [32mPASSED[0m[32m [  3%][0m
 test/test_agent.py::ConfigTests::test_tool_errors_are_printed_after_status_batch_is_closed [32mPASSED[0m[32m [  4%][0m
 test/test_agent.py::ConfigTests::test_tool_safeguards_are_configurable [32mPASSED[0m[32m [  4%][0m
-test/test_agent.py::ConfigTests::test_yes_to_all_is_persisted_without_losing_other_settings [32mPASSED[0m[32m [  5%][0m
+test/test_agent.py::ConfigTests::test_yes_to_all_is_persisted_without_losing_other_settings [32mPASSED[0m[32m [  4%][0m
 test/test_agent.py::PlanContinuationTests::test_completed_plan_does_not_continue [32mPASSED[0m[32m [  5%][0m
-test/test_agent.py::PlanContinuationTests::test_continuation_is_bounded [32mPASSED[0m[32m [  6%][0m
+test/test_agent.py::PlanContinuationTests::test_continuation_is_bounded [32mPASSED[0m[32m [  5%][0m
 test/test_agent.py::PlanContinuationTests::test_text_only_response_continues_when_plan_is_incomplete [32mPASSED[0m[32m [  6%][0m
 test/test_agent.py::ToolSafetyTests::test_api_retries_transient_http_error [32mPASSED[0m[32m [  6%][0m
 test/test_agent.py::ToolSafetyTests::test_edit_file_patch_arguments_are_routed_to_patch_file [32mPASSED[0m[32m [  7%][0m
 test/test_agent.py::ToolSafetyTests::test_identical_calls_are_allowed_and_warn_with_parameters [32mPASSED[0m[32m [  7%][0m
 test/test_agent.py::ToolSafetyTests::test_interrupted_request_rolls_back_partial_history [32mPASSED[0m[32m [  8%][0m
 test/test_agent.py::ToolSafetyTests::test_invalid_tool_selection_has_bounded_recovery [32mPASSED[0m[32m [  8%][0m
-test/test_agent.py::ToolSafetyTests::test_kilo_schema_preserves_file_search_and_pagination_guidance [32mPASSED[0m[32m [  9%][0m
+test/test_agent.py::ToolSafetyTests::test_kilo_schema_preserves_file_search_and_pagination_guidance [32mPASSED[0m[32m [  8%][0m
 test/test_agent.py::ToolSafetyTests::test_provider_switch_history_discards_tool_records [32mPASSED[0m[32m [  9%][0m
-test/test_agent.py::ToolSafetyTests::test_search_files_accepts_single_file_path [32mPASSED[0m[32m [ 10%][0m
+test/test_agent.py::ToolSafetyTests::test_search_files_accepts_single_file_path [32mPASSED[0m[32m [  9%][0m
 test/test_agent.py::ToolSafetyTests::test_three_identical_tool_errors_stop_request [32mPASSED[0m[32m [ 10%][0m
-test/test_agent.py::ToolSafetyTests::test_tool_is_executed_once_per_call [32mPASSED[0m[32m [ 11%][0m
+test/test_agent.py::ToolSafetyTests::test_tool_is_executed_once_per_call [32mPASSED[0m[32m [ 10%][0m
 test/test_agent.py::ToolSafetyTests::test_tool_name_resolution_accepts_prefix_and_close_typo [32mPASSED[0m[32m [ 11%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_compaction_keeps_anthropic_tool_result_pair_together [32mPASSED[0m[32m [ 12%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_compaction_keeps_anthropic_tool_result_pair_together [32mPASSED[0m[32m [ 11%][0m
 test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_compaction_preserves_latest_user_request_and_caps_results [32mPASSED[0m[32m [ 12%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_compaction_preserves_summary_of_completed_tool_work [32mPASSED[0m[32m [ 13%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_file_edit_does_not_affect_read_execution [32mPASSED[0m[32m [ 13%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_compaction_preserves_summary_of_completed_tool_work [32mPASSED[0m[32m [ 12%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_file_edit_does_not_affect_read_execution [32mPASSED[0m[32m [ 12%][0m
 test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_handle_tool_selection_rejects_bad_arguments_before_execution [32mPASSED[0m[32m [ 13%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_invalid_arguments_do_not_permanently_disable_tool [32mPASSED[0m[32m [ 14%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_invalid_arguments_do_not_permanently_disable_tool [32mPASSED[0m[32m [ 13%][0m
 test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_no_progress_distinguishes_failed_argument_variations_from_success [32mPASSED[0m[32m [ 14%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_parameterized_signatures_distinguish_read_file_pages [32mPASSED[0m[32m [ 15%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_parameterized_signatures_distinguish_read_file_pages [32mPASSED[0m[32m [ 14%][0m
 test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_patch_file_is_registered_for_execution [32mPASSED[0m[32m [ 15%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_read_file_can_be_reread_even_if_previous_result_is_in_history [32mPASSED[0m[32m [ 16%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_read_file_can_be_reread_even_if_previous_result_is_in_history [32mPASSED[0m[32m [ 15%][0m
 test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_read_file_schema_accepts_offset_and_limit [32mPASSED[0m[32m [ 16%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_read_file_supports_offset_limit_and_continuation [32mPASSED[0m[32m [ 17%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_repeated_read_file_executes_instead_of_synthetic_suppression [32mPASSED[0m[32m [ 17%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_repeated_successful_batch_resets_no_progress [32mPASSED[0m[32m [ 18%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_repeated_successful_tool_batch_does_not_stop_progress [32mPASSED[0m[32m [ 18%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_tool_argument_schema_checks_required_and_types [32mPASSED[0m[32m [ 19%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_tool_argument_schema_rejects_unknown_parameters [32mPASSED[0m[32m [ 19%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_tool_call_display_shows_pagination_parameters [32mPASSED[0m[32m [ 20%][0m
-test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_tool_result_is_bounded_and_keeps_both_ends [32mPASSED[0m[32m [ 20%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_read_file_supports_offset_limit_and_continuation [32mPASSED[0m[32m [ 16%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_repeated_read_file_executes_instead_of_synthetic_suppression [32mPASSED[0m[32m [ 16%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_repeated_successful_batch_resets_no_progress [32mPASSED[0m[32m [ 17%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_repeated_successful_tool_batch_does_not_stop_progress [32mPASSED[0m[32m [ 17%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_tool_argument_schema_checks_required_and_types [32mPASSED[0m[32m [ 18%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_tool_argument_schema_rejects_unknown_parameters [32mPASSED[0m[32m [ 18%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_tool_call_display_shows_pagination_parameters [32mPASSED[0m[32m [ 19%][0m
+test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_tool_result_is_bounded_and_keeps_both_ends [32mPASSED[0m[32m [ 19%][0m
 test/test_agent_safeguards.py::AgentSafeguardModuleTests::test_truncated_provider_response_stops_without_retry_loop [32mPASSED[0m[32m [ 20%][0m
-test/test_backup_management.py::BackupManagementTests::test_atomic_file_edit_creates_backup_under_shai [32mPASSED[0m[32m [ 21%][0m
-test/test_backup_management.py::BackupManagementTests::test_backup_config_is_project_local [32mPASSED[0m[32m [ 21%][0m
-test/test_backup_management.py::BackupManagementTests::test_backup_directory_is_nested_under_shai [32mPASSED[0m[32m [ 22%][0m
-test/test_backup_management.py::BackupManagementTests::test_cleanup_uses_project_local_retention_policy [32mPASSED[0m[32m [ 22%][0m
-test/test_backup_management.py::BackupManagementTests::test_disabled_cleanup_still_migrates_legacy_directory [32mPASSED[0m[32m [ 23%][0m
-test/test_backup_management.py::BackupManagementTests::test_legacy_backup_directory_is_migrated [32mPASSED[0m[32m [ 23%][0m
-test/test_backup_management.py::BackupManagementTests::test_missing_or_invalid_backup_config_uses_defaults [32mPASSED[0m[32m [ 24%][0m
-test/test_bounded_execution.py::BoundedOutputCaptureTests::test_large_command_output_is_bounded [32mPASSED[0m[32m [ 24%][0m
-test/test_bounded_execution.py::BoundedOutputCaptureTests::test_large_output_keeps_head_and_tail [32mPASSED[0m[32m [ 25%][0m
-test/test_bounded_execution.py::BoundedOutputCaptureTests::test_long_running_command_times_out [32mPASSED[0m[32m [ 25%][0m
-test/test_bounded_execution.py::BoundedOutputCaptureTests::test_small_output_is_preserved_exactly [32mPASSED[0m[32m [ 26%][0m
-test/test_bounded_execution.py::BoundedOutputCaptureTests::test_stderr_and_stdout_are_both_drained [32mPASSED[0m[32m [ 26%][0m
-test/test_chat.py::ChatTests::test_anthropic_response_extracts_text [32mPASSED[0m[32m [ 26%][0m
-test/test_chat.py::ChatTests::test_model_command_switches_provider_without_api_call [32mPASSED[0m[32m [ 27%][0m
-test/test_chat.py::ChatTests::test_provider_switch_keeps_text_and_removes_provider_specific_content [32mPASSED[0m[32m [ 27%][0m
-test/test_configuration.py::ConfigTests::test_tool_safeguards_invalid_boolean_flags [32mPASSED[0m[32m [ 28%][0m
-test/test_context_meter.py::ContextMeterTests::test_discloses_unknown_limit_instead_of_fabricating_percentage [32mPASSED[0m[32m [ 28%][0m
-test/test_context_meter.py::ContextMeterTests::test_does_not_guess_unknown_context_limit [32mPASSED[0m[32m [ 29%][0m
-test/test_context_meter.py::ContextMeterTests::test_estimates_nonempty_prompt [32mPASSED[0m[32m [ 29%][0m
-test/test_context_meter.py::ContextMeterTests::test_extracts_anthropic_usage [32mPASSED[0m[32m [ 30%][0m
-test/test_context_meter.py::ContextMeterTests::test_extracts_openai_usage [32mPASSED[0m[32m [ 30%][0m
-test/test_context_meter.py::ContextMeterTests::test_formats_percentage_when_limit_is_known [32mPASSED[0m[32m [ 31%][0m
-test/test_context_meter.py::ContextMeterTests::test_model_specific_override_takes_precedence_over_provider_metadata [32mPASSED[0m[32m [ 31%][0m
-test/test_context_meter.py::ContextMeterTests::test_reads_model_specific_context_limit [32mPASSED[0m[32m [ 32%][0m
-test/test_conversation_history.py::ConversationHistoryTests::test_clear_preserves_prompt_and_other_mode_history [32mPASSED[0m[32m [ 32%][0m
-test/test_conversation_history.py::ConversationHistoryTests::test_history_file_is_json_and_has_expected_path [32mPASSED[0m[32m [ 33%][0m
-test/test_conversation_history.py::ConversationHistoryTests::test_mode_histories_are_separate_and_preserved [32mPASSED[0m[32m [ 33%][0m
-test/test_conversation_history.py::ConversationHistoryTests::test_prompt_history_shared_and_deduplicated [32mPASSED[0m[32m [ 33%][0m
-test/test_engine_module_boundaries.py::EngineModuleBoundaryTests::test_all_domain_modules_import [32mPASSED[0m[32m [ 34%][0m
+test/test_backup_management.py::BackupManagementTests::test_atomic_file_edit_creates_backup_under_shai [32mPASSED[0m[32m [ 20%][0m
+test/test_backup_management.py::BackupManagementTests::test_backup_config_is_project_local [32mPASSED[0m[32m [ 20%][0m
+test/test_backup_management.py::BackupManagementTests::test_backup_directory_is_nested_under_shai [32mPASSED[0m[32m [ 21%][0m
+test/test_backup_management.py::BackupManagementTests::test_cleanup_uses_project_local_retention_policy [32mPASSED[0m[32m [ 21%][0m
+test/test_backup_management.py::BackupManagementTests::test_disabled_cleanup_still_migrates_legacy_directory [32mPASSED[0m[32m [ 22%][0m
+test/test_backup_management.py::BackupManagementTests::test_legacy_backup_directory_is_migrated [32mPASSED[0m[32m [ 22%][0m
+test/test_backup_management.py::BackupManagementTests::test_missing_or_invalid_backup_config_uses_defaults [32mPASSED[0m[32m [ 23%][0m
+test/test_bounded_execution.py::BoundedOutputCaptureTests::test_large_command_output_is_bounded [32mPASSED[0m[32m [ 23%][0m
+test/test_bounded_execution.py::BoundedOutputCaptureTests::test_large_output_keeps_head_and_tail [32mPASSED[0m[32m [ 24%][0m
+test/test_bounded_execution.py::BoundedOutputCaptureTests::test_long_running_command_times_out [32mPASSED[0m[32m [ 24%][0m
+test/test_bounded_execution.py::BoundedOutputCaptureTests::test_small_output_is_preserved_exactly [32mPASSED[0m[32m [ 25%][0m
+test/test_bounded_execution.py::BoundedOutputCaptureTests::test_stderr_and_stdout_are_both_drained [32mPASSED[0m[32m [ 25%][0m
+test/test_chat.py::ChatTests::test_anthropic_response_extracts_text [32mPASSED[0m[32m [ 25%][0m
+test/test_chat.py::ChatTests::test_model_command_switches_provider_without_api_call [32mPASSED[0m[32m [ 26%][0m
+test/test_chat.py::ChatTests::test_provider_switch_keeps_text_and_removes_provider_specific_content [32mPASSED[0m[32m [ 26%][0m
+test/test_configuration.py::ConfigTests::test_tool_safeguards_invalid_boolean_flags [32mPASSED[0m[32m [ 27%][0m
+test/test_context_meter.py::ContextMeterTests::test_discloses_unknown_limit_instead_of_fabricating_percentage [32mPASSED[0m[32m [ 27%][0m
+test/test_context_meter.py::ContextMeterTests::test_does_not_guess_unknown_context_limit [32mPASSED[0m[32m [ 28%][0m
+test/test_context_meter.py::ContextMeterTests::test_estimates_nonempty_prompt [32mPASSED[0m[32m [ 28%][0m
+test/test_context_meter.py::ContextMeterTests::test_extracts_anthropic_usage [32mPASSED[0m[32m [ 29%][0m
+test/test_context_meter.py::ContextMeterTests::test_extracts_openai_usage [32mPASSED[0m[32m [ 29%][0m
+test/test_context_meter.py::ContextMeterTests::test_formats_percentage_when_limit_is_known [32mPASSED[0m[32m [ 29%][0m
+test/test_context_meter.py::ContextMeterTests::test_model_specific_override_takes_precedence_over_provider_metadata [32mPASSED[0m[32m [ 30%][0m
+test/test_context_meter.py::ContextMeterTests::test_reads_model_specific_context_limit [32mPASSED[0m[32m [ 30%][0m
+test/test_conversation_history.py::ConversationHistoryTests::test_clear_preserves_prompt_and_other_mode_history [32mPASSED[0m[32m [ 31%][0m
+test/test_conversation_history.py::ConversationHistoryTests::test_history_file_is_json_and_has_expected_path [32mPASSED[0m[32m [ 31%][0m
+test/test_conversation_history.py::ConversationHistoryTests::test_mode_histories_are_separate_and_preserved [32mPASSED[0m[32m [ 32%][0m
+test/test_conversation_history.py::ConversationHistoryTests::test_prompt_history_shared_and_deduplicated [32mPASSED[0m[32m [ 32%][0m
+test/test_engine_module_boundaries.py::EngineModuleBoundaryTests::test_all_domain_modules_import [32mPASSED[0m[32m [ 33%][0m
 test/test_engine_module_boundaries.py::EngineModuleBoundaryTests::test_domain_source_is_not_left_in_runtime 
-test/test_engine_module_boundaries.py::EngineModuleBoundaryTests::test_domain_source_is_not_left_in_runtime [32mPASSED[0m[32m [ 34%][0m
-test/test_engine_module_boundaries.py::EngineModuleBoundaryTests::test_engine_runtime_remains_compatibility_surface [32mPASSED[0m[32m [ 35%][0m
+test/test_engine_module_boundaries.py::EngineModuleBoundaryTests::test_domain_source_is_not_left_in_runtime [32mPASSED[0m[32m [ 33%][0m
+test/test_engine_module_boundaries.py::EngineModuleBoundaryTests::test_engine_runtime_remains_compatibility_surface [32mPASSED[0m[32m [ 33%][0m
 test/test_engine_module_boundaries.py::EngineModuleBoundaryTests::test_runtime_installs_public_functions 
-test/test_engine_module_boundaries.py::EngineModuleBoundaryTests::test_runtime_installs_public_functions [32mPASSED[0m[32m [ 35%][0m
-test/test_file_change_display.py::FileChangeDisplayTests::test_settings_are_loaded_from_config [32mPASSED[0m[32m [ 36%][0m
-test/test_file_change_display.py::FileChangeDisplayTests::test_truncates_large_diff_and_preserves_head_tail [32mPASSED[0m[32m [ 36%][0m
-test/test_invalid_tool_recovery.py::InvalidToolCallDetectionTests::test_detects_nested_provider_error [32mPASSED[0m[32m [ 37%][0m
-test/test_invalid_tool_recovery.py::InvalidToolCallDetectionTests::test_does_not_misclassify_rate_limit [32mPASSED[0m[32m [ 37%][0m
-test/test_invalid_tool_recovery.py::InvalidToolCallDetectionTests::test_http_400_invalid_tool_error_is_classified [32mPASSED[0m[32m [ 38%][0m
-test/test_invalid_tool_recovery.py::RetryPolicyTests::test_http_400_is_not_retried_even_if_runtime_settings_include_it [32mPASSED[0m[32m [ 38%][0m
-test/test_invalid_tool_recovery.py::RetryPolicyTests::test_http_400_is_removed_from_configured_retry_statuses [32mPASSED[0m[32m [ 39%][0m
-test/test_invalid_tool_recovery.py::ConversationRepairTests::test_keeps_visible_text_and_drops_thinking_blocks [32mPASSED[0m[32m [ 39%][0m
-test/test_invalid_tool_recovery.py::ConversationRepairTests::test_outgoing_history_preserves_valid_tool_calls [32mPASSED[0m[32m [ 40%][0m
-test/test_invalid_tool_recovery.py::ConversationRepairTests::test_outgoing_history_sanitizes_cohere_thinking_even_without_recovery [32mPASSED[0m[32m [ 40%][0m
-test/test_invalid_tool_recovery.py::ConversationRepairTests::test_recovery_regenerates_with_repaired_history [32mPASSED[0m[32m [ 40%][0m
-test/test_invalid_tool_recovery.py::ConversationRepairTests::test_repairs_anthropic_tool_use_result_blocks [32mPASSED[0m[32m [ 41%][0m
-test/test_invalid_tool_recovery.py::ConversationRepairTests::test_repairs_cohere_thinking_block_with_empty_tool_calls [32mPASSED[0m[32m [ 41%][0m
-test/test_invalid_tool_recovery.py::ConversationRepairTests::test_repairs_openai_tool_exchange_and_preserves_request_and_result [32mPASSED[0m[32m [ 42%][0m
-test/test_invalid_tool_recovery.py::ConversationRepairTests::test_repeated_provider_rejection_stops_without_resending_same_history [32mPASSED[0m[32m [ 42%][0m
-test/test_live_status.py::LiveStatusTests::test_context_and_task_updates_do_not_interrupt_chat_output [32mPASSED[0m[32m [ 43%][0m
-test/test_live_status.py::LiveStatusTests::test_non_tty_does_not_emit_status_spam [32mPASSED[0m[32m [ 43%][0m
-test/test_live_status.py::LiveStatusTests::test_repeated_tool_calls_are_summarized_in_same_transient_line [32mPASSED[0m[32m [ 44%][0m
-test/test_live_status.py::LiveStatusTests::test_tool_batch_rewrites_one_transient_line [32mPASSED[0m[32m [ 44%][0m
-test/test_logging_config.py::LoggingConfigTests::test_default_log_location_is_under_shai_and_migrates_legacy_logs [32mPASSED[0m[32m [ 45%][0m
-test/test_logging_config.py::LoggingConfigTests::test_legacy_logs_config_value_resolves_under_shai [32mPASSED[0m[32m [ 45%][0m
-test/test_logging_config.py::LoggingConfigTests::test_newest_entries_are_at_top_and_per_run_files_retained [32mPASSED[0m[32m [ 46%][0m
-test/test_logging_config.py::LoggingConfigTests::test_retention_keeps_only_last_n_run_logs [32mPASSED[0m[32m [ 46%][0m
-test/test_modular_architecture.py::ModularArchitectureTests::test_command_aliases_preserve_arguments [32mPASSED[0m[32m [ 46%][0m
-test/test_modular_architecture.py::ModularArchitectureTests::test_command_help_is_externalized [32mPASSED[0m[32m [ 47%][0m
-test/test_modular_architecture.py::ModularArchitectureTests::test_legacy_entry_points_resolve_to_runtime_modules [32mPASSED[0m[32m [ 47%][0m
-test/test_modular_architecture.py::ModularArchitectureTests::test_spinner_is_a_ui_component [32mPASSED[0m[32m [ 48%][0m
-test/test_modular_architecture.py::ModularArchitectureTests::test_tool_dispatch_contains_split_tool_functions [32mPASSED[0m[32m [ 48%][0m
-test/test_modular_architecture.py::ModularArchitectureTests::test_tool_facade_exports_split_implementations [32mPASSED[0m[32m [ 49%][0m
-test/test_os_command.py::OSCommandTests::test_agent_registry_exposes_os_command [32mPASSED[0m[32m [ 49%][0m
-test/test_os_command.py::OSCommandTests::test_approval_preview_contains_complete_command [32mPASSED[0m[32m [ 50%][0m
-test/test_os_command.py::OSCommandTests::test_blacklist_cannot_be_overridden_by_whitelist [32mPASSED[0m[32m [ 50%][0m
-test/test_os_command.py::OSCommandTests::test_command_line_parser_does_not_evaluate_shell_syntax [32mPASSED[0m[32m [ 51%][0m
-test/test_os_command.py::OSCommandTests::test_config_cannot_raise_hard_timeout_ceiling [32mPASSED[0m[32m [ 51%][0m
-test/test_os_command.py::OSCommandTests::test_configuration_can_enable_unrestricted_git_commands [32mPASSED[0m[32m [ 52%][0m
-test/test_os_command.py::OSCommandTests::test_configuration_cannot_expand_python_modules [32mPASSED[0m[32m [ 52%][0m
-test/test_os_command.py::OSCommandTests::test_cwd_traversal_is_rejected [32mPASSED[0m[32m [ 53%][0m
-test/test_os_command.py::OSCommandTests::test_disabled_feature_rejects_execution [32mPASSED[0m[32m [ 53%][0m
-test/test_os_command.py::OSCommandTests::test_exact_command_whitelist_bypasses_positive_argument_rules [32mPASSED[0m[32m [ 53%][0m
-test/test_os_command.py::OSCommandTests::test_git_diff_directory_pathspec_is_rejected [32mPASSED[0m[32m [ 54%][0m
-test/test_os_command.py::OSCommandTests::test_git_diff_disables_external_diff_and_textconv [32mPASSED[0m[32m [ 54%][0m
-test/test_os_command.py::OSCommandTests::test_git_diff_rejects_wildcard_pathspecs [32mPASSED[0m[32m [ 55%][0m
-test/test_os_command.py::OSCommandTests::test_git_diff_without_summary_or_safe_path_is_rejected [32mPASSED[0m[32m [ 55%][0m
-test/test_os_command.py::OSCommandTests::test_git_log_accepts_last_ten_commits [32mPASSED[0m[32m [ 56%][0m
-test/test_os_command.py::OSCommandTests::test_git_log_accepts_safe_pretty_format [32mPASSED[0m[32m [ 56%][0m
+test/test_engine_module_boundaries.py::EngineModuleBoundaryTests::test_runtime_installs_public_functions [32mPASSED[0m[32m [ 34%][0m
+test/test_file_change_display.py::FileChangeDisplayTests::test_settings_are_loaded_from_config [32mPASSED[0m[32m [ 34%][0m
+test/test_file_change_display.py::FileChangeDisplayTests::test_truncates_large_diff_and_preserves_head_tail [32mPASSED[0m[32m [ 35%][0m
+test/test_invalid_tool_recovery.py::InvalidToolCallDetectionTests::test_detects_nested_provider_error [32mPASSED[0m[32m [ 35%][0m
+test/test_invalid_tool_recovery.py::InvalidToolCallDetectionTests::test_does_not_misclassify_rate_limit [32mPASSED[0m[32m [ 36%][0m
+test/test_invalid_tool_recovery.py::InvalidToolCallDetectionTests::test_http_400_invalid_tool_error_is_classified [32mPASSED[0m[32m [ 36%][0m
+test/test_invalid_tool_recovery.py::RetryPolicyTests::test_http_400_is_not_retried_even_if_runtime_settings_include_it [32mPASSED[0m[32m [ 37%][0m
+test/test_invalid_tool_recovery.py::RetryPolicyTests::test_http_400_is_removed_from_configured_retry_statuses [32mPASSED[0m[32m [ 37%][0m
+test/test_invalid_tool_recovery.py::ConversationRepairTests::test_keeps_visible_text_and_drops_thinking_blocks [32mPASSED[0m[32m [ 37%][0m
+test/test_invalid_tool_recovery.py::ConversationRepairTests::test_outgoing_history_preserves_valid_tool_calls [32mPASSED[0m[32m [ 38%][0m
+test/test_invalid_tool_recovery.py::ConversationRepairTests::test_outgoing_history_sanitizes_cohere_thinking_even_without_recovery [32mPASSED[0m[32m [ 38%][0m
+test/test_invalid_tool_recovery.py::ConversationRepairTests::test_recovery_regenerates_with_repaired_history [32mPASSED[0m[32m [ 39%][0m
+test/test_invalid_tool_recovery.py::ConversationRepairTests::test_repairs_anthropic_tool_use_result_blocks [32mPASSED[0m[32m [ 39%][0m
+test/test_invalid_tool_recovery.py::ConversationRepairTests::test_repairs_cohere_thinking_block_with_empty_tool_calls [32mPASSED[0m[32m [ 40%][0m
+test/test_invalid_tool_recovery.py::ConversationRepairTests::test_repairs_openai_tool_exchange_and_preserves_request_and_result [32mPASSED[0m[32m [ 40%][0m
+test/test_invalid_tool_recovery.py::ConversationRepairTests::test_repeated_provider_rejection_stops_without_resending_same_history [32mPASSED[0m[32m [ 41%][0m
+test/test_live_status.py::LiveStatusTests::test_context_and_task_updates_do_not_interrupt_chat_output [32mPASSED[0m[32m [ 41%][0m
+test/test_live_status.py::LiveStatusTests::test_non_tty_does_not_emit_status_spam [32mPASSED[0m[32m [ 41%][0m
+test/test_live_status.py::LiveStatusTests::test_repeated_tool_calls_are_summarized_in_same_transient_line [32mPASSED[0m[32m [ 42%][0m
+test/test_live_status.py::LiveStatusTests::test_tool_batch_rewrites_one_transient_line [32mPASSED[0m[32m [ 42%][0m
+test/test_logging_config.py::LoggingConfigTests::test_default_log_location_is_under_shai_and_migrates_legacy_logs [32mPASSED[0m[32m [ 43%][0m
+test/test_logging_config.py::LoggingConfigTests::test_legacy_logs_config_value_resolves_under_shai [32mPASSED[0m[32m [ 43%][0m
+test/test_logging_config.py::LoggingConfigTests::test_newest_entries_are_at_top_and_per_run_files_retained [32mPASSED[0m[32m [ 44%][0m
+test/test_logging_config.py::LoggingConfigTests::test_retention_keeps_only_last_n_run_logs [32mPASSED[0m[32m [ 44%][0m
+test/test_model_routing.py::ModelRoutingTests::test_all_supported_roles_have_unconfigured_template_entries [32mPASSED[0m[32m [ 45%][0m
+test/test_model_routing.py::ModelRoutingTests::test_discovery_is_cached_per_project_and_provider [32mPASSED[0m[32m [ 45%][0m
+test/test_model_routing.py::ModelRoutingTests::test_invalid_project_version_does_not_enable_routes [32mPASSED[0m[32m [ 45%][0m
+test/test_model_routing.py::ModelRoutingTests::test_malformed_candidates_are_skipped_individually [32mPASSED[0m[32m [ 46%][0m
+test/test_model_routing.py::ModelRoutingTests::test_priority_and_availability_choose_first_available_candidate [32mPASSED[0m[32m [ 46%][0m
+test/test_model_routing.py::ModelRoutingTests::test_project_routes_override_template_by_role_only [32mPASSED[0m[32m [ 47%][0m
+test/test_model_routing.py::ModelRoutingTests::test_project_routing_file_is_gitignored_and_template_is_tracked [32mPASSED[0m[32m [ 47%][0m
+test/test_model_routing.py::ModelRoutingTests::test_unavailable_or_invalid_candidate_uses_default [32mPASSED[0m[32m [ 48%][0m
+test/test_model_routing.py::ModelRoutingTests::test_unknown_role_uses_default [32mPASSED[0m[32m [ 48%][0m
+test/test_modular_architecture.py::ModularArchitectureTests::test_command_aliases_preserve_arguments [32mPASSED[0m[32m [ 49%][0m
+test/test_modular_architecture.py::ModularArchitectureTests::test_command_help_is_externalized [32mPASSED[0m[32m [ 49%][0m
+test/test_modular_architecture.py::ModularArchitectureTests::test_legacy_entry_points_resolve_to_runtime_modules [32mPASSED[0m[32m [ 50%][0m
+test/test_modular_architecture.py::ModularArchitectureTests::test_spinner_is_a_ui_component [32mPASSED[0m[32m [ 50%][0m
+test/test_modular_architecture.py::ModularArchitectureTests::test_tool_dispatch_contains_split_tool_functions [32mPASSED[0m[32m [ 50%][0m
+test/test_modular_architecture.py::ModularArchitectureTests::test_tool_facade_exports_split_implementations [32mPASSED[0m[32m [ 51%][0m
+test/test_os_command.py::OSCommandTests::test_agent_registry_exposes_os_command [32mPASSED[0m[32m [ 51%][0m
+test/test_os_command.py::OSCommandTests::test_approval_preview_contains_complete_command [32mPASSED[0m[32m [ 52%][0m
+test/test_os_command.py::OSCommandTests::test_blacklist_cannot_be_overridden_by_whitelist [32mPASSED[0m[32m [ 52%][0m
+test/test_os_command.py::OSCommandTests::test_command_line_parser_does_not_evaluate_shell_syntax [32mPASSED[0m[32m [ 53%][0m
+test/test_os_command.py::OSCommandTests::test_config_cannot_raise_hard_timeout_ceiling [32mPASSED[0m[32m [ 53%][0m
+test/test_os_command.py::OSCommandTests::test_configuration_can_enable_unrestricted_git_commands [32mPASSED[0m[32m [ 54%][0m
+test/test_os_command.py::OSCommandTests::test_configuration_cannot_expand_python_modules [32mPASSED[0m[32m [ 54%][0m
+test/test_os_command.py::OSCommandTests::test_cwd_traversal_is_rejected [32mPASSED[0m[32m [ 54%][0m
+test/test_os_command.py::OSCommandTests::test_disabled_feature_rejects_execution [32mPASSED[0m[32m [ 55%][0m
+test/test_os_command.py::OSCommandTests::test_exact_command_whitelist_bypasses_positive_argument_rules [32mPASSED[0m[32m [ 55%][0m
+test/test_os_command.py::OSCommandTests::test_git_diff_directory_pathspec_is_rejected [32mPASSED[0m[32m [ 56%][0m
+test/test_os_command.py::OSCommandTests::test_git_diff_disables_external_diff_and_textconv [32mPASSED[0m[32m [ 56%][0m
+test/test_os_command.py::OSCommandTests::test_git_diff_rejects_wildcard_pathspecs [32mPASSED[0m[32m [ 57%][0m
+test/test_os_command.py::OSCommandTests::test_git_diff_without_summary_or_safe_path_is_rejected [32mPASSED[0m[32m [ 57%][0m
+test/test_os_command.py::OSCommandTests::test_git_log_accepts_last_ten_commits [32mPASSED[0m[32m [ 58%][0m
+test/test_os_command.py::OSCommandTests::test_git_log_accepts_safe_pretty_format [32mPASSED[0m[32m [ 58%][0m
 test/test_os_command.py::OSCommandTests::test_git_log_accepts_short_and_fuller_formats 
-test/test_os_command.py::OSCommandTests::test_git_log_accepts_short_and_fuller_formats [32mPASSED[0m[32m [ 57%][0m
-test/test_os_command.py::OSCommandTests::test_git_log_rejects_unbounded_or_unsafe_options [32mPASSED[0m[32m [ 57%][0m
-test/test_os_command.py::OSCommandTests::test_git_mutation_is_rejected [32mPASSED[0m[32m [ 58%][0m
-test/test_os_command.py::OSCommandTests::test_git_pathspec_symlink_to_secret_is_rejected [32mPASSED[0m[32m [ 58%][0m
-test/test_os_command.py::OSCommandTests::test_git_read_only_command_uses_argument_vector_and_bounded_runner [32mPASSED[0m[32m [ 59%][0m
-test/test_os_command.py::OSCommandTests::test_git_show_requires_summary_mode [32mPASSED[0m[32m [ 59%][0m
-test/test_os_command.py::OSCommandTests::test_path_traversal_is_rejected [32mPASSED[0m[32m [ 60%][0m
-test/test_os_command.py::OSCommandTests::test_python_script_execution_is_rejected [32mPASSED[0m[32m [ 60%][0m
-test/test_os_command.py::OSCommandTests::test_python_test_command_requires_approval [32mPASSED[0m[32m [ 60%][0m
-test/test_os_command.py::OSCommandTests::test_restricted_git_policy_is_configuration_driven [32mPASSED[0m[32m [ 61%][0m
-test/test_os_command.py::OSCommandTests::test_subcommand_whitelist_bypasses_positive_argument_rules [32mPASSED[0m[32m [ 61%][0m
-test/test_os_command.py::OSCommandTests::test_unittest_module_name_execution_is_rejected [32mPASSED[0m[32m [ 62%][0m
-test/test_os_command.py::OSCommandTests::test_unknown_executable_is_rejected [32mPASSED[0m[32m [ 62%][0m
-test/test_os_command.py::OSCommandTests::test_unrestricted_git_allows_unlisted_subcommands_and_options [32mPASSED[0m[32m [ 63%][0m
-test/test_os_command.py::OSCommandTests::test_unrestricted_git_still_applies_forbidden_argument_patterns [32mPASSED[0m[32m [ 63%][0m
-test/test_os_command.py::OSCommandTests::test_unrestricted_git_still_blocks_blacklisted_subcommands [32mPASSED[0m[32m [ 64%][0m
-test/test_os_command.py::OSCommandTests::test_unrestricted_git_still_blocks_forbidden_options [32mPASSED[0m[32m [ 64%][0m
-test/test_priority_tools.py::PriorityToolTests::test_find_symbol_and_references [32mPASSED[0m[32m [ 65%][0m
-test/test_priority_tools.py::PriorityToolTests::test_get_file_outline_lists_functions_and_methods [32mPASSED[0m[32m [ 65%][0m
-test/test_priority_tools.py::PriorityToolTests::test_get_project_map_and_test_map [32mPASSED[0m[32m [ 66%][0m
-test/test_priority_tools.py::PriorityToolTests::test_inspect_test_failure_extracts_assertion [32mPASSED[0m[32m [ 66%][0m
-test/test_priority_tools.py::PriorityToolTests::test_patch_failure_recommends_replace_lines [32mPASSED[0m[32m [ 66%][0m
-test/test_priority_tools.py::PriorityToolTests::test_patch_mismatch_is_a_tool_error_and_stops_repeated_retry [32mPASSED[0m[32m [ 67%][0m
-test/test_priority_tools.py::PriorityToolTests::test_priority_tools_are_registered_and_have_schemas [32mPASSED[0m[32m [ 67%][0m
-test/test_priority_tools.py::PriorityToolTests::test_replace_lines_uses_line_numbers_and_approval [32mPASSED[0m[32m [ 68%][0m
-test/test_priority_tools.py::PriorityToolTests::test_update_task_plan_validates_and_formats [32mPASSED[0m[32m [ 68%][0m
-test/test_priority_tools.py::PriorityToolTests::test_verify_changes_runs_compile_and_unittest [32mPASSED[0m[32m [ 69%][0m
+test/test_os_command.py::OSCommandTests::test_git_log_accepts_short_and_fuller_formats [32mPASSED[0m[32m [ 58%][0m
+test/test_os_command.py::OSCommandTests::test_git_log_rejects_unbounded_or_unsafe_options [32mPASSED[0m[32m [ 59%][0m
+test/test_os_command.py::OSCommandTests::test_git_mutation_is_rejected [32mPASSED[0m[32m [ 59%][0m
+test/test_os_command.py::OSCommandTests::test_git_pathspec_symlink_to_secret_is_rejected [32mPASSED[0m[32m [ 60%][0m
+test/test_os_command.py::OSCommandTests::test_git_read_only_command_uses_argument_vector_and_bounded_runner [32mPASSED[0m[32m [ 60%][0m
+test/test_os_command.py::OSCommandTests::test_git_show_requires_summary_mode [32mPASSED[0m[32m [ 61%][0m
+test/test_os_command.py::OSCommandTests::test_path_traversal_is_rejected [32mPASSED[0m[32m [ 61%][0m
+test/test_os_command.py::OSCommandTests::test_python_script_execution_is_rejected [32mPASSED[0m[32m [ 62%][0m
+test/test_os_command.py::OSCommandTests::test_python_test_command_requires_approval [32mPASSED[0m[32m [ 62%][0m
+test/test_os_command.py::OSCommandTests::test_restricted_git_policy_is_configuration_driven [32mPASSED[0m[32m [ 62%][0m
+test/test_os_command.py::OSCommandTests::test_subcommand_whitelist_bypasses_positive_argument_rules [32mPASSED[0m[32m [ 63%][0m
+test/test_os_command.py::OSCommandTests::test_unittest_module_name_execution_is_rejected [32mPASSED[0m[32m [ 63%][0m
+test/test_os_command.py::OSCommandTests::test_unknown_executable_is_rejected [32mPASSED[0m[32m [ 64%][0m
+test/test_os_command.py::OSCommandTests::test_unrestricted_git_allows_unlisted_subcommands_and_options [32mPASSED[0m[32m [ 64%][0m
+test/test_os_command.py::OSCommandTests::test_unrestricted_git_still_applies_forbidden_argument_patterns [32mPASSED[0m[32m [ 65%][0m
+test/test_os_command.py::OSCommandTests::test_unrestricted_git_still_blocks_blacklisted_subcommands [32mPASSED[0m[32m [ 65%][0m
+test/test_os_command.py::OSCommandTests::test_unrestricted_git_still_blocks_forbidden_options [32mPASSED[0m[32m [ 66%][0m
+test/test_priority_tools.py::PriorityToolTests::test_find_symbol_and_references [32mPASSED[0m[32m [ 66%][0m
+test/test_priority_tools.py::PriorityToolTests::test_get_file_outline_lists_functions_and_methods [32mPASSED[0m[32m [ 66%][0m
+test/test_priority_tools.py::PriorityToolTests::test_get_project_map_and_test_map [32mPASSED[0m[32m [ 67%][0m
+test/test_priority_tools.py::PriorityToolTests::test_inspect_test_failure_extracts_assertion [32mPASSED[0m[32m [ 67%][0m
+test/test_priority_tools.py::PriorityToolTests::test_patch_failure_recommends_replace_lines [32mPASSED[0m[32m [ 68%][0m
+test/test_priority_tools.py::PriorityToolTests::test_patch_mismatch_is_a_tool_error_and_stops_repeated_retry [32mPASSED[0m[32m [ 68%][0m
+test/test_priority_tools.py::PriorityToolTests::test_priority_tools_are_registered_and_have_schemas [32mPASSED[0m[32m [ 69%][0m
+test/test_priority_tools.py::PriorityToolTests::test_replace_lines_uses_line_numbers_and_approval [32mPASSED[0m[32m [ 69%][0m
+test/test_priority_tools.py::PriorityToolTests::test_update_task_plan_validates_and_formats [32mPASSED[0m[32m [ 70%][0m
+test/test_priority_tools.py::PriorityToolTests::test_verify_changes_runs_compile_and_unittest [32mPASSED[0m[32m [ 70%][0m
 test/test_project_access_control.py::ProjectAccessControlTests::test_absolute_and_parent_paths_are_rejected 
-test/test_project_access_control.py::ProjectAccessControlTests::test_absolute_and_parent_paths_are_rejected [32mPASSED[0m[32m [ 69%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_agent_runtime_prompts_and_persists_on_explicit_block [32mPASSED[0m[32m [ 70%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_agent_runtime_read_and_explicit_folder_access_are_gated [32mPASSED[0m[32m [ 70%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_agent_runtime_recursive_listing_prunes_denied_directories [32mPASSED[0m[32m [ 71%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_all_grant_authorizes_every_supported_capability [32mPASSED[0m[32m [ 71%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_compact_delete_bit_is_independent [32mPASSED[0m[32m [ 72%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_compact_rwx_permissions_and_delete_bit [32mPASSED[0m[32m [ 72%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_default_policy_and_rule_deny [32mPASSED[0m[32m [ 73%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_edit_and_truncate_are_independent_permissions [32mPASSED[0m[32m [ 73%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_exact_folder_grant_covers_descendants [32mPASSED[0m[32m [ 73%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_execute_permission_is_enforced_by_os_command [32mPASSED[0m[32m [ 74%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_existing_file_write_also_requires_read_for_safe_diff [32mPASSED[0m[32m [ 74%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_explicit_deny_overrides_broad_allow [32mPASSED[0m[32m [ 75%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_generic_explicit_deny_wins_even_when_broader_allow_is_later [32mPASSED[0m[32m [ 75%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_generic_policy_uses_dedicated_config_file [32mPASSED[0m[32m [ 76%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_glob_rule_applies_to_directory_and_descendants [32mPASSED[0m[32m [ 76%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_grant_without_requested_capability_is_not_persisted [32mPASSED[0m[32m [ 77%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_interactive_deny_does_not_persist [32mPASSED[0m[32m [ 77%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_interactive_grant_for_exact_file_and_requested_capability [32mPASSED[0m[32m [ 78%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_interactive_level_two_parent_grant [32mPASSED[0m[32m [ 78%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_absolute_and_parent_paths_are_rejected [32mPASSED[0m[32m [ 70%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_agent_runtime_prompts_and_persists_on_explicit_block [32mPASSED[0m[32m [ 71%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_agent_runtime_read_and_explicit_folder_access_are_gated [32mPASSED[0m[32m [ 71%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_agent_runtime_recursive_listing_prunes_denied_directories [32mPASSED[0m[32m [ 72%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_all_grant_authorizes_every_supported_capability [32mPASSED[0m[32m [ 72%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_compact_delete_bit_is_independent [32mPASSED[0m[32m [ 73%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_compact_rwx_permissions_and_delete_bit [32mPASSED[0m[32m [ 73%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_default_policy_and_rule_deny [32mPASSED[0m[32m [ 74%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_edit_and_truncate_are_independent_permissions [32mPASSED[0m[32m [ 74%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_exact_folder_grant_covers_descendants [32mPASSED[0m[32m [ 75%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_execute_permission_is_enforced_by_os_command [32mPASSED[0m[32m [ 75%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_existing_file_write_also_requires_read_for_safe_diff [32mPASSED[0m[32m [ 75%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_explicit_deny_overrides_broad_allow [32mPASSED[0m[32m [ 76%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_generic_explicit_deny_wins_even_when_broader_allow_is_later [32mPASSED[0m[32m [ 76%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_generic_policy_uses_dedicated_config_file [32mPASSED[0m[32m [ 77%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_glob_rule_applies_to_directory_and_descendants [32mPASSED[0m[32m [ 77%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_grant_without_requested_capability_is_not_persisted [32mPASSED[0m[32m [ 78%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_interactive_deny_does_not_persist [32mPASSED[0m[32m [ 78%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_interactive_grant_for_exact_file_and_requested_capability [32mPASSED[0m[32m [ 79%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_interactive_level_two_parent_grant [32mPASSED[0m[32m [ 79%][0m
 test/test_project_access_control.py::ProjectAccessControlTests::test_interactive_parent_grant_and_write_permissions [32mPASSED[0m[32m [ 79%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_invalid_config_falls_back_to_safe_defaults [32mPASSED[0m[32m [ 79%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_invalid_config_falls_back_to_safe_defaults [32mPASSED[0m[32m [ 80%][0m
 test/test_project_access_control.py::ProjectAccessControlTests::test_level_two_parent_at_project_root_covers_project [32mPASSED[0m[32m [ 80%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_listing_hides_denied_descendants [32mPASSED[0m[32m [ 80%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_non_interactive_denial_never_prompts [32mPASSED[0m[32m [ 80%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_os_command_requires_execute_for_pytest_target [32mPASSED[0m[32m [ 81%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_permission_validation_and_diagnostic [32mPASSED[0m[32m [ 81%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_project_grants_are_isolated_per_project [32mPASSED[0m[32m [ 82%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_read_denied [32mPASSED[0m[32m [ 82%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_listing_hides_denied_descendants [32mPASSED[0m[32m [ 81%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_non_interactive_denial_never_prompts [32mPASSED[0m[32m [ 81%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_os_command_requires_execute_for_pytest_target [32mPASSED[0m[32m [ 82%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_permission_validation_and_diagnostic [32mPASSED[0m[32m [ 82%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_project_grants_are_isolated_per_project [32mPASSED[0m[32m [ 83%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_read_denied [32mPASSED[0m[32m [ 83%][0m
 test/test_project_access_control.py::ProjectAccessControlTests::test_search_prunes_denied_directories [32mPASSED[0m[32m [ 83%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_single_star_does_not_cross_directory_boundary [32mPASSED[0m[32m [ 83%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_single_star_does_not_cross_directory_boundary [32mPASSED[0m[32m [ 84%][0m
 test/test_project_access_control.py::ProjectAccessControlTests::test_symlink_escape_is_rejected [32mPASSED[0m[32m [ 84%][0m
-test/test_project_access_control.py::ProjectAccessControlTests::test_test_runner_never_falls_through_to_stdin [32mPASSED[0m[32m [ 84%][0m
+test/test_project_access_control.py::ProjectAccessControlTests::test_test_runner_never_falls_through_to_stdin [32mPASSED[0m[32m [ 85%][0m
 test/test_project_access_control.py::ProjectAccessControlTests::test_unknown_permission_rejected [32mPASSED[0m[32m [ 85%][0m
-test/test_provider_selection.py::ProviderSelectionTests::test_kilo_free_only_returns_free_models [32mPASSED[0m[32m [ 85%][0m
+test/test_provider_selection.py::ProviderSelectionTests::test_kilo_free_only_returns_free_models [32mPASSED[0m[32m [ 86%][0m
 test/test_provider_selection.py::ProviderSelectionTests::test_kilo_hides_free_models_but_kilo_free_keeps_them [32mPASSED[0m[32m [ 86%][0m
-test/test_provider_selection.py::ProviderSelectionTests::test_model_context_window_metadata_is_captured_and_saved [32mPASSED[0m[32m [ 86%][0m
-test/test_provider_selection.py::ProviderSelectionTests::test_ollama_is_keyless_and_reads_local_tags [32mPASSED[0m[32m [ 86%][0m
+test/test_provider_selection.py::ProviderSelectionTests::test_model_context_window_metadata_is_captured_and_saved [32mPASSED[0m[32m [ 87%][0m
+test/test_provider_selection.py::ProviderSelectionTests::test_ollama_is_keyless_and_reads_local_tags [32mPASSED[0m[32m [ 87%][0m
 test/test_provider_selection.py::ProviderSelectionTests::test_provider_endpoints_and_auth_are_configurable [32mPASSED[0m[32m [ 87%][0m
-test/test_provider_selection.py::ProviderSelectionTests::test_provider_zero_reuses_saved_provider_and_model [32mPASSED[0m[32m [ 87%][0m
+test/test_provider_selection.py::ProviderSelectionTests::test_provider_zero_reuses_saved_provider_and_model [32mPASSED[0m[32m [ 88%][0m
 test/test_provider_selection.py::ProviderSelectionTests::test_query_auth_url_is_configurable [32mPASSED[0m[32m [ 88%][0m
-test/test_provider_selection.py::ProviderSelectionTests::test_save_provider_preserves_other_configuration [32mPASSED[0m[32m [ 88%][0m
+test/test_provider_selection.py::ProviderSelectionTests::test_save_provider_preserves_other_configuration [32mPASSED[0m[32m [ 89%][0m
 test/test_provider_selection.py::ProviderSelectionTests::test_saved_model_context_override_is_preserved_and_preferred [32mPASSED[0m[32m [ 89%][0m
-test/test_reasoning_handlers.py::ReasoningHandlerTests::test_anthropic_does_not_expose_thinking_block [32mPASSED[0m[32m [ 89%][0m
+test/test_reasoning_handlers.py::ReasoningHandlerTests::test_anthropic_does_not_expose_thinking_block [32mPASSED[0m[32m [ 90%][0m
 test/test_reasoning_handlers.py::ReasoningHandlerTests::test_anthropic_explicit_summary_is_extracted [32mPASSED[0m[32m [ 90%][0m
-test/test_reasoning_handlers.py::ReasoningHandlerTests::test_display_uses_separate_thinking_summary_section [32mPASSED[0m[32m [ 90%][0m
+test/test_reasoning_handlers.py::ReasoningHandlerTests::test_display_uses_separate_thinking_summary_section [32mPASSED[0m[32m [ 91%][0m
 test/test_reasoning_handlers.py::ReasoningHandlerTests::test_gemini_summary_field_is_extracted [32mPASSED[0m[32m [ 91%][0m
 test/test_reasoning_handlers.py::ReasoningHandlerTests::test_kilo_extracts_explicit_summary_block [32mPASSED[0m[32m [ 91%][0m
 test/test_reasoning_handlers.py::ReasoningHandlerTests::test_openrouter_does_not_expose_raw_reasoning [32mPASSED[0m[32m [ 92%][0m
@@ -461,10 +479,10 @@ test/test_reasoning_handlers.py::ReasoningHandlerTests::test_provider_summary_is
 test/test_reasoning_handlers.py::ReasoningHandlerTests::test_unknown_provider_is_safe [32mPASSED[0m[32m [ 93%][0m
 test/test_shai_command.py::ShaiCommandTests::test_ambiguous_or_argument_requiring_requests_are_not_guessed 
 test/test_shai_command.py::ShaiCommandTests::test_ambiguous_or_argument_requiring_requests_are_not_guessed [32mPASSED[0m[32m [ 93%][0m
-test/test_shai_command.py::ShaiCommandTests::test_chat_status_is_mode_specific [32mPASSED[0m[32m [ 93%][0m
+test/test_shai_command.py::ShaiCommandTests::test_chat_status_is_mode_specific [32mPASSED[0m[32m [ 94%][0m
 test/test_shai_command.py::ShaiCommandTests::test_clear_agent_commands 
 test/test_shai_command.py::ShaiCommandTests::test_clear_agent_commands [32mPASSED[0m[32m [ 94%][0m
-test/test_shai_command.py::ShaiCommandTests::test_commands_are_restricted_by_mode [32mPASSED[0m[32m [ 94%][0m
+test/test_shai_command.py::ShaiCommandTests::test_commands_are_restricted_by_mode [32mPASSED[0m[32m [ 95%][0m
 test/test_shai_command.py::ShaiCommandTests::test_exec_is_canonical_and_os_command_is_legacy_alias [32mPASSED[0m[32m [ 95%][0m
 test/test_shai_command.py::ShaiCommandTests::test_negated_and_meta_requests_do_not_trigger 
 test/test_shai_command.py::ShaiCommandTests::test_negated_and_meta_requests_do_not_trigger [32mPASSED[0m[32m [ 95%][0m
@@ -478,8 +496,8 @@ test/test_tool_registry.py::ToolRegistryTests::test_registry_has_unique_named_to
 test/test_tools_module.py::SharedToolsModuleTests::test_read_only_dispatch_and_schemas_are_shared [32mPASSED[0m[32m [ 99%][0m
 test/test_tools_module.py::SharedToolsModuleTests::test_root_configuration_and_safe_path [32mPASSED[0m[32m [100%][0m
 
-- generated xml file: /mnt/data/shai_context_override_work/test/test_report_pytest.xml -
-[32m=================== [32m[1m215 passed[0m, [32m[1m35 subtests passed[0m[32m in 0.89s[0m[32m ====================[0m
+- generated xml file: /mnt/data/shai_model_routing_work/test/test_report_pytest.xml -
+[32m=================== [32m[1m224 passed[0m, [32m[1m35 subtests passed[0m[32m in 0.77s[0m[32m ====================[0m
 
 SYNTAX COMPILATION
 ------------------------------------------------------------------------

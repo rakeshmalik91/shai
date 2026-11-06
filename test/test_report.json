@@ -1,12 +1,12 @@
 {
   "status": "passed",
-  "started_at": "2026-11-06T03:36:14.969616+00:00",
-  "finished_at": "2026-11-06T03:36:26.200164+00:00",
-  "duration_seconds": 11.23,
+  "started_at": "2026-11-06T03:44:03.689496+00:00",
+  "finished_at": "2026-11-06T03:44:13.920583+00:00",
+  "duration_seconds": 10.23,
   "python_version": "3.13.5",
   "unittest": {
     "success": true,
-    "tests_run": 215,
+    "tests_run": 224,
     "failures": 0,
     "errors": 0,
     "skipped": 0,
@@ -409,6 +409,42 @@
       },
       {
         "test": "test_retention_keeps_only_last_n_run_logs (test.test_logging_config.LoggingConfigTests.test_retention_keeps_only_last_n_run_logs)",
+        "status": "passed"
+      },
+      {
+        "test": "test_all_supported_roles_have_unconfigured_template_entries (test.test_model_routing.ModelRoutingTests.test_all_supported_roles_have_unconfigured_template_entries)",
+        "status": "passed"
+      },
+      {
+        "test": "test_discovery_is_cached_per_project_and_provider (test.test_model_routing.ModelRoutingTests.test_discovery_is_cached_per_project_and_provider)",
+        "status": "passed"
+      },
+      {
+        "test": "test_invalid_project_version_does_not_enable_routes (test.test_model_routing.ModelRoutingTests.test_invalid_project_version_does_not_enable_routes)",
+        "status": "passed"
+      },
+      {
+        "test": "test_malformed_candidates_are_skipped_individually (test.test_model_routing.ModelRoutingTests.test_malformed_candidates_are_skipped_individually)",
+        "status": "passed"
+      },
+      {
+        "test": "test_priority_and_availability_choose_first_available_candidate (test.test_model_routing.ModelRoutingTests.test_priority_and_availability_choose_first_available_candidate)",
+        "status": "passed"
+      },
+      {
+        "test": "test_project_routes_override_template_by_role_only (test.test_model_routing.ModelRoutingTests.test_project_routes_override_template_by_role_only)",
+        "status": "passed"
+      },
+      {
+        "test": "test_project_routing_file_is_gitignored_and_template_is_tracked (test.test_model_routing.ModelRoutingTests.test_project_routing_file_is_gitignored_and_template_is_tracked)",
+        "status": "passed"
+      },
+      {
+        "test": "test_unavailable_or_invalid_candidate_uses_default (test.test_model_routing.ModelRoutingTests.test_unavailable_or_invalid_candidate_uses_default)",
+        "status": "passed"
+      },
+      {
+        "test": "test_unknown_role_uses_default (test.test_model_routing.ModelRoutingTests.test_unknown_role_uses_default)",
         "status": "passed"
       },
       {

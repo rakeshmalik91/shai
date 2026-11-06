@@ -30,6 +30,7 @@ This document provides a complete overview of the Shai project structure, includ
 ├── assets/shai_config.json         # Core runtime configuration
 ├── assets/project_access_config.json # Generic project path access policy
 ├── assets/provider_config.json    # Provider overrides
+├── assets/model_routing.json      # Tracked model-routing template
 ├── assets/command_config.json     # Command and execution configuration
 └── test/                     # Unit tests
 ```
@@ -53,6 +54,7 @@ This document provides a complete overview of the Shai project structure, includ
 | `file_change_display.py` | Bounded diff previews |
 | `logging_config.py` | Run-based logs, retention, console settings, API payload redaction |
 | `provider_selection.py` | Provider definitions, API keys, model discovery, selection, persistence |
+| `model_routing.py` | Project-specific task-role routing, priority resolution and availability cache |
 | `reasoning_handlers/` | Provider-specific reasoning summary extraction |
 | `terminal_style.py` | Terminal styling utilities |
 | `tools/` | Shared read-only project inspection tools used by Agent mode |
@@ -182,6 +184,7 @@ agent.py
 ├── modules/commands/registry.py
 ├── modules/tools/ (shared read-only tools)
 ├── modules/provider_selection.py
+├── modules/model_routing.py
 ├── modules/conversation_history.py
 ├── modules/agent_safeguards.py
 ├── modules/logging_config.py
@@ -194,6 +197,7 @@ chat.py
 ├── modules/ui/chat_runtime.py
 ├── modules/tools/ (shared read-only tools)
 ├── modules/provider_selection.py
+├── modules/model_routing.py
 ├── modules/conversation_history.py
 ├── modules/agent_safeguards.py
 ├── modules/logging_config.py
@@ -234,3 +238,8 @@ blocks ask for the exact file/folder, parent, or level-2 parent scope and the
 compact permission bits: `r` read, `w` write (including truncate), `x` execute,
 `d` delete, or `a` for all (for example, `rwx`). Tests never prompt through
 stdin. See `docs/CONFIGURATION.md`.
+
+
+Project-specific model routes live in `.Shai/model_routing.json`. The
+`.Shai/` directory is Git-ignored; `assets/model_routing.json` is the
+version-controlled template with all supported roles initially unconfigured.

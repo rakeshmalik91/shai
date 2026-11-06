@@ -228,11 +228,16 @@ __marimo__/
 
 setup_keys.sh
 .setup_keys.sh
+
+# Ignore all project-specific Shai state by default.
+.shai/
+
+# Allow the directory and selected configuration files.
+!.shai/
 .shai/*
 !.shai/project_access.json
+!.shai/model_routing.json
 
-.shai_backup
-.shai_backups
 .backup
 .backups
 *.backup

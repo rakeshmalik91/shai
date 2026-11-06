@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "models": {
+    "orchestrator": [
+    ],
+    "planner": [
+    ],
+    "code": [
+      {
+        "provider": "kilo-free",
+        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "priority": 1
+      },
+      {
+        "provider": "kilo-free",
+        "model": "cohere/north-mini-code:free",
+        "priority": 2
+      }
+    ],
+    "debug": [
+    ],
+    "test": [
+    ],
+    "chat": [
+      {
+        "provider": "kilo-free",
+        "model": "cohere/north-mini-code:free",
+        "priority": 1
+      }
+    ],
+    "commit_message": [
+      {
+        "provider": "kilo-free",
+        "model": "cohere/north-mini-code:free",
+        "priority": 1
+      }
+    ],
+    "review": [
+    ],
+    "documentation": [
+    ],
+    "research": [
+    ]
+  }
+}

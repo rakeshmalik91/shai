@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "availability": {
+    "cache_seconds": 30,
+    "probe_timeout_seconds": 5,
+    "failure_cooldown_seconds": 60
+  },
+  "models": {
+    "orchestrator": [],
+    "planner": [],
+    "code": [],
+    "debug": [],
+    "test": [],
+    "chat": [],
+    "commit_message": [],
+    "review": [],
+    "documentation": [],
+    "research": []
+  }
+}

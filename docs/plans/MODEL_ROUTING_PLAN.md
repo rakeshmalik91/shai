@@ -1,6 +1,6 @@
 # Plan: Project-Specific Multi-Model Routing
 
-**Status:** Proposed  
+**Status:** Implemented (initial routing integration)  
 **Scope:** ShAI agent runtime  
 **Configuration location:** `.Shai/model_routing.json`
 
@@ -325,3 +325,20 @@ The feature is ready when:
 - Do not silently choose a random model if a route is invalid.
 - Do not let configuration parsing errors escape into the agent loop.
 - Keep role names stable and centrally defined so logs, tests, and configuration use the same identifiers.
+
+
+## Implementation notes
+
+The initial implementation adds `assets/model_routing.json` as the tracked
+empty template and `.Shai/model_routing.json` as the active project's ignored
+override. `modules/model_routing.py` validates roles/candidates, sorts by
+priority, checks discovered provider models, caches discovery briefly, and
+falls back to the configured default. Chat requests are integrated with the
+`chat` role; Agent requests are integrated with `orchestrator`.
+
+The remaining specialist roles (`planner`, `code`, `debug`, `test`,
+`commit_message`, `review`, `documentation`, and `research`) are declared and
+ready for explicit task-specific model calls. They are not automatically
+inferred from prompt text. Runtime failover after a request has already been
+sent is not implemented in this initial integration; unavailable candidates
+are skipped before request dispatch.

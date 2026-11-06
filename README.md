@@ -148,3 +148,12 @@ test/             # Unit tests
 MIT — see [LICENSE](LICENSE).
 
 Generic project path policy lives in `assets/project_access_config.json`; user-approved project-specific grants are stored in `.shai/project_access.json`. See `docs/CONFIGURATION.md`.
+
+
+### Model routing
+
+Task-based model routing is configured per project in `.Shai/model_routing.json`.
+Start from `assets/model_routing.json`, which lists all supported categories
+with empty candidate lists, or inspect `assets/model_routing.sample.json` for
+an example. `.Shai/model_routing.json` is committed; other `.Shai/` state is ignored. See
+`docs/CONFIGURATION.md` for setup and fallback behavior.
