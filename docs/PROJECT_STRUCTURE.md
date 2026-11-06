@@ -27,7 +27,9 @@ This document provides a complete overview of the Shai project structure, includ
 ├── requirements.txt
 ├── run_all_tests.sh
 ├── setup_keys.sample.sh
-├── shai_config.json          # Runtime configuration
+├── assets/shai_config.json          # Core runtime configuration
+├── assets/provider_config.json     # Provider overrides
+├── assets/command_config.json      # Command and execution configuration
 └── test/                     # Unit tests
 ```
 
@@ -151,7 +153,9 @@ This document provides a complete overview of the Shai project structure, includ
 
 | File | Description |
 |------|-------------|
-| `shai_config.json` | Runtime configuration (provider, model, approvals, limits) |
+| `assets/shai_config.json` | Core runtime configuration (model, approvals, limits) |
+| `assets/provider_config.json` | Provider endpoints, authentication and overrides |
+| `assets/command_config.json` | Shai commands, OS commands and execution policy |
 | `.shai/history.json` | Conversation history per project |
 | `.shai/task.json` | Task plan state |
 | `logs/` | Diagnostic logs (when enabled) |
@@ -202,3 +206,13 @@ chat.py
 4. **Tool separation**: Read-only tools in `modules/tools/` shared by both modes; mutating tools remain in agent mode
 5. **Provider abstraction**: `provider_selection.py` and `reasoning_handlers/` isolate provider-specific logic
 6. **Test coverage**: Dedicated test for engine module boundaries (`test_engine_module_boundaries.py`)
+
+### Configuration files (`assets/`)
+
+- `shai_config.json`: core runtime and approval settings.
+- `provider_config.json`: provider endpoint/authentication overrides.
+- `command_config.json`: command execution and command policy.
+- `context_window_config.json`: model context-window limits.
+- `cli_config.json`: terminal interface and display preferences.
+- `logging_config.json`: logging behaviour and retention.
+- `command_registry.json`: natural-language command registry.

@@ -49,7 +49,7 @@ ROOT = pathlib.Path(
     sys.argv[1] if len(sys.argv) > 1 else "."
 ).expanduser().resolve()
 configure_tools_root(ROOT)
-CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
+CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
 DEFAULT_API_TIMEOUT_SECONDS = 300
 
 # Define the logger before loading configuration: API_TIMEOUT_SECONDS is
@@ -61,7 +61,17 @@ def load_config():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as handle:
             value = json.load(handle)
-        return value if isinstance(value, dict) else {}
+        if not isinstance(value, dict):
+            return {}
+        for filename in ("provider_config.json", "command_config.json"):
+            try:
+                with (SCRIPT_DIR / "assets" / filename).open("r", encoding="utf-8") as extra:
+                    section = json.load(extra)
+                if isinstance(section, dict):
+                    value.update(section)
+            except (OSError, ValueError, TypeError):
+                pass
+        return value
     except (OSError, ValueError, TypeError):
         LOGGER.exception("Could not load Shai configuration; using defaults")
         return {}

@@ -1,0 +1,17 @@
+{
+  "tool_call_display": {
+    "show_parameters": true,
+    "max_argument_chars": 2000
+  },
+  "reasoning_display": {
+    "enabled": true,
+    "max_chars": 6000
+  },
+  "file_change_display": {
+    "enabled": true,
+    "max_diff_lines": 160,
+    "max_diff_chars": 16000,
+    "preserve_head_lines": 90,
+    "preserve_tail_lines": 40
+  }
+}

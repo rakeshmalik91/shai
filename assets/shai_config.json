@@ -1,0 +1,95 @@
+{
+  "provider": "kilo-free",
+  "model": "cohere/north-mini-code:free",
+  "max_tool_call_iterations": 500,
+  "api_timeout_seconds": 300,
+  "approve": {
+    "all": true,
+    "file_edit": true,
+    "file_delete": true,
+    "file_truncate": true,
+    "execution": true,
+    "git_commit": true,
+    "git_push": false,
+    "tools": {
+      "run_checks": true,
+      "edit_file": true,
+      "os_command": false
+    }
+  },
+  "commit_message": {
+    "provider": "",
+    "model": "",
+    "enabled": true,
+    "pattern": "{type}: {summary} {changes}",
+    "prompt": "Generate a concise, conventional commit message for the following changes.\\nFollow the format: <type>: <summary>\\n\\nTypes: feat, fix, docs, test, chore, refactor, style, perf, ci, build\\n\\n{diff_section}\\nReturn only the commit message, nothing else."
+  },
+  "tool_safeguards": {
+    "duplicate_call_detection": true,
+    "duplicate_call_limit": 5,
+    "repeat_call_warning": true,
+    "repeat_call_warning_after": 5,
+    "run_checks_timeout_seconds": 120,
+    "git_status_timeout_seconds": 15,
+    "git_diff_timeout_seconds": 15
+  },
+  "retry": {
+    "enabled": true,
+    "max_retries": 10,
+    "initial_backoff_seconds": 5.0,
+    "backoff_multiplier": 2.0,
+    "max_backoff_seconds": 600.0,
+    "jitter": true,
+    "jitter_fraction": 0.2,
+    "retry_network_errors": true,
+    "retry_http_statuses": [
+      408,
+      425,
+      429,
+      500,
+      502,
+      503,
+      504
+    ],
+    "retry_invalid_json": true,
+    "invalid_tool_selection_enabled": true,
+    "invalid_tool_selection_max_attempts": 5,
+    "invalid_tool_call_recovery": {
+      "enabled": true,
+      "max_recovery_attempts": 5,
+      "repair_conversation_history": true,
+      "preserve_user_request": true,
+      "stop_on_repeated_failure": false,
+      "max_tool_result_chars": 12000
+    }
+  },
+  "test_execution": {
+    "timeout_seconds": 120,
+    "max_output_bytes": 65536,
+    "max_stdout_bytes": 49152,
+    "max_stderr_bytes": 16384,
+    "preserve_output_head_bytes": 4096,
+    "preserve_output_tail_bytes": 8192,
+    "terminate_child_processes": true
+  },
+  "backup_cleanup": {
+    "enabled": true,
+    "retention_days": 1
+  },
+  "agent_safeguards": {
+    "enabled": true,
+    "max_history_chars": 90000,
+    "max_tool_result_chars": 8000,
+    "keep_recent_turns": 4,
+    "max_recent_tool_cycles": 6,
+    "max_consecutive_no_progress_iterations": 5,
+    "max_tool_calls_per_request": 500,
+    "validate_tool_arguments": true,
+    "reject_unknown_tool_arguments": true,
+    "max_invalid_argument_attempts_per_tool": 5,
+    "default_read_file_lines": 100,
+    "max_read_file_lines": 500,
+    "max_read_file_chars": 4000,
+    "deduplicate_read_file_calls": true
+  }
+}

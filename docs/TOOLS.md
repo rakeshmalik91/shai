@@ -34,7 +34,7 @@ The eight priority tools are `get_file_outline`, `find_symbol`, `find_references
 | `replace_lines` | `path`, `start_line`, `end_line`, `new_text` | Replace a 1-based inclusive line range. Useful when exact matching fails because of indentation or whitespace. |
 
 File modifications are previewed and require approval according to the granular
-`approve` settings in `shai_config.json`. Risky truncations/deletions require an
+`approve` settings in `assets/shai_config.json`. Risky truncations/deletions require an
 explicit category or tool approval (or an interactive confirmation); the global
 `approve.all` setting alone does not bypass high-risk file checks. Original files
 are backed up before atomic replacement.
@@ -102,13 +102,13 @@ Shared read-only tools (project listing/reading/search, Git inspection, AST/code
 
 ## Configuration
 
-`shai_config.json` controls provider/model selection, approval behaviour, safeguards, test execution, logging, history limits and display settings. API keys belong in environment variables, not this file.
+`assets/shai_config.json` controls core provider/model selection, approval behaviour, safeguards, test execution, logging, history limits and display settings. Provider-specific endpoint/auth overrides are in `assets/provider_config.json`; command execution and Git policy are in `assets/command_config.json`. API keys belong in environment variables, not this file.
 
 ## Context meter
 
 Before each request, Agent and Chat display an approximate prompt-token count. The estimate is also shown in the thinking indicator. After the response, Shai displays exact prompt/completion/total token counts when the provider returns usage metadata.
 
-A context percentage is shown only when a context limit is known. Shai captures model context metadata from the provider's model catalogue when available and stores it in `shai_config.json`. If the provider does not publish a limit, the display explicitly says the limit is unknown rather than inventing a percentage. A user may add `context_window_tokens` for the currently selected model or an entry in `model_context_windows` keyed as `provider::model`.
+A context percentage is shown only when a context limit is known. Shai captures model context metadata from the provider's model catalogue when available and stores it in `assets/shai_config.json`. If the provider does not publish a limit, the display explicitly says the limit is unknown rather than inventing a percentage. A user may add `context_window_tokens` for the currently selected model or an entry in `model_context_windows` keyed as `provider::model`.
 
 The pre-request estimate is heuristic and should not be treated as tokenizer-exact. Debug logs record both estimates and provider-reported usage.
 

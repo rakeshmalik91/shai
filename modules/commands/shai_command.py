@@ -7,7 +7,7 @@ from pathlib import Path
 LOGGER = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_PATH = ROOT / "assets" / "command_registry.json"
-CONFIG_PATH = ROOT / "shai_config.json"
+CONFIG_PATH = Path(__file__).resolve().parents[2] / "assets" / "command_config.json"
 
 _POLITE_PREFIXES = (
     "could you please ", "could you ", "would you please ", "would you ",

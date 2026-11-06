@@ -18,7 +18,7 @@ and execution policy. Arguments are parsed into an array and executed with
 
 | Executable | Supported operations | Approval |
 |---|---|---|
-| `git` | Configurable. Restricted mode uses the subcommands and argument rules in `shai_config.json`; unrestricted mode accepts any Git subcommand and arguments. | Configurable with `requires_approval` |
+| `git` | Configurable. Restricted mode uses the subcommands and argument rules in `assets/command_config.json`; unrestricted mode accepts any Git subcommand and arguments. | Configurable with `requires_approval` |
 | `python3` | `-m pytest`, `-m unittest discover`, `-m compileall` | Approval required by default |
 
 The executable is resolved by Shai; the model cannot supply an arbitrary
@@ -153,7 +153,7 @@ configured approval setting.
 
 To customize policy, edit `subcommands`, `argument_rules`,
 `blocked_subcommands`, `forbidden_options`, `forbidden_option_prefixes`,
-`forbidden_argument_patterns`, and the injected-option maps in `shai_config.json`.
+`forbidden_argument_patterns`, and the injected-option maps in `assets/command_config.json`.
 `forbidden_argument_patterns` contains regular expressions tested against each
 argument token. `argument_rules` supports `allowed_args`, `value_options`,
 `numeric_options`, `max_numeric_value`, regular-expression `patterns`,
@@ -204,7 +204,7 @@ Shai displays the complete command and asks whether to whitelist it:
 2. Every parameter for that Git subcommand (`approved_subcommands`).
 3. Every Git command and subcommand (`allow_unrestricted`).
 
-The selected permission is persisted in `shai_config.json`, then the command is
+The selected permission is persisted in `assets/command_config.json`, then the command is
 retried. Explicit blacklist rules (`blocked_subcommands`, forbidden options,
 option prefixes, and argument patterns) are evaluated first and cannot be
 bypassed by any whitelist choice. The approval preview also displays the full

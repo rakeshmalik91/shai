@@ -7,6 +7,7 @@ Logs are written only to files (never stdout/stderr). Each process gets its own
 import datetime
 import json
 import logging
+import json
 import os
 import pathlib
 import threading
@@ -136,6 +137,14 @@ def get_logger(name):
 
 def load_logging_config(config):
     settings = config.get("logging", {}) if isinstance(config, dict) else {}
+    config_path = pathlib.Path(__file__).resolve().parent.parent / "assets" / "logging_config.json"
+    try:
+        with config_path.open("r", encoding="utf-8") as handle:
+            dedicated = json.load(handle)
+        if isinstance(dedicated, dict):
+            settings = dedicated
+    except (OSError, ValueError, TypeError):
+        pass
     if not settings.get("enabled", True):
         return {"enabled": False}
     level_map = {
@@ -161,7 +170,7 @@ def load_logging_config(config):
         "backup_count": settings.get("backup_count", 5),
         "log_level": level_map.get(level, DEFAULT_LOG_LEVEL),
         "console_level": level_map.get(str(settings.get("console_level", "INFO")).upper(), DEFAULT_CONSOLE_LEVEL),
-        "enable_console": False,
+        "enable_console": settings.get("enable_console", False) is True,
         "per_run_file": settings.get("per_run_file", True) is True,
         "newest_first": settings.get("newest_first", True) is True,
         "retain_files": settings.get("retain_files", DEFAULT_RETAIN_FILES),
@@ -177,7 +186,7 @@ def init_default_logging(config=None):
         return _default_logger
     if config is None:
         try:
-            with (SCRIPT_DIR / "shai_config.json").open("r", encoding="utf-8") as handle:
+            with (SCRIPT_DIR / "assets" / "shai_config.json").open("r", encoding="utf-8") as handle:
                 config = json.load(handle)
         except (OSError, ValueError, TypeError):
             config = {}

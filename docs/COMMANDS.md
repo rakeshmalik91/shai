@@ -106,7 +106,7 @@ Available when running `python3 chat.py`.
 
 ## Configuration
 
-Commands and behavior can be customized via `shai_config.json`:
+Commands and behavior can be customized via `assets/command_config.json`:
 
 - `max_tool_call_iterations` — Maximum tool calls per agent iteration (default: 80)
 - `tool_safeguards` — Enable/disable safeguards (repeat detection, history compaction, etc.)
@@ -116,7 +116,7 @@ Commands and behavior can be customized via `shai_config.json`:
 - `os_command` — Enable/disable command profiles and set timeout/output limits
 - `tool_call_display` — Tool call display settings (`show_parameters`, `max_argument_chars`)
 
-See `shai_config.json` for the full configuration schema.
+See `assets/command_config.json` for command settings and `assets/command_registry.json` for natural-language routing.
 
 ---
 

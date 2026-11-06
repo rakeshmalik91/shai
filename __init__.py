@@ -37,7 +37,7 @@ ROOT = pathlib.Path(
 
 MAX_FILE_SIZE = 200_000
 DEFAULT_MAX_TOOL_CALL_ITERATIONS = 12
-CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
+CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
 LOGGER = get_logger("shai.agent")
 DEFAULT_API_TIMEOUT_SECONDS = 300
 
@@ -71,7 +71,22 @@ def load_config():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as handle:
             value = json.load(handle)
-        return value if isinstance(value, dict) else {}
+        if not isinstance(value, dict):
+            return {}
+        # Split configuration files are merged for existing consumers.
+        for filename in (
+            "provider_config.json", "command_config.json",
+            "context_window_config.json", "cli_config.json",
+            "logging_config.json",
+        ):
+            try:
+                with (SCRIPT_DIR / "assets" / filename).open("r", encoding="utf-8") as extra:
+                    section = json.load(extra)
+                if isinstance(section, dict):
+                    value.update(section)
+            except (FileNotFoundError, OSError, ValueError, TypeError):
+                pass
+        return value
     except (FileNotFoundError, OSError, ValueError, TypeError):
         return {}
 

@@ -2,7 +2,7 @@
 
 Shai supports cloud APIs and local Ollama. Provider endpoints, authentication,
 headers, model-list filtering and request timeouts are configurable in
-`shai_config.json`; the built-in values below are defaults.
+`assets/provider_config.json`; the built-in values below are defaults.
 
 ## Provider comparison
 
@@ -32,7 +32,7 @@ API key by default.
 
 ## Provider configuration
 
-Copy `shai_config.sample.json` to `shai_config.json` (or add the `providers`
+Add provider overrides to `assets/provider_config.json` under the `providers`
 section to your existing file). Existing settings are preserved when Shai
 saves the selected provider/model.
 
@@ -120,7 +120,7 @@ that computer's LAN address and ensure its server accepts LAN connections.
 
 Use `/model` (or `/switch`, `/switch-model`) in Chat or Agent mode. Shai fetches
 the selected provider's model list, lets you choose a model, and persists the
-selection in `shai_config.json`.
+selection in `assets/shai_config.json`; provider endpoint and authentication overrides live in `assets/provider_config.json`.
 
 ## Context windows
 

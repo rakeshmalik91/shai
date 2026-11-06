@@ -48,7 +48,7 @@ flowchart TD
     Loop --> LLM
     ChatLoop --> LLM
 
-    Config[shai_config.json] --> Agent
+    Config[assets/shai_config.json + provider_config.json + command_config.json] --> Agent
     Config --> Chat
     Config --> SharedModules
     History[.shai/history.json] --> ConvHist
@@ -70,7 +70,7 @@ The ASCII diagram above shows the high-level flow. Key points:
 - **Shared modules** provide provider selection, conversation history, safeguards, logging, reasoning handlers, and context metering
 - **Agent mode** adds mutating tools (editing, verification, Git, task management) with approval and bounded execution
 - **Chat mode** provides conversation without local project or OS command tools
-- **Configuration** (`shai_config.json`), history (`.shai/history.json`), and logs are persistent data
+- **Configuration** (`assets/*.json`), history (`.shai/history.json`), and logs are persistent data
 
 ## Entry points
 
@@ -127,7 +127,7 @@ Reasoning handlers expose provider-supplied summaries when available. They do no
 
 ## Persistent data
 
-- `shai_config.json`: runtime configuration and last-used provider/model.
+- `assets/shai_config.json`: core runtime configuration and last-used provider/model; `assets/provider_config.json`: provider overrides; `assets/command_config.json`: command policies.
 - `.shai/history.json`: conversation history in the selected working project.
 - `logs/`: diagnostic logs when file logging is enabled.
 - `setup_keys.sh`: optional user-created shell file for API-key environment variables; keep it private and do not commit it.

@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent.parent
-CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
+CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
 
 MODEL_CONTEXT_WINDOWS = {}
 
@@ -85,7 +85,16 @@ def load_config():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
-            return data if isinstance(data, dict) else {}
+            data = data if isinstance(data, dict) else {}
+        for filename in ("provider_config.json", "context_window_config.json", "cli_config.json", "logging_config.json", "command_config.json"):
+            try:
+                with (CONFIG_FILE.parent / filename).open("r", encoding="utf-8") as handle:
+                    section = json.load(handle)
+                if isinstance(section, dict):
+                    data.update(section)
+            except (OSError, ValueError, TypeError):
+                pass
+        return data
     except (OSError, ValueError):
         return {}
 
@@ -167,30 +176,47 @@ def provider_timeout(provider, fallback=300):
 
 
 def save_config(provider, model, context_window_tokens=None):
-    """Update provider/model and context metadata, preserving other settings."""
-    config = load_config()
+    """Persist provider/model in core config and context limits separately."""
+    config = {}
+    if CONFIG_FILE.exists():
+        try:
+            config = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            config = {}
     config["provider"] = provider
     config["model"] = model
-    context_key = "{}::{}".format(provider, model)
-    context_mapping = config.get("model_context_windows", {})
-    if not isinstance(context_mapping, dict):
-        context_mapping = {}
-    if isinstance(context_window_tokens, int) and not isinstance(context_window_tokens, bool) and context_window_tokens > 0:
-        context_mapping[context_key] = context_window_tokens
-        config["context_window_tokens"] = context_window_tokens
-    else:
-        saved_limit = context_mapping.get(context_key)
-        if isinstance(saved_limit, int) and saved_limit > 0:
-            config["context_window_tokens"] = saved_limit
-        else:
-            config.pop("context_window_tokens", None)
-    # Sort model_context_windows by key for consistent ordering
-    config["model_context_windows"] = dict(sorted(context_mapping.items()))
     temporary = CONFIG_FILE.with_name(CONFIG_FILE.name + ".tmp")
     with temporary.open("w", encoding="utf-8") as handle:
         json.dump(config, handle, indent=2, ensure_ascii=False)
         handle.write("\n")
     temporary.replace(CONFIG_FILE)
+
+    context_path = CONFIG_FILE.parent / "context_window_config.json"
+    context = {}
+    if context_path.exists():
+        try:
+            context = json.loads(context_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            context = {}
+    mapping = context.get("model_context_windows", {})
+    if not isinstance(mapping, dict):
+        mapping = {}
+    context_key = "{}::{}".format(provider, model)
+    if isinstance(context_window_tokens, int) and not isinstance(context_window_tokens, bool) and context_window_tokens > 0:
+        mapping[context_key] = context_window_tokens
+        context["context_window_tokens"] = context_window_tokens
+    else:
+        saved_limit = mapping.get(context_key)
+        if isinstance(saved_limit, int) and saved_limit > 0:
+            context["context_window_tokens"] = saved_limit
+        else:
+            context.pop("context_window_tokens", None)
+    context["model_context_windows"] = dict(sorted(mapping.items()))
+    temporary = context_path.with_name(context_path.name + ".tmp")
+    with temporary.open("w", encoding="utf-8") as handle:
+        json.dump(context, handle, indent=2, ensure_ascii=False)
+        handle.write("\n")
+    temporary.replace(context_path)
 
 def _get_json(url, key, provider):
     config = get_provider_config(provider)

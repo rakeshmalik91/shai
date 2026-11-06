@@ -104,7 +104,7 @@ class ProviderSelectionTests(unittest.TestCase):
             "kilo-free", "provider/model-a:free",
             selection.MODEL_CONTEXT_WINDOWS["provider/model-a:free"]
         )
-        saved = json.loads(selection.CONFIG_FILE.read_text(encoding="utf-8"))
+        saved = json.loads((selection.CONFIG_FILE.parent / "context_window_config.json").read_text(encoding="utf-8"))
         self.assertEqual(saved["context_window_tokens"], 131072)
         self.assertEqual(
             saved["model_context_windows"]["kilo-free::provider/model-a:free"],

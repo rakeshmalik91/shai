@@ -13,7 +13,7 @@ def load_settings(config_path=None):
         "preserve_tail_lines": 40,
     }
     if config_path is None:
-        config_path = pathlib.Path(__file__).resolve().parent.parent / "shai_config.json"
+        config_path = pathlib.Path(__file__).resolve().parent.parent / "assets" / "shai_config.json"
     try:
         with pathlib.Path(config_path).open("r", encoding="utf-8") as handle:
             config = json.load(handle)

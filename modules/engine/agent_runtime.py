@@ -82,7 +82,7 @@ MAX_FILE_SIZE = 200_000
 DEFAULT_MAX_TOOL_CALL_ITERATIONS = 80
 HARD_MAX_TOOL_CALL_ITERATIONS = 1000
 MAX_PLAN_CONTINUATIONS = 2
-CONFIG_FILE = SCRIPT_DIR / "shai_config.json"
+CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
 TASK_FILE = SCRIPT_DIR / ".shai" / "task.json"
 LOGGER = get_logger("shai.agent")
 # Set by main() after provider selection; defaults keep helpers import-testable.

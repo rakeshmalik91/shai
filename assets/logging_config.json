@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "log_dir": "logs",
+  "log_file": "shai.log",
+  "log_level": "DEBUG",
+  "per_run_file": true,
+  "newest_first": true,
+  "retain_files": 10,
+  "enable_console": false
+}
