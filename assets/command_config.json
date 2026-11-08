@@ -162,7 +162,8 @@
         "approved_subcommands": [
           "config",
           "log",
-          "commit"
+          "commit",
+          "ls-files"
         ]
       },
       "python3": {
