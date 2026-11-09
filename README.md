@@ -146,8 +146,8 @@ docs/             # Documentation
 test/             # Unit tests
 ```
 
+Generic project path policy lives in `assets/project_access_config.json`; user-approved project-specific grants are stored in `.shai/project_access.json`. See `docs/CONFIGURATION.md`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-Generic project path policy lives in `assets/project_access_config.json`; user-approved project-specific grants are stored in `.shai/project_access.json`. See `docs/CONFIGURATION.md`.
