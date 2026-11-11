@@ -20,11 +20,19 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from modules.empty_response_retry import request_with_empty_response_retries
+from modules.project_paths import set_active_project_root, resolve_startup_project_root
+from modules.project_state import ensure_project_state
 from modules.terminal_style import colorize
 from modules.commands.shai_command import resolve_shai_command
 from modules.commands.registry import normalize_command
 from modules.ui.spinner import Spinner
-from modules.model_routing import resolve_model as resolve_routed_model
+from modules.model_routing import (
+    resolve_model as resolve_routed_model,
+    resolve_model_candidates,
+    request_with_model_fallback,
+    is_model_unavailable_error,
+)
 from modules.provider_selection import (
     PROVIDERS, initialize_provider, get_provider_config,
     provider_api_key, build_provider_url, build_provider_headers,
@@ -32,7 +40,9 @@ from modules.provider_selection import (
 )
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
-from modules.conversation_history import ConversationHistory, input_with_history
+from modules.conversation_history import (
+    ConversationHistory, input_with_history, input_without_history
+)
 from modules.agent_safeguards import compact_conversation_history
 from modules.context_meter import (
     estimate_messages_tokens, get_context_window, format_context_status,
@@ -46,16 +56,17 @@ from modules.tools import (
 )
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parents[2]
-ROOT = pathlib.Path(
-    sys.argv[1] if len(sys.argv) > 1 else "."
-).expanduser().resolve()
+ROOT = resolve_startup_project_root()
+set_active_project_root(ROOT)
 configure_tools_root(ROOT)
+ensure_project_state(ROOT)
 CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
 DEFAULT_API_TIMEOUT_SECONDS = 300
 
 # Define the logger before loading configuration: API_TIMEOUT_SECONDS is
 # initialized at import time and load_config() may need to report bad JSON.
 LOGGER = get_logger("shai.chat")
+_INACTIVE_MODEL_ROUTE = False
 
 
 def _merge_config_section(base, extra):
@@ -76,16 +87,28 @@ def load_config():
             return {}
         for filename in (
             "provider_config.json", "command_config.json",
-            "context_window_config.json", "cli_config.json",
-            "logging_config.json",
+            "cli_config.json", "logging_config.json",
         ):
             try:
                 with (CONFIG_FILE.parent / filename).open("r", encoding="utf-8") as extra:
                     section = json.load(extra)
                 if isinstance(section, dict):
                     _merge_config_section(value, section)
-            except (OSError, ValueError, TypeError):
+            except (FileNotFoundError, OSError, ValueError, TypeError):
                 pass
+        from modules.project_state import migrate_legacy_model_selection
+        from modules.model_routing import load_default_model
+        migrate_legacy_model_selection(ROOT, CONFIG_FILE)
+        selection = load_default_model(ROOT)
+        value.update(selection)
+        state_dir = ROOT / ".shai"
+        try:
+            model_data = json.loads((state_dir / "model_config.json").read_text(encoding="utf-8"))
+            if isinstance(model_data, dict):
+                value.setdefault("model_config", {})
+                _merge_config_section(value["model_config"], model_data)
+        except (OSError, ValueError, TypeError):
+            pass
         return value
     except (OSError, ValueError, TypeError):
         LOGGER.exception("Could not load Shai configuration; using defaults")
@@ -176,8 +199,14 @@ def request_json(url, key, provider, body=None):
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")
         log_api_payload(LOGGER, "API ERROR RESPONSE", detail)
-        LOGGER.warning("HTTP API error provider=%s status=%s body=%s",
-                       provider, error.code, detail[:1000])
+        if _INACTIVE_MODEL_ROUTE and is_model_unavailable_error(detail):
+            LOGGER.debug(
+                "Inactive model route unavailable; trying next route provider=%s status=%s",
+                provider, error.code,
+            )
+        else:
+            LOGGER.warning("HTTP API error provider=%s status=%s body=%s",
+                           provider, error.code, detail[:1000])
         raise RuntimeError(
             "API error {}: {}".format(error.code, detail[:2000])
         )
@@ -210,7 +239,7 @@ def choose_model(models, preferred=None):
         prompt = "\nChoose model number: "
 
     while True:
-        choice = input(prompt).strip()
+        choice = input_without_history(prompt).strip()
         if not choice and default_number is not None:
             return models[default_number - 1]
         try:
@@ -223,46 +252,51 @@ def choose_model(models, preferred=None):
 
 
 def api_request(history, provider, model, task_role="chat"):
-    route = resolve_routed_model(task_role, ROOT, provider, model)
-    provider, model = route["provider"], route["model"]
-    LOGGER.info("Chat model role=%s provider=%s model=%s routed=%s reason=%s",
-                task_role, provider, model, route["routed"], route["reason"])
-    LOGGER.debug("Chat API request provider=%s model=%s history_messages=%d",
-                 provider, model, len(history))
-    key = provider_api_key(provider)
+    global _INACTIVE_MODEL_ROUTE
+    previous_inactive_route = _INACTIVE_MODEL_ROUTE
+    routes = resolve_model_candidates(task_role, ROOT, provider, model)
 
-    # Determine if provider supports tools
-    supports_tools = get_provider_config(provider)["format"] in ("openai", "anthropic")
+    def request_for_route(route):
+        global _INACTIVE_MODEL_ROUTE
+        _INACTIVE_MODEL_ROUTE = bool(route["routed"])
+        selected_provider, selected_model = route["provider"], route["model"]
+        LOGGER.info("Chat model role=%s provider=%s model=%s routed=%s reason=%s",
+                    task_role, selected_provider, selected_model,
+                    route["routed"], route["reason"])
+        LOGGER.debug("Chat API request provider=%s model=%s history_messages=%d",
+                     selected_provider, selected_model, len(history))
+        key = provider_api_key(selected_provider)
+        supports_tools = get_provider_config(selected_provider)["format"] in ("openai", "anthropic")
 
-    if get_provider_config(provider)["format"] == "anthropic":
-        messages = [
-            item for item in history
-            if item.get("role") != "system"
-        ]
-        body = {
-            "model": model,
-            "max_tokens": 8192,
-            "system": SYSTEM_PROMPT,
-            "messages": messages,
-        }
-        if supports_tools:
-            body["tools"] = FUNCTIONS_READ_ONLY
-    else:
-        body = {
-            "model": model,
-            "messages": history,
-        }
-        if provider == "openai":
-            body["max_completion_tokens"] = 8192
+        if get_provider_config(selected_provider)["format"] == "anthropic":
+            messages = [item for item in history if item.get("role") != "system"]
+            body = {
+                "model": selected_model,
+                "max_tokens": 8192,
+                "system": SYSTEM_PROMPT,
+                "messages": messages,
+            }
+            if supports_tools:
+                body["tools"] = FUNCTIONS_READ_ONLY
         else:
-            body["temperature"] = 0.2
-            body["max_tokens"] = 8192
-        if supports_tools:
-            body["tools"] = FUNCTIONS_READ_ONLY
+            body = {"model": selected_model, "messages": history}
+            if selected_provider == "openai":
+                body["max_completion_tokens"] = 8192
+            else:
+                body["temperature"] = 0.2
+                body["max_tokens"] = 8192
+            if supports_tools:
+                body["tools"] = FUNCTIONS_READ_ONLY
 
-    return request_json(
-        build_provider_url(provider, "chat"), key, provider, body
-    )
+        return request_json(
+            build_provider_url(selected_provider, "chat"), key,
+            selected_provider, body
+        )
+
+    try:
+        return request_with_model_fallback(routes, request_for_route)
+    finally:
+        _INACTIVE_MODEL_ROUTE = previous_inactive_route
 
 
 def response_text(response, provider):
@@ -326,6 +360,19 @@ def history_for_new_provider(history):
         cleaned.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
     return cleaned
 
+
+
+def _request_with_empty_response_retries(history, provider, model):
+    retry_settings = load_config().get("retry", {})
+    if not isinstance(retry_settings, dict):
+        retry_settings = {}
+    return request_with_empty_response_retries(
+        lambda request_history: api_request(request_history, provider, model),
+        history,
+        get_provider_config(provider)["format"],
+        retry_settings,
+        LOGGER,
+    )
 
 def main():
     init_default_logging(load_config())
@@ -427,7 +474,11 @@ def main():
                 continue
             global ROOT
             ROOT = new_root
+            set_active_project_root(ROOT)
             configure_tools_root(ROOT)
+            ensure_project_state(ROOT)
+            from modules.logging_config import reset_default_logging
+            reset_default_logging(load_config())
             history_store = ConversationHistory(ROOT, "chat", SYSTEM_PROMPT)
             history = history_store.load()
             history_store.save(history, provider=provider, model=model)
@@ -468,7 +519,7 @@ def main():
         LOGGER.info("Chat turn started provider=%s model=%s user_chars=%d history_messages=%d",
                     provider, model, len(user_text), len(history))
         try:
-            response = api_request(history, provider, model)
+            response = _request_with_empty_response_retries(history, provider, model)
             log_and_display_usage(
                 LOGGER, response, get_provider_config(provider)["format"],
                 estimated_prompt_tokens, context_limit
@@ -553,7 +604,7 @@ def main():
             spinner = Spinner("Shai is thinking | " + context_status)
             spinner.start()
             try:
-                response = api_request(history, provider, model)
+                response = _request_with_empty_response_retries(history, provider, model)
                 log_and_display_usage(
                     LOGGER, response, get_provider_config(provider)["format"],
                     estimated_prompt_tokens, context_limit

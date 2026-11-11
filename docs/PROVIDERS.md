@@ -33,13 +33,12 @@ API key by default.
 ## Provider configuration
 
 Add provider overrides to `assets/provider_config.json` under the `providers`
-section to your existing file). Existing settings are preserved when Shai
-saves the selected provider/model.
+section. The default provider/model is configured separately in
+`assets/model_routing.json` and can be overridden per project in
+`.shai/model_routing.json`.
 
 ```json
 {
-  "provider": "ollama",
-  "model": "llama3.2",
   "api_timeout_seconds": 300,
   "providers": {
     "ollama": {
@@ -118,38 +117,29 @@ that computer's LAN address and ensure its server accepts LAN connections.
 
 ## Switching providers and models
 
-Use `/model` (or `/switch`, `/switch-model`) in Chat or Agent mode. Shai fetches
-the selected provider's model list, lets you choose a model, and persists the
-selection in `assets/shai_config.json`; provider endpoint and authentication overrides live in `assets/provider_config.json`.
+Use `/model` (or `/switch`, `/switch-model`) in Chat or Agent mode. Shai first
+shows the provider list and asks you to choose a provider. It then fetches the
+provider's model IDs only, displays the filtered model list, and asks you to
+choose a model. It does not fetch or save metadata for every model in that
+list. After you select a model, Shai makes one best-effort, short-timeout
+request for that model's details only; metadata lookup failure does not block
+selection or the next model request. The selected default provider/model is persisted
+in the active project's `.shai/model_routing.json` under `default`; task-specific
+routes share that file. Provider endpoint and authentication overrides live in
+`assets/provider_config.json`.
 
-## Context windows
+## Model capabilities and context windows
 
-Shai captures provider-reported context limits in `model_context_windows`.
-You can set a separate, explicit per-model override in
-`assets/context_window_config.json`. Overrides take precedence over metadata
-returned by the provider and are keyed by `provider::model`:
+Shai stores project-local provider-discovered model limits and capabilities in
+the active project's `.shai/model_config.json`. The `models` section contains discovered metadata,
+while the `overrides` section holds explicit per-model values. Overrides take
+precedence over discovered metadata, and `defaults` provide fallbacks. Entries
+are keyed by `provider::model`.
 
-```json
-{
-  "model_context_windows": {
-    "ollama::llama3.2": 131072,
-    "openrouter::provider/model:free": 131072
-  },
-  "model_context_window_overrides": {
-    "ollama::llama3.2": 65536,
-    "openrouter::provider/model:free": 98304
-  }
-}
-```
-
-`model_context_windows` is provider-discovered metadata; normally let Shai
-manage it. `model_context_window_overrides` is user-managed and is never
-replaced when model metadata is refreshed or a provider/model is selected.
-Values must be positive integer token counts. Remove an override entry to
-return to the provider-reported value. The legacy `context_window_tokens`
-setting remains supported for the currently selected model when no
-model-specific value is available.
-
+For example, a model can declare `context_window`, `max_output_tokens`,
+`supported_input_types`, `supported_output_types`, `supports_tools`,
+`supports_structured_output`, and `supports_reasoning`. A `null` capability
+means unknown rather than unsupported. Content type values are extensible.
 
 ## Troubleshooting
 
@@ -174,9 +164,10 @@ model-specific value is available.
 
 Shai supports project-local model routing by task category. Configure candidate
 models in `.shai/model_routing.json`; use `assets/model_routing.json` as the
-tracked template. Candidates are ordered by ascending `priority` (1 is highest)
-and must exist in the selected provider's discovered model list. A missing or
-unavailable route uses the normal default provider/model. See
+tracked template. Candidates are ordered by ascending `priority` (1 is highest).
+Model IDs are used as configured; Shai does not download a provider catalogue
+to validate them. An unavailable route is skipped in favour of the next
+candidate, then the normal default provider/model. See
 [CONFIGURATION.md](CONFIGURATION.md#model-routing) for the complete schema and
-supported roles. `.shai/` is ignored by Git so project-specific preferences are
-not committed accidentally.
+supported roles. Shai's `.shai/.gitignore` ignores only logs, backups, task state,
+and conversation history; project preferences and routing can be committed.

@@ -2,50 +2,68 @@
 
 This document provides a complete overview of the Shai project structure, including all modules, entry points, tests, configuration, and documentation.
 
-## Root Directory
+## Shai Installation Directory
 
-```
+The following tree describes the Shai source/install directory. It contains shared code, documentation and `assets/` policy. Runtime project state is **not** read from or written to this directory's `.shai/` merely because Shai is installed here.
+
+```text
 .
 ├── .gitignore
-├── .lectra-project.json
-├── .shai/                    # Project-local runtime data, logs and configuration
-│   ├── history.json
-│   ├── task.json
-│   ├── project_access.json    # User-approved path grants (ignored by Git)
-│   ├── backup_config.json     # Project-specific backup retention policy
-│   ├── model_routing.json     # Project-specific model route overrides
-│   └── shai_backups/          # Automatic backups of edited files
 ├── LICENSE
 ├── README.md
 ├── __init__.py
-├── agent.py                  # Entry point: Coding agent CLI
-├── chat.py                   # Entry point: Chat mode CLI
-├── assets/                   # Shared runtime and command JSON configuration
+├── agent.py
+├── chat.py
+├── assets/
 │   ├── shai_config.json
+│   ├── approval_config.json
 │   ├── project_access_config.json
 │   ├── provider_config.json
 │   ├── model_routing.json
 │   ├── command_config.json
-│   ├── context_window_config.json
 │   ├── cli_config.json
 │   ├── logging_config.json
 │   ├── command_registry.json
 │   └── tools_registry.json
-├── docs/                     # Technical specifications and guides
+├── docs/
 │   ├── bugfixes/
 │   └── plans/
-├── modules/                  # Core implementation packages
+├── modules/
 │   ├── commands/
 │   ├── engine/
+│   ├── providers/
 │   ├── reasoning_handlers/
 │   ├── tools/
-│   └── ui/
+│   ├── ui/
+│   └── project_paths.py
 ├── pytest.ini
 ├── requirements.txt
 ├── run_all_tests.sh
 ├── setup_keys.sample.sh
-└── test/                     # Comprehensive hermetic test suite
+└── test/
 ```
+
+## Selected Project State
+
+For a selected working project at `/path/to/project`, Shai creates and uses this separate state directory:
+
+```text
+/path/to/project/
+└── .shai/
+    ├── .gitignore
+    ├── model_config.json
+    ├── approval_config.json
+    ├── os_command_approvals.json
+    ├── project_access.json
+    ├── model_routing.json
+    ├── backup_config.json
+    ├── history.json
+    ├── task.json
+    ├── logs/
+    └── shai_backups/
+```
+
+The `modules/project_paths.py` resolver is the source of truth for this location. The CLI initializes it from the selected project and updates it whenever `/project <path>` changes the working project. See [Configuration](CONFIGURATION.md).
 
 ## Entry Points
 
@@ -65,7 +83,8 @@ This document provides a complete overview of the Shai project structure, includ
 | `conversation_history.py` | Agent/chat history, prompt history, input navigation |
 | `file_change_display.py` | Bounded diff previews |
 | `logging_config.py` | Run-based logs, retention, console settings, API payload redaction |
-| `provider_selection.py` | Provider definitions, API keys, model discovery, selection, persistence |
+| `provider_selection.py` | Shared provider configuration, API transport/authentication, interactive selection and persistence |
+| `providers/` | Provider-specific model discovery and capability metadata handlers, dispatched through a registry |
 | `model_routing.py` | Project-specific task-role routing, priority resolution and availability cache |
 | `reasoning_handlers/` | Provider-specific reasoning summary extraction |
 | `terminal_style.py` | Terminal styling utilities |

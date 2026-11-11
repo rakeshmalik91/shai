@@ -2,13 +2,11 @@
   "version": 1,
   "default": {
     "provider": "kilo-free",
-    "model": "cohere/north-mini-code:free"
+    "model": "nvidia/nemotron-3.5-lightning:free"
   },
   "models": {
-    "orchestrator": [
-    ],
-    "planner": [
-    ],
+    "orchestrator": [],
+    "planner": [],
     "code": [
       {
         "provider": "kilo-free",
@@ -21,10 +19,8 @@
         "priority": 2
       }
     ],
-    "debug": [
-    ],
-    "test": [
-    ],
+    "debug": [],
+    "test": [],
     "chat": [
       {
         "provider": "kilo-free",
@@ -39,11 +35,13 @@
         "priority": 1
       }
     ],
-    "review": [
-    ],
-    "documentation": [
-    ],
-    "research": [
-    ]
+    "review": [],
+    "documentation": [],
+    "research": []
+  },
+  "availability": {
+    "cache_seconds": 30,
+    "probe_timeout_seconds": 5,
+    "failure_cooldown_seconds": 60
   }
 }

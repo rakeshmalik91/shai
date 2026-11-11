@@ -1,11 +1,14 @@
+import json
 import pathlib
 import sys
+import tempfile
 import unittest
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from modules.project_paths import get_active_project_root, set_active_project_root
 from modules.context_meter import (
     estimate_text_tokens, estimate_messages_tokens, get_context_window,
     extract_usage, format_context_status
@@ -13,6 +16,40 @@ from modules.context_meter import (
 
 
 class ContextMeterTests(unittest.TestCase):
+    def setUp(self):
+        self.original_project_root = get_active_project_root()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        set_active_project_root(self.temp_dir.name)
+        state_dir = pathlib.Path(self.temp_dir.name) / ".shai"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        model_config = {
+            "version": 1,
+            "models": {
+                "kilo-free::cohere/north-mini-code:free": {
+                    "context_window": 256000,
+                    "max_output_tokens": 8192,
+                    "supported_input_types": ["text"],
+                    "supported_output_types": ["text"],
+                    "supports_tools": True,
+                },
+                "gemini::gemini-3.5-flash": {
+                    "context_window": 1048576,
+                    "max_output_tokens": 8192,
+                    "supported_input_types": ["text", "image", "audio", "video"],
+                    "supported_output_types": ["text"],
+                    "supports_tools": True,
+                },
+            },
+            "overrides": {},
+        }
+        (state_dir / "model_config.json").write_text(
+            json.dumps(model_config, indent=2), encoding="utf-8"
+        )
+
+    def tearDown(self):
+        set_active_project_root(self.original_project_root)
+        self.temp_dir.cleanup()
+
     def test_estimates_nonempty_prompt(self):
         self.assertGreater(estimate_text_tokens("hello world"), 0)
         self.assertGreater(
@@ -41,32 +78,26 @@ class ContextMeterTests(unittest.TestCase):
         self.assertGreater(with_system, base)
 
     def test_reads_model_specific_context_limit(self):
-        config = {
-            "model_context_windows": {
-                "kilo-free::example:model": 65536
-            }
-        }
+        config = {"models": {"kilo-free::example:model": {"context_window": 65536}}}
         self.assertEqual(
             get_context_window("kilo-free", "example:model", config), 65536
         )
 
     def test_model_specific_override_takes_precedence_over_provider_metadata(self):
         config = {
-            "model_context_windows": {"kilo-free::example:model": 65536},
-            "model_context_window_overrides": {"kilo-free::example:model": 98304},
+            "models": {"kilo-free::example:model": {"context_window": 65536}},
+            "overrides": {"kilo-free::example:model": {"context_window": 98304}},
         }
         self.assertEqual(
             get_context_window("kilo-free", "example:model", config), 98304
         )
 
     def test_get_context_window_rejects_booleans_and_negatives(self):
-        config = {
-            "model_context_windows": {
-                "p::bool": True,
-                "p::negative": -1000,
-                "p::zero": 0,
-            }
-        }
+        config = {"models": {
+            "p::bool": {"context_window": True},
+            "p::negative": {"context_window": -1000},
+            "p::zero": {"context_window": 0},
+        }}
         self.assertIsNone(get_context_window("p", "bool", config))
         self.assertIsNone(get_context_window("p", "negative", config))
         self.assertIsNone(get_context_window("p", "zero", config))
@@ -122,8 +153,8 @@ class ContextMeterTests(unittest.TestCase):
             "context limit unknown", format_context_status(250, None)
         )
 
-    def test_fallback_to_assets_context_window_config_for_known_models(self):
-        # Even with empty config, default model context limits from assets are resolved
+    def test_fallback_to_project_local_model_config_for_known_models(self):
+        # Model context limits are read from the selected project's .shai registry.
         self.assertEqual(
             get_context_window("kilo-free", "cohere/north-mini-code:free", {}), 256000
         )

@@ -42,15 +42,16 @@ Keep `setup_keys.sh` private; it is ignored by Git.
 
 ## Configuration
 
-Shai uses `shai_config.json` for all settings. Key sections:
+Shai keeps shared runtime defaults in the installation's `assets/shai_config.json` and provider endpoint overrides in the installation's `assets/provider_config.json`. **Every `.shai/` path is resolved from the currently selected working project, never from the Shai installation/repository.** Switching projects with `/project <path>` changes the active `.shai/` directory for provider/model state, approvals, history, logs, backups, task state, routing, and access grants. Key locations:
 
-- **providers** — endpoint URLs, auth headers, timeouts, model lists per provider
+- **`assets/model_routing.json` / `.shai/model_routing.json`** — default provider/model plus task-specific model routes
 - **agent_safeguards** — history compaction limits, context window estimates
 - **tool_safeguards** — per-tool timeouts (git_status, git_diff, etc.)
-- **approve** — granular approval policy (tools, categories, global)
-- **retry** — retry/backoff settings for API requests
-- **shai_command** — enable deterministic natural-language routing to registered Shai slash commands
-- **os_command** — enable restricted, bounded OS command profiles in Agent mode
+- **`.shai/model_config.json`** — discovered model limits, capabilities, and user overrides
+- **`assets/approval_config.json`** — existing application-wide approval defaults
+- **`.shai/approval_config.json`** — only project-specific interactive approval overrides
+- **`.shai/os_command_approvals.json`** — interactive OS-command permission grants
+- **`assets/shai_config.json`** — retry/backoff, safeguards, and runtime settings
 - **project_access_config.json** — generic path access defaults and rules; per-project user grants are saved under `.shai/project_access.json`; automatic edit backups and retention policy live under `.shai/shai_backups/` and `.shai/backup_config.json`
 
 See [Provider configuration](docs/PROVIDERS.md) and [Commands reference](docs/COMMANDS.md) for details.
@@ -140,7 +141,6 @@ automatically when installed.
 ```
 agent.py          # Main agent entry point (CLI, modes, commands)
 chat.py           # Chat mode entry point
-shai_config.json  # Configuration (providers, safeguards, approvals, etc.)
 requirements.txt  # Optional test dependencies only
 assets/           # Split runtime, provider, command, and access configuration
 modules/          # Core modules (tools, commands, history, providers, logging, etc.)
@@ -148,7 +148,7 @@ docs/             # Documentation
 test/             # Unit tests
 ```
 
-Generic project path policy lives in `assets/project_access_config.json`; user-approved project-specific grants are stored in `.shai/project_access.json`. See `docs/CONFIGURATION.md`.
+Generic path policy lives in the installation's `assets/project_access_config.json`; user-approved grants are stored in `<selected-project>/.shai/project_access.json`. Interactive approval overrides, command grants, provider/model selection, model metadata, logs, history, task state and backups all live under `<selected-project>/.shai/`. The installation's `assets/approval_config.json` remains the baseline approval policy. Shai creates `<selected-project>/.shai/.gitignore` to ignore only `logs/`, `shai_backups/`, `task.json`, and `history.json`. Static command policy remains in the installation's `assets/command_config.json`. See `docs/CONFIGURATION.md`.
 
 ## License
 
