@@ -5,6 +5,7 @@ from pathlib import Path
 
 from modules import logging_config
 from modules.logging_config import setup_logging
+from modules.project_paths import get_active_project_root, set_active_project_root
 
 
 class LoggingConfigTests(unittest.TestCase):
@@ -43,12 +44,10 @@ class LoggingConfigTests(unittest.TestCase):
 
 
     def test_default_log_location_is_under_shai_and_migrates_legacy_logs(self):
-        original_script_dir = logging_config.SCRIPT_DIR
+        original_project_root = get_active_project_root()
         with tempfile.TemporaryDirectory() as root_dir:
-            original_default_log_dir = logging_config.DEFAULT_LOG_DIR
             try:
-                logging_config.SCRIPT_DIR = Path(root_dir)
-                logging_config.DEFAULT_LOG_DIR = Path(root_dir) / ".shai" / "logs"
+                set_active_project_root(root_dir)
                 legacy = Path(root_dir) / "logs"
                 legacy.mkdir()
                 (legacy / "old.log").write_text("legacy")
@@ -60,18 +59,17 @@ class LoggingConfigTests(unittest.TestCase):
                 self.assertTrue(any(str(expected) in h.baseFilename for h in logger.handlers
                                     if hasattr(h, "baseFilename")))
             finally:
-                logging_config.SCRIPT_DIR = original_script_dir
-                logging_config.DEFAULT_LOG_DIR = original_default_log_dir
+                set_active_project_root(original_project_root)
 
     def test_legacy_logs_config_value_resolves_under_shai(self):
-        original_script_dir = logging_config.SCRIPT_DIR
+        original_project_root = get_active_project_root()
         with tempfile.TemporaryDirectory() as root_dir:
             try:
-                logging_config.SCRIPT_DIR = Path(root_dir)
+                set_active_project_root(root_dir)
                 settings = logging_config.load_logging_config({"logging": {}})
                 self.assertEqual(settings["log_dir"], Path(root_dir) / ".shai" / "logs")
             finally:
-                logging_config.SCRIPT_DIR = original_script_dir
+                set_active_project_root(original_project_root)
 
     def test_load_logging_config_caller_overrides_dedicated_asset(self):
         # Caller-supplied logging overrides take precedence over assets/logging_config.json

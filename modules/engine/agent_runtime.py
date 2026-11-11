@@ -24,6 +24,8 @@ import tty
 import _thread
 
 from modules.empty_response_retry import request_with_empty_response_retries
+from modules.project_paths import set_active_project_root, resolve_startup_project_root
+from modules.project_state import ensure_project_state
 from modules.ui.spinner import Spinner
 from modules.ui.chat_runtime import extract_anthropic_response, response_text
 from modules.commands.registry import normalize_command
@@ -78,10 +80,23 @@ from modules.agent_safeguards import (
 # -------------------------------------------------------------------
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parents[2]
-ROOT = pathlib.Path(
-    sys.argv[1] if len(sys.argv) > 1 else "."
-).expanduser().resolve()
+ROOT = resolve_startup_project_root()
+set_active_project_root(ROOT)
 configure_tools_root(ROOT)
+ensure_project_state(ROOT)
+
+def set_project_root(path):
+    """Switch all project-scoped runtime state to the selected project."""
+    global ROOT, TASK_FILE
+    ROOT = pathlib.Path(path).expanduser().resolve()
+    set_active_project_root(ROOT)
+    configure_tools_root(ROOT)
+    ensure_project_state(ROOT)
+    TASK_FILE = ROOT / ".shai" / "task.json"
+    from modules.logging_config import reset_default_logging
+    reset_default_logging(load_config())
+    return ROOT
+
 
 # In-memory task checklist for the current agent session/request.
 TASK_PLAN = []
@@ -91,7 +106,7 @@ DEFAULT_MAX_TOOL_CALL_ITERATIONS = 80
 HARD_MAX_TOOL_CALL_ITERATIONS = 1000
 MAX_PLAN_CONTINUATIONS = 2
 CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
-TASK_FILE = SCRIPT_DIR / ".shai" / "task.json"
+TASK_FILE = ROOT / ".shai" / "task.json"
 LOGGER = get_logger("shai.agent")
 # Set by main() after provider selection; defaults keep helpers import-testable.
 PROVIDER = "unknown"
@@ -325,7 +340,8 @@ Rules:
 Command execution boundary:
 - You MAY execute operating-system commands using the model-facing `os_command`
   tool when needed for the user's task. This tool is governed by
-  `assets/command_config.json` and its approval workflow.
+  the shared `assets/command_config.json` policy plus project-local CLI
+  approval overlays in `.shai/os_command_approvals.json`.
 - Never claim a command ran unless `os_command` returned an execution result.
 - The model-facing `os_command` tool is restricted: executable allowlists,
   blocked executables, blocked argument rules, exceptions, project access
@@ -477,97 +493,168 @@ DEFAULT_COMMIT_DIFF_SECTION_WITHOUT_DIFF = "Changes:\n{changes}\n"
 
 
 
+def _interactive_command_approval_file():
+    """Return the project-local store for permissions granted in the CLI."""
+    return ROOT / ".shai" / "os_command_approvals.json"
+
+
 def _load_os_command_settings():
-    """Load OS command policy from its dedicated split configuration file."""
+    """Load static command policy and overlay project-local CLI approvals."""
     command_file = CONFIG_FILE.parent / "command_config.json"
     try:
         with command_file.open("r", encoding="utf-8") as handle:
             config = json.load(handle)
         if not isinstance(config, dict):
-            return {}
-        settings = config.get("os_command", {})
-        return settings if isinstance(settings, dict) else {}
+            config = {}
+        settings = dict(config.get("os_command", {}))
+        if not isinstance(settings, dict):
+            settings = {}
     except (OSError, ValueError, TypeError):
-        return {}
+        settings = {}
+
+    approval_file = _interactive_command_approval_file()
+    try:
+        with approval_file.open("r", encoding="utf-8") as handle:
+            approvals = json.load(handle)
+        if not isinstance(approvals, dict):
+            approvals = {}
+    except FileNotFoundError:
+        approvals = {}
+    except (OSError, ValueError, TypeError):
+        LOGGER.warning("Could not read project command approvals: %s", approval_file)
+        approvals = {}
+
+    platforms = settings.setdefault("platforms", {})
+    platform_key = "windows" if os.name == "nt" else "unix"
+    common = platforms.setdefault("common", {})
+    active = platforms.setdefault(platform_key, {})
+    for key in ("approved_commands", "approved_subcommands", "approved_invocations"):
+        if key in approvals:
+            if key == "approved_commands":
+                current = settings.setdefault(key, [])
+                for value in approvals.get(key, []):
+                    if value not in current:
+                        current.append(value)
+            else:
+                current_map = settings.setdefault(key, {})
+                for executable, entries in approvals.get(key, {}).items():
+                    target = current_map.setdefault(executable, [])
+                    for entry in entries:
+                        if entry not in target:
+                            target.append(entry)
+
+    allowed = approvals.get("allowed_commands", [])
+    if isinstance(allowed, list):
+        active_allowed = active.setdefault("allowed_commands", [])
+        for executable in allowed:
+            if isinstance(executable, str) and executable not in active_allowed:
+                active_allowed.append(executable)
+
+    blocked_remove = approvals.get("blocked_commands_remove", [])
+    if isinstance(blocked_remove, list):
+        for section in (common, active):
+            blocked = section.get("blocked_commands", [])
+            if isinstance(blocked, list):
+                section["blocked_commands"] = [
+                    item for item in blocked if item not in blocked_remove
+                ]
+
+    platform_overrides = approvals.get("platforms", {})
+    active_overrides = platform_overrides.get(platform_key, {}) if isinstance(platform_overrides, dict) else {}
+    for key in ("blocked_command_exceptions", "blocked_command_rule_exceptions"):
+        supplied = active_overrides.get(key, {}) if isinstance(active_overrides, dict) else {}
+        if isinstance(supplied, dict):
+            target_map = active.setdefault(key, {})
+            for executable, entries in supplied.items():
+                target = target_map.setdefault(executable, [])
+                for entry in entries:
+                    if entry not in target:
+                        target.append(entry)
+    return settings
 
 
 def _persist_os_command_permission(executable, args, scope, blocked=False):
-    """Persist the narrowest selected command permission atomically."""
-    command_file = CONFIG_FILE.parent / "command_config.json"
-    with command_file.open("r", encoding="utf-8") as handle:
-        persisted = json.load(handle)
-    os_settings = persisted.setdefault("os_command", {})
+    """Persist only the interactive CLI grant under .shai, never assets."""
+    approval_file = _interactive_command_approval_file()
+    approval_file.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with approval_file.open("r", encoding="utf-8") as handle:
+            persisted = json.load(handle)
+        if not isinstance(persisted, dict):
+            persisted = {}
+    except FileNotFoundError:
+        persisted = {}
+
     tokens = list(args)
     platform_key = "windows" if os.name == "nt" else "unix"
-    platforms = os_settings.setdefault("platforms", {})
-    platforms.setdefault("common", {})
-    platform_config = platforms.setdefault(platform_key, {})
 
-    def platform_rule_map(setting):
-        common_map = platforms["common"].setdefault(setting, {})
-        active_map = platform_config.setdefault(setting, {})
-        if not isinstance(common_map, dict) or not isinstance(active_map, dict):
-            raise ValueError("{} platform configuration must be an object".format(setting))
-        return active_map
-
-    if blocked:
-        if scope == "command":
-            common_blocked = platforms["common"].setdefault("blocked_commands", [])
-            active_blocked = platform_config.setdefault("blocked_commands", [])
-            for blocked_list in (common_blocked, active_blocked):
-                if executable in blocked_list:
-                    blocked_list.remove(executable)
-            allowed = platform_config.setdefault("allowed_commands", [])
-            common_allowed = platforms["common"].setdefault("allowed_commands", [])
-            if executable not in common_allowed and executable not in allowed:
+    if scope == "command":
+        entries = persisted.setdefault("approved_commands", [])
+        if executable not in entries:
+            entries.append(executable)
+        if blocked:
+            allowed = persisted.setdefault("allowed_commands", [])
+            if executable not in allowed:
                 allowed.append(executable)
-        elif scope == "subcommand":
-            subcommand = _valid_os_subcommand(executable, tokens)
-            if not subcommand:
-                raise ValueError("No valid subcommand is available for this invocation")
-            rules = platform_rule_map("blocked_command_rule_exceptions").setdefault(executable, [])
+            remove = persisted.setdefault("blocked_commands_remove", [])
+            if executable not in remove:
+                remove.append(executable)
+    elif scope == "subcommand":
+        subcommand = _valid_os_subcommand(executable, tokens)
+        if not subcommand:
+            raise ValueError("No valid subcommand is available for this invocation")
+        entries = persisted.setdefault("approved_subcommands", {}).setdefault(executable, [])
+        if [subcommand] not in entries:
+            entries.append([subcommand])
+        if blocked:
+            rules = (persisted.setdefault("platforms", {})
+                     .setdefault(platform_key, {})
+                     .setdefault("blocked_command_rule_exceptions", {})
+                     .setdefault(executable, []))
             if subcommand not in rules:
                 rules.append(subcommand)
-        elif scope == "exact":
-            rules = platform_rule_map("blocked_command_exceptions").setdefault(executable, [])
+    elif scope == "exact":
+        entries = persisted.setdefault("approved_invocations", {}).setdefault(executable, [])
+        if tokens not in entries:
+            entries.append(tokens)
+        if blocked:
             exact_text = shlex.join(tokens)
-            if exact_text not in rules:
-                rules.append(exact_text)
-        # A permanent blocked-command exception also records approval at the
-        # same scope, preventing a second generic approval prompt on retry.
-        if scope == "command":
-            entries = os_settings.setdefault("approved_commands", [])
-            if executable not in entries:
-                entries.append(executable)
-        elif scope == "subcommand":
-            entries = os_settings.setdefault("approved_subcommands", {}).setdefault(executable, [])
-            if [subcommand] not in entries:
-                entries.append([subcommand])
-        elif scope == "exact":
-            entries = os_settings.setdefault("approved_invocations", {}).setdefault(executable, [])
-            if tokens not in entries:
-                entries.append(tokens)
+            exceptions = (persisted.setdefault("platforms", {})
+                          .setdefault(platform_key, {})
+                          .setdefault("blocked_command_exceptions", {})
+                          .setdefault(executable, []))
+            if exact_text not in exceptions:
+                exceptions.append(exact_text)
     else:
-        if scope == "command":
-            entries = os_settings.setdefault("approved_commands", [])
-            if executable not in entries:
-                entries.append(executable)
-        elif scope == "subcommand":
-            subcommand = _valid_os_subcommand(executable, tokens)
-            if not subcommand:
-                raise ValueError("No valid subcommand is available for this invocation")
-            entries = os_settings.setdefault("approved_subcommands", {}).setdefault(executable, [])
-            if [subcommand] not in entries:
-                entries.append([subcommand])
-        elif scope == "exact":
-            entries = os_settings.setdefault("approved_invocations", {}).setdefault(executable, [])
-            if tokens not in entries:
-                entries.append(tokens)
-    temporary = command_file.with_name(command_file.name + ".tmp")
+        raise ValueError("Unknown command approval scope: {}".format(scope))
+
+    temporary = approval_file.with_name(approval_file.name + ".tmp")
     with temporary.open("w", encoding="utf-8") as handle:
         json.dump(persisted, handle, indent=2, ensure_ascii=False)
         handle.write("\n")
-    temporary.replace(command_file)
+    temporary.replace(approval_file)
+
+
+
+def _persist_os_command_whitelist(executable):
+    """Persist a CLI-approved executable in the project-local overlay."""
+    approval_file = _interactive_command_approval_file()
+    approval_file.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with approval_file.open("r", encoding="utf-8") as handle:
+            persisted = json.load(handle)
+        if not isinstance(persisted, dict):
+            persisted = {}
+    except FileNotFoundError:
+        persisted = {}
+    allowed = persisted.setdefault("allowed_commands", [])
+    if executable not in allowed:
+        allowed.append(executable)
+    temporary = approval_file.with_name(approval_file.name + ".tmp")
+    with temporary.open("w", encoding="utf-8") as handle:
+        json.dump(persisted, handle, indent=2, ensure_ascii=False)
+        handle.write("\\n")
+    temporary.replace(approval_file)
 
 
 def _valid_os_subcommand(executable, args):
@@ -672,23 +759,7 @@ def os_command(executable, args, cwd=".", timeout_seconds=None, manual=False):
         from modules.engine.interaction import get_interaction_handler
         if get_interaction_handler().request_command_whitelist(full_command):
             try:
-                command_file = CONFIG_FILE.parent / "command_config.json"
-                with command_file.open("r", encoding="utf-8") as handle:
-                    persisted = json.load(handle)
-                os_settings = persisted.setdefault("os_command", {})
-                platform_key = "windows" if os.name == "nt" else "unix"
-                platforms = os_settings.setdefault("platforms", {})
-                platforms.setdefault("common", {})
-                platform_config = platforms.setdefault(platform_key, {})
-                common_allowed = platforms["common"].setdefault("allowed_commands", [])
-                allowed = platform_config.setdefault("allowed_commands", [])
-                if executable not in common_allowed and executable not in allowed:
-                    allowed.append(executable)
-                temporary = command_file.with_name(command_file.name + ".tmp")
-                with temporary.open("w", encoding="utf-8") as handle:
-                    json.dump(persisted, handle, indent=2, ensure_ascii=False)
-                    handle.write("\n")
-                temporary.replace(command_file)
+                _persist_os_command_whitelist(executable)
                 settings = _load_os_command_settings()
                 result = execute_os_command(
                     executable, args, cwd=cwd, timeout_seconds=timeout_seconds,

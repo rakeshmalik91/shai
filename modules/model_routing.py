@@ -34,6 +34,10 @@ def load_routing_config(project_root):
     template = _read_json(TEMPLATE_FILE)
     if template.get("version") != SCHEMA_VERSION:
         template = {"version": SCHEMA_VERSION, "models": {role: [] for role in ROLES}}
+    default = template.get("default")
+    default = dict(default) if isinstance(default, dict) else {
+        "provider": None, "model": None
+    }
     models = template.get("models")
     if not isinstance(models, dict):
         models = {role: [] for role in ROLES}
@@ -46,6 +50,14 @@ def load_routing_config(project_root):
         if project.get("version") != SCHEMA_VERSION:
             LOGGER.warning("Ignoring unsupported model routing version in %s", project_file)
         else:
+            project_default = project.get("default", {})
+            if (isinstance(project_default, dict)
+                    and isinstance(project_default.get("provider"), str)
+                    and project_default["provider"].strip()
+                    and isinstance(project_default.get("model"), str)
+                    and project_default["model"].strip()):
+                default["provider"] = project_default["provider"]
+                default["model"] = project_default["model"]
             project_models = project.get("models", {})
             if isinstance(project_models, dict):
                 for role in ROLES:
@@ -55,8 +67,49 @@ def load_routing_config(project_root):
                             models[role] = value
                         else:
                             LOGGER.warning("Ignoring invalid model route list for role=%s", role)
+    template["default"] = default
     template["models"] = models
     return template
+
+
+def load_default_model(project_root):
+    """Return the selected project's default provider/model pair."""
+    default = load_routing_config(project_root).get("default", {})
+    if not isinstance(default, dict):
+        return {}
+    provider, model = default.get("provider"), default.get("model")
+    if (isinstance(provider, str) and provider.strip()
+            and isinstance(model, str) and model.strip()):
+        return {"provider": provider, "model": model}
+    return {}
+
+
+def save_default_model(project_root, provider, model):
+    """Persist the default provider/model in the selected project's routing file."""
+    project_file = pathlib.Path(project_root).expanduser().resolve() / ".shai" / "model_routing.json"
+    project_file.parent.mkdir(parents=True, exist_ok=True)
+    data = _read_json(project_file)
+    if data.get("version") != SCHEMA_VERSION:
+        data = {"version": SCHEMA_VERSION}
+    default = data.get("default")
+    if not isinstance(default, dict):
+        default = {}
+    default["provider"] = provider
+    default["model"] = model
+    data["default"] = default
+    models = data.get("models")
+    if isinstance(models, dict):
+        data["models"] = models
+    else:
+        data.pop("models", None)
+    if "availability" not in data:
+        template = _read_json(TEMPLATE_FILE)
+        if isinstance(template.get("availability"), dict):
+            data["availability"] = template["availability"]
+    temporary = project_file.with_name(project_file.name + ".tmp")
+    temporary.write_text(json.dumps(data, indent=2, ensure_ascii=False) + chr(10), encoding="utf-8")
+    temporary.replace(project_file)
+    return project_file
 
 
 def _valid_candidates(items):

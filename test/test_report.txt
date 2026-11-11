@@ -1,15 +1,15 @@
 SHAI TEST REPORT
 ========================================================================
-Status: FAILED
-Started: 2026-11-11T13:27:19.956458+00:00
-Finished: 2026-11-11T13:27:40.774861+00:00
-Duration: 20.82 seconds
+Status: PASSED
+Started: 2026-11-11T17:00:54.171110+00:00
+Finished: 2026-11-11T17:01:19.761309+00:00
+Duration: 25.59 seconds
 Python: 3.9.16
 
 UNITTEST
 ------------------------------------------------------------------------
-Status: FAILED
-Run: 338 | Failures: 2 | Errors: 0 | Skipped: 0
+Status: PASSED
+Run: 362 | Failures: 0 | Errors: 0 | Skipped: 0
 test_approval_settings_support_category_and_tool_overrides (test.test_agent.ConfigTests) ... ok
 test_global_approval_applies_when_category_is_not_explicitly_denied (test.test_agent.ConfigTests) ... ok
 test_invalid_iteration_limit_uses_default (test.test_agent.ConfigTests) ... ok
@@ -82,6 +82,8 @@ test_failed_routed_request_returns_to_pattern_fallback (test.test_commit_message
 test_llm_commit_generation_uses_shared_commit_message_role_router (test.test_commit_message_routing.CommitMessageRoutingTests) ... ok
 test_message_only_command_path_invokes_message_generator (test.test_commit_message_routing.CommitMessageRoutingTests) ... ok
 test_approval_granted_hierarchy (test.test_configuration.ConfigTests) ... ok
+test_assets_approval_baseline_is_read_only_and_project_file_contains_only_deltas (test.test_configuration.ConfigTests) ... ok
+test_legacy_full_project_snapshot_is_compacted_to_differences (test.test_configuration.ConfigTests) ... ok
 test_load_agent_safeguards_bounds (test.test_configuration.ConfigTests) ... ok
 test_load_api_timeout_seconds_defaults_and_validation (test.test_configuration.ConfigTests) ... ok
 test_load_config_handles_malformed_json_gracefully (test.test_configuration.ConfigTests) ... ok
@@ -94,8 +96,9 @@ test_load_retry_settings_exhaustive_validation (test.test_configuration.ConfigTe
 test_load_test_execution_settings_clamps_combined_streams (test.test_configuration.ConfigTests) ... ok
 test_load_tool_call_display_settings_validation (test.test_configuration.ConfigTests) ... ok
 test_positive_int_setting_helper (test.test_configuration.ConfigTests) ... ok
+test_project_approval_overrides_legacy_asset_approval (test.test_configuration.ConfigTests) ... ok
 test_provider_selection_load_config_preserves_shai_config_overrides (test.test_configuration.ConfigTests) ... ok
-test_save_approval_settings_does_not_leak_split_configs_into_shai_config (test.test_configuration.ConfigTests) ... ok
+test_save_approval_settings_uses_project_shai_directory (test.test_configuration.ConfigTests) ... ok
 test_tool_safeguards_invalid_boolean_flags (test.test_configuration.ConfigTests)
 Test that invalid boolean flags are normalized. ... ok
 test_discloses_unknown_limit_instead_of_fabricating_percentage (test.test_context_meter.ContextMeterTests) ... ok
@@ -107,21 +110,29 @@ test_extract_usage_anthropic (test.test_context_meter.ContextMeterTests) ... ok
 test_extract_usage_calculates_total_when_missing (test.test_context_meter.ContextMeterTests) ... ok
 test_extract_usage_malformed_returns_empty (test.test_context_meter.ContextMeterTests) ... ok
 test_extract_usage_openai (test.test_context_meter.ContextMeterTests) ... ok
-test_fallback_to_assets_model_config_for_known_models (test.test_context_meter.ContextMeterTests) ... FAIL
+test_fallback_to_project_local_model_config_for_known_models (test.test_context_meter.ContextMeterTests) ... ok
 test_formats_exact_and_generated_tokens (test.test_context_meter.ContextMeterTests) ... ok
 test_formats_percentage_when_limit_is_known (test.test_context_meter.ContextMeterTests) ... ok
 test_get_context_window_rejects_booleans_and_negatives (test.test_context_meter.ContextMeterTests) ... ok
 test_model_specific_override_takes_precedence_over_provider_metadata (test.test_context_meter.ContextMeterTests) ... ok
 test_reads_model_specific_context_limit (test.test_context_meter.ContextMeterTests) ... ok
-test_thinking_context_status_known_for_default_model (test.test_context_meter.ContextMeterTests) ... FAIL
+test_thinking_context_status_known_for_default_model (test.test_context_meter.ContextMeterTests) ... ok
 test_add_input_ignores_whitespace_and_caps_history (test.test_conversation_history.ConversationHistoryTests) ... ok
 test_clear_preserves_prompt_and_other_mode_history (test.test_conversation_history.ConversationHistoryTests) ... ok
+test_command_execution_inputs_are_in_prompt_history (test.test_conversation_history.ConversationHistoryTests) ... ok
 test_corrupt_history_file_recovers_to_empty (test.test_conversation_history.ConversationHistoryTests) ... ok
 test_history_file_is_json_and_has_expected_path (test.test_conversation_history.ConversationHistoryTests) ... ok
 test_load_returns_deep_copy (test.test_conversation_history.ConversationHistoryTests) ... ok
 test_metadata_persistence_and_mode_isolation (test.test_conversation_history.ConversationHistoryTests) ... ok
 test_mode_histories_are_separate_and_preserved (test.test_conversation_history.ConversationHistoryTests) ... ok
 test_prompt_history_shared_and_deduplicated (test.test_conversation_history.ConversationHistoryTests) ... ok
+test_selection_input_does_not_enter_readline_history (test.test_conversation_history.ConversationHistoryTests) ... ok
+test_all_registered_provider_formats_are_supported (test.test_empty_response_retry.EmptyResponseRetryTests) ... ok
+test_anthropic_empty_then_tool_use_retries (test.test_empty_response_retry.EmptyResponseRetryTests) ... ok
+test_max_retries_is_respected (test.test_empty_response_retry.EmptyResponseRetryTests) ... ok
+test_nonempty_text_and_tool_calls_are_not_retried (test.test_empty_response_retry.EmptyResponseRetryTests) ... ok
+test_openai_compatible_empty_then_text_retries (test.test_empty_response_retry.EmptyResponseRetryTests) ... ok
+test_retry_can_be_disabled (test.test_empty_response_retry.EmptyResponseRetryTests) ... ok
 test_all_domain_modules_import (test.test_engine_module_boundaries.EngineModuleBoundaryTests) ... ok
 test_domain_source_is_not_left_in_runtime (test.test_engine_module_boundaries.EngineModuleBoundaryTests) ... ok
 test_engine_runtime_remains_compatibility_surface (test.test_engine_module_boundaries.EngineModuleBoundaryTests) ... ok
@@ -181,7 +192,9 @@ test_all_supported_roles_have_unconfigured_template_entries (test.test_model_rou
 test_candidate_deduplication_preserves_first_occurrence (test.test_model_routing.ModelRoutingTests) ... ok
 test_candidate_validation_rejects_booleans_and_missing_keys (test.test_model_routing.ModelRoutingTests) ... ok
 test_clear_availability_cache_is_backward_compatible_noop (test.test_model_routing.ModelRoutingTests) ... ok
+test_default_provider_model_loads_from_assets_and_project_override (test.test_model_routing.ModelRoutingTests) ... ok
 test_discontinued_inactive_route_is_silently_skipped (test.test_model_routing.ModelRoutingTests) ... ok
+test_incomplete_project_default_does_not_mix_with_shared_default (test.test_model_routing.ModelRoutingTests) ... ok
 test_invalid_project_version_does_not_enable_routes (test.test_model_routing.ModelRoutingTests) ... ok
 test_malformed_candidates_are_skipped_individually (test.test_model_routing.ModelRoutingTests) ... ok
 test_non_model_errors_do_not_trigger_route_fallback (test.test_model_routing.ModelRoutingTests) ... ok
@@ -189,6 +202,7 @@ test_priority_route_does_not_probe_model_catalogue (test.test_model_routing.Mode
 test_project_routes_override_template_by_role_only (test.test_model_routing.ModelRoutingTests) ... ok
 test_project_routing_file_is_gitignored_and_template_is_tracked (test.test_model_routing.ModelRoutingTests) ... ok
 test_routes_include_active_default_after_inactive_candidates (test.test_model_routing.ModelRoutingTests) ... ok
+test_saving_default_preserves_existing_task_routes (test.test_model_routing.ModelRoutingTests) ... ok
 test_unknown_provider_is_skipped_but_configured_model_is_trusted (test.test_model_routing.ModelRoutingTests) ... ok
 test_unknown_role_uses_default (test.test_model_routing.ModelRoutingTests) ... ok
 test_detail_lookup_failure_is_non_blocking_and_does_not_create_empty_entry (test.test_model_selection_regressions.ModelSelectionRegressionTests) ... ok
@@ -287,6 +301,16 @@ test_single_star_does_not_cross_directory_boundary (test.test_project_access_con
 test_symlink_escape_is_rejected (test.test_project_access_control.ProjectAccessControlTests) ... ok
 test_test_runner_never_falls_through_to_stdin (test.test_project_access_control.ProjectAccessControlTests) ... ok
 test_unknown_permission_rejected (test.test_project_access_control.ProjectAccessControlTests) ... ok
+test_approval_and_project_access_files_are_scoped_to_selected_project (test.test_project_paths.ActiveProjectStatePathTests) ... ok
+test_logging_defaults_to_selected_project (test.test_project_paths.ActiveProjectStatePathTests) ... ok
+test_model_metadata_defaults_to_selected_project (test.test_project_paths.ActiveProjectStatePathTests) ... ok
+test_project_switch_updates_task_state_path_and_active_root (test.test_project_paths.ActiveProjectStatePathTests) ... ok
+test_provider_selection_and_migration_use_selected_project (test.test_project_paths.ActiveProjectStatePathTests) ... ok
+test_startup_resolver_uses_explicit_project_directory (test.test_project_paths.ActiveProjectStatePathTests) ... ok
+test_ignore_file_ignores_only_managed_runtime_artifacts (test.test_project_state.ProjectStateTests) ... ok
+test_ignore_file_preserves_user_rules_and_is_idempotent (test.test_project_state.ProjectStateTests) ... ok
+test_legacy_selection_migrates_into_existing_routing_file_and_is_removed (test.test_project_state.ProjectStateTests) ... ok
+test_provider_and_model_state_migrates_out_of_assets (test.test_project_state.ProjectStateTests) ... ok
 test_all_handlers_are_total_for_invalid_payloads (test.test_provider_handlers.ProviderHandlerTests) ... ok
 test_anthropic_catalogue_and_limits (test.test_provider_handlers.ProviderHandlerTests) ... ok
 test_gemini_populates_all_fields_available_in_model_resource (test.test_provider_handlers.ProviderHandlerTests) ... ok
@@ -350,26 +374,10 @@ test_read_only_dispatch_and_schemas_are_shared (test.test_tools_module.SharedToo
 test_root_configuration_and_safe_path (test.test_tools_module.SharedToolsModuleTests) ... ok
 test_search_files_single_and_recursive (test.test_tools_module.SharedToolsModuleTests) ... ok
 
-======================================================================
-FAIL: test_fallback_to_assets_model_config_for_known_models (test.test_context_meter.ContextMeterTests)
 ----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "/mnt/lectra/shai/test/test_context_meter.py", line 121, in test_fallback_to_assets_model_config_for_known_models
-    self.assertEqual(
-AssertionError: None != 256000
+Ran 362 tests in 17.757s
 
-======================================================================
-FAIL: test_thinking_context_status_known_for_default_model (test.test_context_meter.ContextMeterTests)
-----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "/mnt/lectra/shai/test/test_context_meter.py", line 131, in test_thinking_context_status_known_for_default_model
-    self.assertNotIn("limit unknown", status)
-AssertionError: 'limit unknown' unexpectedly found in 'Prompt estimate: ~1,200 tokens (context limit unknown)'
-
-----------------------------------------------------------------------
-Ran 338 tests in 14.132s
-
-FAILED (failures=2)
+OK
 
 PYTEST
 ------------------------------------------------------------------------

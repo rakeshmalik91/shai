@@ -32,9 +32,9 @@ from modules.conversation_history import input_without_history
 # -------------------------------------------------------------------
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
-ROOT = pathlib.Path(
-    sys.argv[1] if __name__ == "__main__" and len(sys.argv) > 1 else "."
-).expanduser().resolve()
+from modules.project_paths import set_active_project_root, resolve_startup_project_root, get_active_project_root
+ROOT = resolve_startup_project_root()
+set_active_project_root(ROOT)
 
 MAX_FILE_SIZE = 200_000
 DEFAULT_MAX_TOOL_CALL_ITERATIONS = 12
@@ -87,20 +87,28 @@ def load_config():
         # Split configuration files are merged for existing consumers.
         for filename in (
             "provider_config.json", "command_config.json",
-            "model_config.json", "cli_config.json",
-            "logging_config.json",
+            "cli_config.json", "logging_config.json",
         ):
             try:
                 with (CONFIG_FILE.parent / filename).open("r", encoding="utf-8") as extra:
                     section = json.load(extra)
                 if isinstance(section, dict):
-                    if filename == "model_config.json":
-                        value.setdefault("model_config", {})
-                        _merge_config_section(value["model_config"], section)
-                    else:
-                        _merge_config_section(value, section)
+                    _merge_config_section(value, section)
             except (FileNotFoundError, OSError, ValueError, TypeError):
                 pass
+        from modules.project_state import migrate_legacy_model_selection
+        from modules.model_routing import load_default_model
+        migrate_legacy_model_selection(get_active_project_root(), CONFIG_FILE)
+        selection = load_default_model(get_active_project_root())
+        value.update(selection)
+        state_dir = get_active_project_root() / ".shai"
+        try:
+            model_data = json.loads((state_dir / "model_config.json").read_text(encoding="utf-8"))
+            if isinstance(model_data, dict):
+                value.setdefault("model_config", {})
+                _merge_config_section(value["model_config"], model_data)
+        except (OSError, ValueError, TypeError):
+            pass
         return value
     except (FileNotFoundError, OSError, ValueError, TypeError):
         return {}

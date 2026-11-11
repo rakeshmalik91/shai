@@ -4,10 +4,14 @@ import json
 import logging
 import pathlib
 from copy import deepcopy
+from modules.project_paths import get_project_state_dir
 
 LOGGER = logging.getLogger("shai.model_config")
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parents[1]
-MODEL_CONFIG_FILE = SCRIPT_DIR / "assets" / "model_config.json"
+MODEL_CONFIG_FILE = get_project_state_dir() / "model_config.json"
+
+def _default_model_config_file():
+    return get_project_state_dir() / "model_config.json"
 SCHEMA_VERSION = 1
 DEFAULT_MODEL_ATTRIBUTES = {
     "context_window": None, "max_output_tokens": None,
@@ -88,7 +92,7 @@ def _normalize_config(config):
 
 
 def load_model_config(path=None, migrate=True):
-    path = pathlib.Path(path or MODEL_CONFIG_FILE)
+    path = pathlib.Path(path or _default_model_config_file())
     config = _read(path)
     if config.get("version") != SCHEMA_VERSION:
         if "model_context_windows" in config or "model_context_window_overrides" in config:
@@ -104,7 +108,7 @@ def load_model_config(path=None, migrate=True):
 
 
 def save_model_config(config, path=None):
-    path = pathlib.Path(path or MODEL_CONFIG_FILE)
+    path = pathlib.Path(path or _default_model_config_file())
     path.parent.mkdir(parents=True, exist_ok=True)
     normalized = _normalize_config(config)
     temporary = path.with_name(path.name + ".tmp")

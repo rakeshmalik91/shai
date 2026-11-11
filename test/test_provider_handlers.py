@@ -188,6 +188,7 @@ class ProviderHandlerTests(unittest.TestCase):
             original = selection.CONFIG_FILE
             selection.CONFIG_FILE = Path(temp) / "assets" / "shai_config.json"
             selection.CONFIG_FILE.parent.mkdir()
+            selection._state_dir().mkdir(parents=True, exist_ok=True)
             try:
                 for provider, payload in payloads.items():
                     with self.subTest(provider=provider), \
@@ -195,7 +196,7 @@ class ProviderHandlerTests(unittest.TestCase):
                          mock.patch.object(selection, "_get_json", return_value=payload):
                         result = selection.get_selected_model_details(provider, "m")
                         self.assertTrue(result, provider)
-                        saved = selection.CONFIG_FILE.parent / "model_config.json"
+                        saved = selection._state_dir() / "model_config.json"
                         from modules.model_config import load_model_config, get_model_config
                         model = get_model_config(provider, "m", load_model_config(saved))
                         self.assertTrue(model.get("context_window"), provider)

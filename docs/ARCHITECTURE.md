@@ -66,7 +66,7 @@ flowchart TD
 - **Shared modules** provide provider selection, conversation history, safeguards, logging, reasoning handlers, and context metering.
 - **Agent mode** adds mutating tools (editing, verification, Git, task management) with approval and bounded execution.
 - **Chat mode** provides conversation and read-only inspection without local project mutation or OS command execution.
-- **Configuration** (`assets/*.json`), history (`.shai/history.json`), and project-local logs are persistent data.
+- **Configuration** (`assets/*.json`) is installation-shared; history (`<selected-project>/.shai/history.json`) and project-local logs are rooted in the selected project.
 
 ## Entry Points
 
@@ -123,11 +123,11 @@ Reasoning handlers expose provider-supplied summaries when available. They do no
 
 ## Persistent Data
 
-- `assets/shai_config.json`: core runtime configuration and last-used provider/model; `assets/project_access_config.json`: generic project path access policy; `assets/provider_config.json`: provider overrides; `assets/command_config.json`: command policies.
-- `.shai/history.json`: conversation history in the selected working project.
-- `.shai/project_access.json`: user-approved path grants scoped to that project (ignored by Git).
+- `assets/shai_config.json`: core runtime configuration; `assets/model_routing.json` and `.shai/model_routing.json`: default provider/model and task-role routes; `.shai/model_config.json`: model metadata and overrides; `assets/project_access_config.json`: generic project path access policy; `assets/provider_config.json`: provider overrides; `assets/command_config.json`: command policies.
+- `<selected-project>/.shai/history.json`: conversation history in the selected working project. All other `.shai/` paths follow this same selected-project root.
+- `.shai/project_access.json`: user-approved path grants scoped to that project.
 - `.shai/backup_config.json` and `.shai/shai_backups/`: project-specific backup policy and automatic file backups.
-- `.shai/logs/`: diagnostic logs when file logging is enabled.
+- `.shai/logs/`: diagnostic logs when file logging is enabled. Shai maintains `.shai/.gitignore`, which ignores only `logs/`, `shai_backups/`, `task.json`, and `history.json`; other `.shai` files remain trackable.
 - `setup_keys.sh`: optional user-created shell file for API-key environment variables; keep it private and do not commit it.
 
 ## Tests
@@ -179,3 +179,7 @@ The shared read-only project tools are divided by responsibility:
 All project-path decisions are centralized in `modules/tools/common.py`. Filesystem tools and code-inspection tools require `view`; file mutation operations require `edit`, with a separate `truncate` check for high-risk content reductions. Controlled command execution checks `execute` for its working directory and Python targets, and `view` for Git pathspecs.
 
 Generic policy is stored in `assets/project_access_config.json`; user-approved project-specific grants are stored in `.shai/project_access.json`. Path rules use project-relative globs, explicit deny always wins, and canonicalization prevents traversal and symlink escapes. Access checks are separate from interactive/configured approvals: approval cannot grant a path permission. See `docs/CONFIGURATION.md`.
+
+## Active project path resolution
+
+`modules/project_paths.py` is the single source of truth for the active project root. The CLI sets it at startup and updates it on `/project`; every project-local `.shai/` path derives from this root. The Shai installation path is used only for shared `assets/` files.

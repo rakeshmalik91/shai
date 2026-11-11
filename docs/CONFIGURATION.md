@@ -1,19 +1,20 @@
 # Configuration layout
 
-Shai configuration is stored under `assets/` and split by responsibility:
+Shared defaults and policies are stored under the Shai installation's `assets/`; project-specific runtime state and preferences are stored under `<selected-project>/.shai/`. The selected project is the CLI's current project (including a project selected or changed with `/project`); switching projects rebinds provider/model state, task state, history, logs, backups, approvals, routing, and access grants to the new root. **No runtime `.shai/` read, write, migration, or cleanup may be rooted in the Shai source/repository directory.**
 
 - `assets/tools_registry.json` stores model-facing tool definitions and chat availability.
 
-`assets/shai_config.json` — core agent, runtime, retry, approval, and safeguard settings.
+- `assets/shai_config.json` — core agent, runtime, retry, and safeguard settings.
+- `assets/approval_config.json` — existing application-wide approval defaults and policy.
 - `assets/project_access_config.json` — generic project path access defaults and administrator-authored path rules.
 - `assets/provider_config.json` — provider endpoint/authentication overrides under `providers`.
 - `assets/command_config.json` — Shai slash-command and OS command settings (`shai_command`, `os_command`).
-- `assets/model_config.json` — per-model technical limits and capabilities, including context windows, output limits, supported input/output content types, tool calling, structured output, and reasoning. Model-specific `overrides` take precedence over model metadata, which takes precedence over global `defaults`.
+- `.shai/model_config.json` — per-model technical limits and capabilities, including context windows, output limits, supported input/output content types, tool calling, structured output, and reasoning. Model-specific `overrides` take precedence over model metadata, which takes precedence over global `defaults`.
 
 
 ### Model metadata configuration
 
-`assets/model_config.json` is the shared model metadata registry. Model keys use
+`.shai/model_config.json` is the project-local model metadata registry. Model keys use
 `provider::model` so identifiers remain unambiguous across providers. The file
 is divided into three layers:
 
@@ -57,8 +58,16 @@ file is absent.
 - `assets/logging_config.json` — log level, output location (`.shai/logs/` by default), rotation, retention, and console logging.
 - `assets/command_registry.json` — natural-language command registry.
 
-Runtime configuration loaders merge the split files for consumers that need a unified view. Provider/model selection metadata remains in the core configuration; provider-specific endpoint and authentication overrides belong in `provider_config.json`. Context-window values, CLI presentation settings, and logging settings are persisted only to their dedicated files.
+Runtime configuration loaders merge the split files for consumers that need a unified view. The default provider/model is defined by `default.provider` and `default.model` in `assets/model_routing.json`; the selected project's `.shai/model_routing.json` can override those values and also holds task-role routes. On startup, legacy selections from `provider_model.json` or top-level `provider`/`model` keys in `assets/shai_config.json` are migrated into the project's `model_routing.json` default, and the obsolete selection file is removed. Legacy `assets/model_config.json` is still moved to `.shai/model_config.json`. Discovered model capabilities and user overrides remain in `.shai/model_config.json`; provider endpoint and authentication overrides remain in `assets/provider_config.json`.
 
+
+## Interactive CLI approvals
+
+Existing approval defaults and policy remain in `assets/approval_config.json` and are read as the baseline; Shai does not rewrite this file during interactive use. Only differences introduced through interactive approval prompts are stored in `<project-root>/.shai/approval_config.json`. OS-command permissions granted interactively (permanent executable, subcommand, exact-invocation, or allowlist choices) are saved in `<project-root>/.shai/os_command_approvals.json`. Static command allowlists, block rules, and platform policy remain in the shared `assets/command_config.json`. Legacy `approve` and `yes_to_all` values in `assets/shai_config.json` remain supported as a fallback.
+
+## `.shai` Git ignore rules
+
+Shai creates and maintains `.shai/.gitignore` with exactly these managed exclusions: `logs/`, `shai_backups/`, `task.json`, and `history.json`. It does not ignore the `.shai` directory or use a catch-all rule. Provider/model preferences, model metadata, interactive approval overrides, project access grants, routing configuration, and other files remain eligible for Git tracking. The approval baseline itself remains in `assets/approval_config.json`.
 
 ## Project path access policy
 
@@ -163,7 +172,7 @@ by Git; `.shai/backup_config.json` remains available for project-specific policy
 
 ## Logging location
 
-Diagnostic logs are written to `<Shai-root>/.shai/logs/` by default.
+Diagnostic logs are written to `<selected-project>/.shai/logs/` by default.
 The legacy `logs/` configuration value is treated as `.shai/logs/`, and
 existing files in the old root-level `logs/` directory are moved into the
 canonical directory when logging initializes. A custom absolute or relative
@@ -172,15 +181,15 @@ canonical directory when logging initializes. A custom absolute or relative
 
 ## Model routing
 
-`assets/model_routing.json` is the tracked routing template. It declares every
-supported task category with an empty candidate list, so routing is disabled
-until a project configures candidates. The active project's override is `.shai/model_routing.json`. This specific
-file is intentionally committed with the project so the team's routing policy
-is shared. Other files under `.shai/` remain Git-ignored. The root `.gitignore`
-uses `.shai/*` with an exception for `.shai/model_routing.json`.
+`assets/model_routing.json` is the tracked default/template configuration. Its
+`default` object supplies the fallback provider/model, while `models` declares
+every supported task category with an empty candidate list. The active project's
+`.shai/model_routing.json` can override the default and define task-specific
+candidate lists. This project file can be committed to share the team's default
+model and routing policy. Shai creates `<selected-project>/.shai/.gitignore` with rules for only `logs/`, `shai_backups/`, `task.json`, and `history.json`; other `.shai/` files, including model-routing defaults, approval state, and model metadata, remain eligible for version control.
 
 For a populated example, see `assets/model_routing.sample.json`. Copy its
-`models` entries into `.shai/model_routing.json` and replace every
+`default` and `models` entries into `.shai/model_routing.json` and replace every
 `YOUR_*_MODEL` placeholder with an exact model identifier returned by that
 provider's model discovery. The Ollama examples also require those models to
 be installed locally.

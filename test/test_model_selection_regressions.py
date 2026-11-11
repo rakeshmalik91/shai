@@ -15,6 +15,7 @@ class ModelSelectionRegressionTests(unittest.TestCase):
         self.original_config_file = selection.CONFIG_FILE
         selection.CONFIG_FILE = pathlib.Path(self.temp.name) / "assets" / "shai_config.json"
         selection.CONFIG_FILE.parent.mkdir(parents=True)
+        selection._state_dir().mkdir(parents=True, exist_ok=True)
         selection.MODEL_CATALOGUE_ITEMS.clear()
         selection.MODEL_CONTEXT_WINDOWS.clear()
 
@@ -76,7 +77,7 @@ class ModelSelectionRegressionTests(unittest.TestCase):
         with mock.patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}), \
              mock.patch.object(selection, "_get_json", side_effect=RuntimeError("not found")):
             self.assertEqual(selection.get_selected_model_details("openai", "retired-model"), {})
-        model_path = selection.CONFIG_FILE.parent / "model_config.json"
+        model_path = selection._state_dir() / "model_config.json"
         self.assertFalse(model_path.exists())
 
     def test_kilo_metadata_maps_modality_string_and_supported_parameters(self):
@@ -99,7 +100,7 @@ class ModelSelectionRegressionTests(unittest.TestCase):
         self.assertTrue(metadata["supports_reasoning"])
 
     def test_metadata_update_preserves_existing_attributes_and_user_overrides(self):
-        path = selection.CONFIG_FILE.parent / "model_config.json"
+        path = selection._state_dir() / "model_config.json"
         path.write_text(json.dumps({
             "version": 1,
             "models": {"openai::model-x": {
@@ -126,19 +127,20 @@ class ModelSelectionRegressionTests(unittest.TestCase):
              mock.patch.object(selection, "get_selected_model_details", return_value={}):
             result = selection.initialize_provider()
         self.assertEqual(result, ("openai", "gpt-test"))
-        saved = json.loads(selection.CONFIG_FILE.read_text(encoding="utf-8"))
-        self.assertEqual(saved["provider"], "openai")
-        self.assertEqual(saved["model"], "gpt-test")
+        saved = json.loads((selection._state_dir() / "model_routing.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["default"]["provider"], "openai")
+        self.assertEqual(saved["default"]["model"], "gpt-test")
+        self.assertFalse((selection._state_dir() / "provider_model.json").exists())
 
     def test_provider_config_and_model_config_are_merged_without_mutating_source(self):
-        selection.CONFIG_FILE.write_text(json.dumps({"provider": "openai"}), encoding="utf-8")
-        model_path = selection.CONFIG_FILE.parent / "model_config.json"
+        selection.CONFIG_FILE.write_text(json.dumps({"max_tool_call_iterations": 12}), encoding="utf-8")
+        model_path = selection._state_dir() / "model_config.json"
         model_path.write_text(json.dumps({"version": 1, "models": {
             "openai::gpt-test": {"context_window": 123456}
         }}), encoding="utf-8")
         merged = selection.load_config()
         self.assertEqual(merged["model_config"]["models"]["openai::gpt-test"]["context_window"], 123456)
-        self.assertEqual(json.loads(selection.CONFIG_FILE.read_text()), {"provider": "openai"})
+        self.assertEqual(json.loads(selection.CONFIG_FILE.read_text()), {"max_tool_call_iterations": 12})
 
 
 if __name__ == "__main__":

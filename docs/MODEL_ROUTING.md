@@ -18,17 +18,20 @@ runtime call sites. See [the remaining implementation plan](plans/MODEL_ROUTING_
 
 ## Configuration locations
 
-- `assets/model_routing.json` is the tracked empty template and defines the
-  supported roles and default configuration shape.
-- `<project>/.shai/model_routing.json` is the active project's override.
-- The project file overrides only roles it explicitly defines. Other roles
-  retain their template values (currently empty candidate lists).
-- The provider/model selected through the normal ShAI configuration remains
-  the fallback when no configured candidate is usable.
+- `assets/model_routing.json` is the tracked shared default configuration.
+  Its `default.provider` and `default.model` values provide the fallback model;
+  its `models` object defines the supported task roles.
+- `<project>/.shai/model_routing.json` is the active project's override and
+  stores both its selected default provider/model and task-specific routes.
+- A project `default` overrides the shared `default`; project role lists
+  override only the roles they explicitly define. Other roles retain their
+  template values (normally empty candidate lists).
+- There is no separate provider/model selection file. Interactive selection
+  updates the project's `default` object in this same routing file.
 - Provider credentials, API endpoints, and provider-specific settings remain
   in provider configuration; they do not belong in the routing file.
 
-The directory name is consistently lowercase `.shai/` across runtime code,
+The `.shai/` directory is always rooted in the selected working project, not the Shai installation. The directory name is consistently lowercase `.shai/` across runtime code,
 tests, and documentation. This is the same project-local directory used for
 access grants, logs, task state, and backups.
 
@@ -37,6 +40,10 @@ access grants, logs, task state, and backups.
 ```json
 {
   "version": 1,
+  "default": {
+    "provider": "openrouter",
+    "model": "vendor/default-model"
+  },
   "models": {
     "orchestrator": [
       {"provider": "ollama", "model": "qwen2.5:14b", "priority": 1},
@@ -58,8 +65,9 @@ access grants, logs, task state, and backups.
 }
 ```
 
-Lower positive `priority` values are preferred. Candidate order is stable for
-equal priorities. Duplicate provider/model pairs are ignored after the first
+When no role-specific candidate is usable, Shai uses the configured default
+provider/model. Lower positive `priority` values are preferred. Candidate
+order is stable for equal priorities. Duplicate provider/model pairs are ignored after the first
 entry. A candidate is eligible when its provider is registered and its
 configuration entry is structurally valid. The model name is trusted until an
 actual request is made; this avoids slow catalogue calls.

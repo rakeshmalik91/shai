@@ -34,7 +34,7 @@ The eight priority tools are `get_file_outline`, `find_symbol`, `find_references
 | `replace_lines` | `path`, `start_line`, `end_line`, `new_text` | Replace a 1-based inclusive line range. Useful when exact matching fails because of indentation or whitespace. |
 
 File modifications are previewed and require approval according to the granular
-`approve` settings in `assets/shai_config.json`. Risky truncations/deletions require an
+interactive approval settings in the selected project's `.shai/approval_config.json`. All `.shai/` storage follows the active project, not the Shai installation. Risky truncations/deletions require an
 explicit category or tool approval (or an interactive confirmation); the global
 `approve.all` setting alone does not bypass high-risk file checks. Original files
 are backed up before atomic replacement.
@@ -106,13 +106,13 @@ Shared read-only tools (project listing/reading/search, Git inspection, AST/code
 
 ## Configuration
 
-`assets/shai_config.json` controls core provider/model selection, approval behaviour, safeguards, test execution, logging, history limits and display settings. Provider-specific endpoint/auth overrides are in `assets/provider_config.json`; command execution and Git policy are in `assets/command_config.json`. API keys belong in environment variables, not this file.
+`assets/shai_config.json` controls core safeguards, test execution, retry policy, history limits and runtime settings. The default provider/model is defined in `assets/model_routing.json` and can be overridden in the active project's `.shai/model_routing.json`, alongside task-specific routes; model capabilities and overrides are stored in `.shai/model_config.json`. The approval baseline remains in `assets/approval_config.json`; only interactive approval overrides are stored in `.shai/approval_config.json` and `.shai/os_command_approvals.json`. Provider-specific endpoint/auth overrides are in `assets/provider_config.json`; command execution and Git policy are in `assets/command_config.json`. API keys belong in environment variables, not this file.
 
 ## Context meter
 
 Before each request, Agent and Chat display an approximate prompt-token count. The estimate is also shown in the thinking indicator. After the response, Shai displays exact prompt/completion/total token counts when the provider returns usage metadata.
 
-A context percentage is shown only when a context limit is known. During interactive `/model` selection, Shai lists model IDs, then persists metadata only for the model selected by the user in `assets/model_config.json`. Kilo publishes model capabilities in its documented `/models` catalogue response rather than a documented per-model detail endpoint, so Shai retains that response in memory and extracts only the selected model's record after selection; it does not write metadata for the other catalogue entries or make an extra per-model request. Other providers use their configured per-model detail endpoint where available. If the provider does not publish a limit, the display explicitly says the limit is unknown rather than inventing a percentage. User overrides in the `overrides` section always take precedence over discovered metadata.
+A context percentage is shown only when a context limit is known. During interactive `/model` selection, Shai lists model IDs, then persists metadata only for the model selected by the user in `.shai/model_config.json`. Kilo publishes model capabilities in its documented `/models` catalogue response rather than a documented per-model detail endpoint, so Shai retains that response in memory and extracts only the selected model's record after selection; it does not write metadata for the other catalogue entries or make an extra per-model request. Other providers use their configured per-model detail endpoint where available. If the provider does not publish a limit, the display explicitly says the limit is unknown rather than inventing a percentage. User overrides in the `overrides` section always take precedence over discovered metadata.
 
 The pre-request estimate is heuristic and should not be treated as tokenizer-exact. Debug logs record both estimates and provider-reported usage.
 

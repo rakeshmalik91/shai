@@ -17,10 +17,13 @@ class ConfigTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.config_path = pathlib.Path(self.temp_dir.name) / "shai_config.json"
         self.original_config_file = agent.CONFIG_FILE
+        self.original_root = agent.ROOT
         agent.CONFIG_FILE = self.config_path
+        agent.ROOT = pathlib.Path(self.temp_dir.name)
 
     def tearDown(self):
         agent.CONFIG_FILE = self.original_config_file
+        agent.ROOT = self.original_root
         self.temp_dir.cleanup()
 
     def write_config(self, data):
@@ -219,25 +222,69 @@ class ConfigTests(unittest.TestCase):
         self.assertLessEqual(settings["max_invalid_argument_attempts_per_tool"], 5)
         self.assertLessEqual(settings["default_read_file_lines"], settings["max_read_file_lines"])
 
-    def test_save_approval_settings_does_not_leak_split_configs_into_shai_config(self):
+    def test_save_approval_settings_uses_project_shai_directory(self):
         self.write_config({"provider": "kilo-free", "model": "test-model"})
-        # Place sibling split config files in the same directory
-        (pathlib.Path(self.temp_dir.name) / "model_config.json").write_text(
-            json.dumps({"version": 1, "models": {"kilo-free::test-model": {"context_window": 128000}}}),
-            encoding="utf-8"
-        )
-        (pathlib.Path(self.temp_dir.name) / "cli_config.json").write_text(
-            json.dumps({"tool_call_display": {"show_parameters": True}}),
-            encoding="utf-8"
-        )
         agent.save_approval_settings({"all": True, "tools": {"run_checks": True}})
         saved = json.loads(self.config_path.read_text(encoding="utf-8"))
+        approval_path = pathlib.Path(self.temp_dir.name) / ".shai" / "approval_config.json"
+        persisted = json.loads(approval_path.read_text(encoding="utf-8"))
         self.assertEqual(saved["provider"], "kilo-free")
         self.assertEqual(saved["model"], "test-model")
-        self.assertTrue(saved["approve"]["all"])
-        # Crucial check: split files must not be copied/leaked into shai_config.json
-        self.assertNotIn("model_config", saved)
-        self.assertNotIn("tool_call_display", saved)
+        self.assertNotIn("approve", saved)
+        self.assertTrue(persisted["all"])
+        self.assertTrue(persisted["tools"]["run_checks"])
+        self.assertEqual(agent.load_approval_settings()["all"], True)
+
+    def test_assets_approval_baseline_is_read_only_and_project_file_contains_only_deltas(self):
+        base_path = self.config_path.parent / "approval_config.json"
+        baseline = {
+            "all": True,
+            "file_edit": False,
+            "execution": True,
+            "tools": {"run_checks": False, "edit_file": True},
+        }
+        base_path.write_text(json.dumps(baseline), encoding="utf-8")
+
+        settings = agent.load_approval_settings()
+        self.assertTrue(settings["all"])
+        self.assertFalse(settings["file_edit"])
+        self.assertFalse(settings["tools"]["run_checks"])
+
+        settings["file_edit"] = True
+        settings["tools"]["run_checks"] = True
+        agent.save_approval_settings(settings)
+
+        overlay_path = pathlib.Path(self.temp_dir.name) / ".shai" / "approval_config.json"
+        overlay = json.loads(overlay_path.read_text(encoding="utf-8"))
+        self.assertEqual(overlay, {
+            "file_edit": True,
+            "tools": {"run_checks": True},
+        })
+        self.assertEqual(json.loads(base_path.read_text(encoding="utf-8")), baseline)
+
+    def test_legacy_full_project_snapshot_is_compacted_to_differences(self):
+        base_path = self.config_path.parent / "approval_config.json"
+        baseline = {
+            "all": True,
+            "file_edit": False,
+            "execution": True,
+            "tools": {"run_checks": False},
+        }
+        base_path.write_text(json.dumps(baseline), encoding="utf-8")
+        overlay_path = pathlib.Path(self.temp_dir.name) / ".shai" / "approval_config.json"
+        overlay_path.parent.mkdir(parents=True)
+        overlay_path.write_text(json.dumps(baseline), encoding="utf-8")
+
+        loaded = agent.load_approval_settings()
+        self.assertTrue(loaded["all"])
+        self.assertFalse(overlay_path.exists())
+
+    def test_project_approval_overrides_legacy_asset_approval(self):
+        self.write_config({"approve": {"all": True, "execution": True}})
+        approval_path = pathlib.Path(self.temp_dir.name) / ".shai" / "approval_config.json"
+        approval_path.parent.mkdir(parents=True)
+        approval_path.write_text(json.dumps({"all": False, "execution": False}), encoding="utf-8")
+        self.assertFalse(agent.approval_granted(category="execution", tool="os_command"))
 
     def test_provider_selection_load_config_preserves_shai_config_overrides(self):
         from modules import provider_selection

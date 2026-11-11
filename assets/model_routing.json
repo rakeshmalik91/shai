@@ -1,5 +1,9 @@
 {
   "version": 1,
+  "default": {
+    "provider": null,
+    "model": null
+  },
   "availability": {
     "cache_seconds": 30,
     "probe_timeout_seconds": 5,

@@ -17,6 +17,7 @@ class ProviderSelectionTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.original_config_file = selection.CONFIG_FILE
         selection.CONFIG_FILE = pathlib.Path(self.temp_dir.name) / "shai_config.json"
+        selection._state_dir().mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
         selection.CONFIG_FILE = self.original_config_file
@@ -99,12 +100,12 @@ class ProviderSelectionTests(unittest.TestCase):
             }):
                 models = selection.get_available_models("kilo-free")
         self.assertEqual(models, ["provider/model-a:free"])
-        model_config_path = selection.CONFIG_FILE.parent / "model_config.json"
+        model_config_path = selection._state_dir() / "model_config.json"
         self.assertFalse(model_config_path.exists())
 
     def test_saved_model_context_override_is_preserved_and_preferred(self):
         selection.CONFIG_FILE.write_text("{}", encoding="utf-8")
-        context_path = selection.CONFIG_FILE.parent / "model_config.json"
+        context_path = selection._state_dir() / "model_config.json"
         context_path.write_text(json.dumps({"version": 1,
             "models": {"kilo-free::vendor/model": {"context_window": 65536}},
             "overrides": {"kilo-free::vendor/model": {"context_window": 98304}},
@@ -161,7 +162,7 @@ class ProviderSelectionTests(unittest.TestCase):
 
         self.assertEqual(result, ("kilo-free", "vendor/new-model:free"))
         self.assertEqual(get_json.call_count, 1, "Kilo must not make an undocumented per-model request")
-        saved = json.loads((selection.CONFIG_FILE.parent / "model_config.json").read_text())
+        saved = json.loads((selection._state_dir() / "model_config.json").read_text())
         self.assertEqual(set(saved["models"]), {"kilo-free::vendor/new-model:free"})
         metadata = saved["models"]["kilo-free::vendor/new-model:free"]
         self.assertEqual(metadata["context_window"], 65536)
@@ -181,11 +182,11 @@ class ProviderSelectionTests(unittest.TestCase):
              mock.patch.object(selection, "get_selected_model_details",
                                side_effect=lambda provider, model: (
                                    self.assertEqual(
-                                       json.loads(selection.CONFIG_FILE.read_text())["provider"],
+                                       json.loads((selection._state_dir() / "model_routing.json").read_text())["default"]["provider"],
                                        provider
                                    ),
                                    self.assertEqual(
-                                       json.loads(selection.CONFIG_FILE.read_text())["model"],
+                                       json.loads((selection._state_dir() / "model_routing.json").read_text())["default"]["model"],
                                        model
                                    ),
                                    {}
@@ -193,9 +194,10 @@ class ProviderSelectionTests(unittest.TestCase):
             result = selection.initialize_provider()
 
         self.assertEqual(result, ("kilo-free", "vendor/selected-model:free"))
-        saved = json.loads(selection.CONFIG_FILE.read_text(encoding="utf-8"))
-        self.assertEqual(saved["provider"], "kilo-free")
-        self.assertEqual(saved["model"], "vendor/selected-model:free")
+        saved = json.loads((selection._state_dir() / "model_routing.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["default"]["provider"], "kilo-free")
+        self.assertEqual(saved["default"]["model"], "vendor/selected-model:free")
+        self.assertFalse((selection._state_dir() / "provider_model.json").exists())
 
     def test_kilo_missing_selected_catalogue_record_is_non_blocking(self):
         selection.MODEL_CATALOGUE_ITEMS["kilo-free"] = {}
@@ -216,11 +218,17 @@ class ProviderSelectionTests(unittest.TestCase):
         }), encoding="utf-8")
         selection.save_config("kilo-free", "provider/model-a:free")
         saved = json.loads(selection.CONFIG_FILE.read_text(encoding="utf-8"))
-        self.assertEqual(saved["provider"], "kilo-free")
-        self.assertEqual(saved["model"], "provider/model-a:free")
+        selection_state = json.loads(
+            (selection._state_dir() / "model_routing.json").read_text(encoding="utf-8")
+        )
+        self.assertNotIn("provider", saved)
+        self.assertNotIn("model", saved)
         self.assertTrue(saved["yes_to_all"])
         self.assertEqual(saved["max_tool_call_iterations"], 100)
         self.assertEqual(saved["retry"]["max_retries"], 4)
+        self.assertEqual(selection_state["default"]["provider"], "kilo-free")
+        self.assertEqual(selection_state["default"]["model"], "provider/model-a:free")
+        self.assertFalse((selection._state_dir() / "provider_model.json").exists())
 
 
 if __name__ == "__main__":

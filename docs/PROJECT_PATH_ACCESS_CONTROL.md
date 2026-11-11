@@ -3,7 +3,7 @@
 ## Status: Implemented
 
 Generic policy lives in `assets/project_access_config.json`; user-approved
-project-specific grants live in `.shai/project_access.json`. Enforcement is
+project-specific grants live in the selected project's `.shai/project_access.json`, never in the Shai installation/repository. Enforcement is
 centralized in `modules.tools.common` and applied by filesystem tools, code
 inspection, file editing, and controlled command execution.
 

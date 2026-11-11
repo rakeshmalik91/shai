@@ -8,9 +8,30 @@ import urllib.parse
 import urllib.request
 
 from modules.conversation_history import input_without_history
+from modules.project_state import migrate_legacy_model_selection
+from modules.project_paths import get_active_project_root
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent.parent
 CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
+
+
+_DEFAULT_CONFIG_FILE = CONFIG_FILE
+
+
+def _project_dir():
+    # Tests/integrations may point CONFIG_FILE at an isolated project config.
+    # In normal use, the shared assets file is install-relative while .shai is
+    # always rooted in the explicitly selected working project.
+    if CONFIG_FILE != _DEFAULT_CONFIG_FILE:
+        return CONFIG_FILE.parent.parent if CONFIG_FILE.parent.name == "assets" else CONFIG_FILE.parent
+    return get_active_project_root()
+
+
+def _state_dir():
+    return _project_dir() / ".shai"
+
+
+
 
 MODEL_CONTEXT_WINDOWS = {}
 # Retain catalogue records only in memory so Kilo metadata can be persisted
@@ -102,22 +123,27 @@ def _merge_config_section(base, extra):
 
 def load_config():
     try:
+        migrate_legacy_model_selection(_project_dir(), CONFIG_FILE)
         with CONFIG_FILE.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
         if not isinstance(data, dict):
             return {}
-        for filename in ("provider_config.json", "model_config.json", "cli_config.json", "logging_config.json", "command_config.json"):
+        for filename in ("provider_config.json", "cli_config.json", "logging_config.json", "command_config.json"):
             try:
                 with (CONFIG_FILE.parent / filename).open("r", encoding="utf-8") as handle:
                     section = json.load(handle)
                 if isinstance(section, dict):
-                    if filename == "model_config.json":
-                        data.setdefault("model_config", {})
-                        _merge_config_section(data["model_config"], section)
-                    else:
-                        _merge_config_section(data, section)
+                    _merge_config_section(data, section)
             except (OSError, ValueError, TypeError):
                 pass
+        from modules.model_routing import load_default_model
+        selection = load_default_model(_project_dir())
+        if selection:
+            data.update(selection)
+        from modules.model_config import load_model_config
+        model_data = load_model_config(_state_dir() / "model_config.json")
+        if model_data.get("models"):
+            data["model_config"] = model_data
         return data
     except (OSError, ValueError):
         return {}
@@ -200,27 +226,20 @@ def provider_timeout(provider, fallback=300):
 
 
 def save_config(provider, model, context_window_tokens=None):
-    """Persist selected provider/model and provider-reported model metadata."""
-    config = {}
-    if CONFIG_FILE.exists():
-        try:
-            config = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except (OSError, ValueError, TypeError):
-            config = {}
-    config["provider"], config["model"] = provider, model
-    temporary = CONFIG_FILE.with_name(CONFIG_FILE.name + ".tmp")
-    with temporary.open("w", encoding="utf-8") as handle:
-        json.dump(config, handle, indent=2, ensure_ascii=False)
-        handle.write("\n")
-    temporary.replace(CONFIG_FILE)
+    """Persist selected default model in project model_routing.json."""
+    state_dir = _state_dir()
+    state_dir.mkdir(parents=True, exist_ok=True)
+    from modules.model_routing import save_default_model
+    save_default_model(_project_dir(), provider, model)
 
     from modules.model_config import load_model_config, save_model_config
-    model_config = load_model_config(CONFIG_FILE.parent / "model_config.json")
+    model_path = state_dir / "model_config.json"
+    model_config = load_model_config(model_path)
     key = "{}::{}".format(provider, model)
     metadata = model_config["models"].setdefault(key, {})
     if isinstance(context_window_tokens, int) and not isinstance(context_window_tokens, bool) and context_window_tokens > 0:
         metadata["context_window"] = context_window_tokens
-    save_model_config(model_config, CONFIG_FILE.parent / "model_config.json")
+    save_model_config(model_config, model_path)
 
 
 def _get_json(url, key, provider, timeout=None):
@@ -261,7 +280,7 @@ def get_saved_context_window(provider, model):
     """Return the effective model context limit, including user overrides."""
     from modules.model_config import get_model_config, load_model_config
     return get_model_config(provider, model, load_model_config(
-        CONFIG_FILE.parent / "model_config.json"
+        _state_dir() / "model_config.json"
     )).get("context_window")
 
 
@@ -277,7 +296,7 @@ def _save_discovered_metadata(provider, model, metadata):
     try:
         from modules.model_config import update_model_metadata
         update_model_metadata(provider, model, metadata,
-                              CONFIG_FILE.parent / "model_config.json")
+                              _state_dir() / "model_config.json")
     except (OSError, ValueError, TypeError) as error:
         print("Warning: could not save model metadata: {}".format(error))
 
@@ -449,7 +468,7 @@ def initialize_provider(auto_select=False):
 
     # Persist the user's explicit selection immediately. Model-detail lookup is
     # best-effort and must never be a prerequisite for updating the active
-    # provider/model in shai_config.json. This also protects the selection if
+    # provider/model in the active project's model_routing.json default. This also protects the selection if
     # the detail endpoint is slow, unavailable, or interrupted.
     save_config(provider, model)
 

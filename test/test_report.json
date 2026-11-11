@@ -1,13 +1,13 @@
 {
-  "status": "failed",
-  "started_at": "2026-11-11T13:27:19.956458+00:00",
-  "finished_at": "2026-11-11T13:27:40.774861+00:00",
-  "duration_seconds": 20.82,
+  "status": "passed",
+  "started_at": "2026-11-11T17:00:54.171110+00:00",
+  "finished_at": "2026-11-11T17:01:19.761309+00:00",
+  "duration_seconds": 25.59,
   "python_version": "3.9.16",
   "unittest": {
-    "success": false,
-    "tests_run": 338,
-    "failures": 2,
+    "success": true,
+    "tests_run": 362,
+    "failures": 0,
     "errors": 0,
     "skipped": 0,
     "details": [
@@ -300,6 +300,14 @@
         "status": "passed"
       },
       {
+        "test": "test_assets_approval_baseline_is_read_only_and_project_file_contains_only_deltas (test.test_configuration.ConfigTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_legacy_full_project_snapshot_is_compacted_to_differences (test.test_configuration.ConfigTests)",
+        "status": "passed"
+      },
+      {
         "test": "test_load_agent_safeguards_bounds (test.test_configuration.ConfigTests)",
         "status": "passed"
       },
@@ -348,11 +356,15 @@
         "status": "passed"
       },
       {
+        "test": "test_project_approval_overrides_legacy_asset_approval (test.test_configuration.ConfigTests)",
+        "status": "passed"
+      },
+      {
         "test": "test_provider_selection_load_config_preserves_shai_config_overrides (test.test_configuration.ConfigTests)",
         "status": "passed"
       },
       {
-        "test": "test_save_approval_settings_does_not_leak_split_configs_into_shai_config (test.test_configuration.ConfigTests)",
+        "test": "test_save_approval_settings_uses_project_shai_directory (test.test_configuration.ConfigTests)",
         "status": "passed"
       },
       {
@@ -396,9 +408,8 @@
         "status": "passed"
       },
       {
-        "test": "test_fallback_to_assets_model_config_for_known_models (test.test_context_meter.ContextMeterTests)",
-        "status": "failed",
-        "traceback": "Traceback (most recent call last):\n  File \"/mnt/lectra/shai/test/test_context_meter.py\", line 121, in test_fallback_to_assets_model_config_for_known_models\n    self.assertEqual(\nAssertionError: None != 256000\n"
+        "test": "test_fallback_to_project_local_model_config_for_known_models (test.test_context_meter.ContextMeterTests)",
+        "status": "passed"
       },
       {
         "test": "test_formats_exact_and_generated_tokens (test.test_context_meter.ContextMeterTests)",
@@ -422,8 +433,7 @@
       },
       {
         "test": "test_thinking_context_status_known_for_default_model (test.test_context_meter.ContextMeterTests)",
-        "status": "failed",
-        "traceback": "Traceback (most recent call last):\n  File \"/mnt/lectra/shai/test/test_context_meter.py\", line 131, in test_thinking_context_status_known_for_default_model\n    self.assertNotIn(\"limit unknown\", status)\nAssertionError: 'limit unknown' unexpectedly found in 'Prompt estimate: ~1,200 tokens (context limit unknown)'\n"
+        "status": "passed"
       },
       {
         "test": "test_add_input_ignores_whitespace_and_caps_history (test.test_conversation_history.ConversationHistoryTests)",
@@ -431,6 +441,10 @@
       },
       {
         "test": "test_clear_preserves_prompt_and_other_mode_history (test.test_conversation_history.ConversationHistoryTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_command_execution_inputs_are_in_prompt_history (test.test_conversation_history.ConversationHistoryTests)",
         "status": "passed"
       },
       {
@@ -455,6 +469,34 @@
       },
       {
         "test": "test_prompt_history_shared_and_deduplicated (test.test_conversation_history.ConversationHistoryTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_selection_input_does_not_enter_readline_history (test.test_conversation_history.ConversationHistoryTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_all_registered_provider_formats_are_supported (test.test_empty_response_retry.EmptyResponseRetryTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_anthropic_empty_then_tool_use_retries (test.test_empty_response_retry.EmptyResponseRetryTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_max_retries_is_respected (test.test_empty_response_retry.EmptyResponseRetryTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_nonempty_text_and_tool_calls_are_not_retried (test.test_empty_response_retry.EmptyResponseRetryTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_openai_compatible_empty_then_text_retries (test.test_empty_response_retry.EmptyResponseRetryTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_retry_can_be_disabled (test.test_empty_response_retry.EmptyResponseRetryTests)",
         "status": "passed"
       },
       {
@@ -694,7 +736,15 @@
         "status": "passed"
       },
       {
+        "test": "test_default_provider_model_loads_from_assets_and_project_override (test.test_model_routing.ModelRoutingTests)",
+        "status": "passed"
+      },
+      {
         "test": "test_discontinued_inactive_route_is_silently_skipped (test.test_model_routing.ModelRoutingTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_incomplete_project_default_does_not_mix_with_shared_default (test.test_model_routing.ModelRoutingTests)",
         "status": "passed"
       },
       {
@@ -723,6 +773,10 @@
       },
       {
         "test": "test_routes_include_active_default_after_inactive_candidates (test.test_model_routing.ModelRoutingTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_saving_default_preserves_existing_task_routes (test.test_model_routing.ModelRoutingTests)",
         "status": "passed"
       },
       {
@@ -1115,6 +1169,46 @@
       },
       {
         "test": "test_unknown_permission_rejected (test.test_project_access_control.ProjectAccessControlTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_approval_and_project_access_files_are_scoped_to_selected_project (test.test_project_paths.ActiveProjectStatePathTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_logging_defaults_to_selected_project (test.test_project_paths.ActiveProjectStatePathTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_model_metadata_defaults_to_selected_project (test.test_project_paths.ActiveProjectStatePathTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_project_switch_updates_task_state_path_and_active_root (test.test_project_paths.ActiveProjectStatePathTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_provider_selection_and_migration_use_selected_project (test.test_project_paths.ActiveProjectStatePathTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_startup_resolver_uses_explicit_project_directory (test.test_project_paths.ActiveProjectStatePathTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_ignore_file_ignores_only_managed_runtime_artifacts (test.test_project_state.ProjectStateTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_ignore_file_preserves_user_rules_and_is_idempotent (test.test_project_state.ProjectStateTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_legacy_selection_migrates_into_existing_routing_file_and_is_removed (test.test_project_state.ProjectStateTests)",
+        "status": "passed"
+      },
+      {
+        "test": "test_provider_and_model_state_migrates_out_of_assets (test.test_project_state.ProjectStateTests)",
         "status": "passed"
       },
       {

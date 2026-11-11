@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "defaults": {
+    "context_window": null,
+    "max_output_tokens": null,
+    "supported_input_types": [
+      "text"
+    ],
+    "supported_output_types": [
+      "text"
+    ],
+    "supports_tools": null,
+    "supports_structured_output": null,
+    "supports_reasoning": null
+  },
+  "models": {
+    "kilo-free::nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+      "context_window": 256000,
+      "max_output_tokens": 65536,
+      "supported_input_types": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true,
+      "supports_reasoning": true
+    },
+    "kilo-free::nvidia/nemotron-3-ultra-550b-a55b:free": {
+      "context_window": 1000000,
+      "max_output_tokens": 65536,
+      "supported_input_types": [
+        "text"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true,
+      "supports_reasoning": true
+    },
+    "kilo-free::nvidia/nemotron-3.5-lightning:free": {
+      "context_window": 1000000,
+      "max_output_tokens": 65536,
+      "supported_input_types": [
+        "text"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true,
+      "supports_reasoning": true
+    }
+  },
+  "overrides": {}
+}

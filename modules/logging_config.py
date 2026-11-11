@@ -13,9 +13,10 @@ import pathlib
 import shutil
 import threading
 from typing import Optional
+from modules.project_paths import get_active_project_root, get_project_state_dir
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent.parent
-DEFAULT_LOG_DIR = SCRIPT_DIR / ".shai" / "logs"
+DEFAULT_LOG_DIR = get_project_state_dir() / "logs"
 DEFAULT_LOG_FILE = "shai.log"
 DEFAULT_RETAIN_FILES = 10
 DEFAULT_LOG_LEVEL = logging.DEBUG
@@ -83,8 +84,8 @@ def _prune_run_logs(log_dir, log_file, retain_files):
 def _migrate_legacy_logs(log_dir):
     """Move legacy root-level logs/ into the canonical .shai/logs/ directory."""
     log_dir = pathlib.Path(log_dir)
-    legacy_dir = SCRIPT_DIR / "logs"
-    canonical_dir = SCRIPT_DIR / ".shai" / "logs"
+    legacy_dir = get_active_project_root() / "logs"
+    canonical_dir = get_project_state_dir() / "logs"
     try:
         if log_dir.resolve() != canonical_dir.resolve() or not legacy_dir.is_dir():
             return
@@ -121,7 +122,9 @@ def setup_logging(
 ):
     """Configure file-only logging, timestamped per run, newest records first."""
     if log_dir is None:
-        log_dir = DEFAULT_LOG_DIR
+        # Keep the exported constant patchable for integrations/tests, but
+        # default to the currently selected project's state directory.
+        log_dir = get_project_state_dir() / "logs"
     log_dir = pathlib.Path(log_dir)
     _migrate_legacy_logs(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -194,7 +197,7 @@ def load_logging_config(config):
         # Treat the historical "logs" setting as the new canonical location.
         if configured_log_dir == pathlib.Path("logs"):
             configured_log_dir = pathlib.Path(".shai") / "logs"
-        log_dir = SCRIPT_DIR / configured_log_dir
+        log_dir = get_active_project_root() / configured_log_dir
     else:
         log_dir = configured_log_dir
     log_file = pathlib.Path(settings.get("log_file", DEFAULT_LOG_FILE))
@@ -220,6 +223,13 @@ def load_logging_config(config):
 
 
 _default_logger = None
+
+
+def reset_default_logging(config=None):
+    """Recreate the run logger after the active project has changed."""
+    global _default_logger
+    _default_logger = None
+    return init_default_logging(config)
 
 
 def init_default_logging(config=None):

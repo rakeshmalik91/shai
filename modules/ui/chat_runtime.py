@@ -21,6 +21,8 @@ import urllib.parse
 import urllib.request
 
 from modules.empty_response_retry import request_with_empty_response_retries
+from modules.project_paths import set_active_project_root, resolve_startup_project_root
+from modules.project_state import ensure_project_state
 from modules.terminal_style import colorize
 from modules.commands.shai_command import resolve_shai_command
 from modules.commands.registry import normalize_command
@@ -54,10 +56,10 @@ from modules.tools import (
 )
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parents[2]
-ROOT = pathlib.Path(
-    sys.argv[1] if len(sys.argv) > 1 else "."
-).expanduser().resolve()
+ROOT = resolve_startup_project_root()
+set_active_project_root(ROOT)
 configure_tools_root(ROOT)
+ensure_project_state(ROOT)
 CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
 DEFAULT_API_TIMEOUT_SECONDS = 300
 
@@ -85,20 +87,28 @@ def load_config():
             return {}
         for filename in (
             "provider_config.json", "command_config.json",
-            "model_config.json", "cli_config.json",
-            "logging_config.json",
+            "cli_config.json", "logging_config.json",
         ):
             try:
                 with (CONFIG_FILE.parent / filename).open("r", encoding="utf-8") as extra:
                     section = json.load(extra)
                 if isinstance(section, dict):
-                    if filename == "model_config.json":
-                        value.setdefault("model_config", {})
-                        _merge_config_section(value["model_config"], section)
-                    else:
-                        _merge_config_section(value, section)
-            except (OSError, ValueError, TypeError):
+                    _merge_config_section(value, section)
+            except (FileNotFoundError, OSError, ValueError, TypeError):
                 pass
+        from modules.project_state import migrate_legacy_model_selection
+        from modules.model_routing import load_default_model
+        migrate_legacy_model_selection(ROOT, CONFIG_FILE)
+        selection = load_default_model(ROOT)
+        value.update(selection)
+        state_dir = ROOT / ".shai"
+        try:
+            model_data = json.loads((state_dir / "model_config.json").read_text(encoding="utf-8"))
+            if isinstance(model_data, dict):
+                value.setdefault("model_config", {})
+                _merge_config_section(value["model_config"], model_data)
+        except (OSError, ValueError, TypeError):
+            pass
         return value
     except (OSError, ValueError, TypeError):
         LOGGER.exception("Could not load Shai configuration; using defaults")
@@ -464,7 +474,11 @@ def main():
                 continue
             global ROOT
             ROOT = new_root
+            set_active_project_root(ROOT)
             configure_tools_root(ROOT)
+            ensure_project_state(ROOT)
+            from modules.logging_config import reset_default_logging
+            reset_default_logging(load_config())
             history_store = ConversationHistory(ROOT, "chat", SYSTEM_PROMPT)
             history = history_store.load()
             history_store.save(history, provider=provider, model=model)

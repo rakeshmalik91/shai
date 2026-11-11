@@ -27,10 +27,13 @@ class ConfigTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.config_path = pathlib.Path(self.temp_dir.name) / "shai_config.json"
         self.original_config_file = agent.CONFIG_FILE
+        self.original_root = agent.ROOT
         agent.CONFIG_FILE = self.config_path
+        agent.ROOT = pathlib.Path(self.temp_dir.name)
 
     def tearDown(self):
         agent.CONFIG_FILE = self.original_config_file
+        agent.ROOT = self.original_root
         self.temp_dir.cleanup()
 
     def write_config(self, data):
@@ -62,8 +65,10 @@ class ConfigTests(unittest.TestCase):
         self.write_config(original)
         agent.save_yes_to_all(True)
         saved = json.loads(self.config_path.read_text(encoding="utf-8"))
-        self.assertTrue(saved["approve"]["all"])
-        self.assertNotIn("yes_to_all", saved)
+        approval_path = pathlib.Path(self.temp_dir.name) / ".shai" / "approval_config.json"
+        approvals = json.loads(approval_path.read_text(encoding="utf-8"))
+        self.assertTrue(approvals["all"])
+        self.assertNotIn("approve", saved)
         self.assertEqual(saved["retry"], original["retry"])
         self.assertEqual(saved["provider"], original["provider"])
         self.assertTrue(agent.load_yes_to_all())
@@ -116,8 +121,10 @@ class ConfigTests(unittest.TestCase):
         self.assertTrue(agent.load_approval_settings()["all"])
         agent.save_yes_to_all(False)
         saved = json.loads(self.config_path.read_text(encoding="utf-8"))
-        self.assertFalse(saved["approve"]["all"])
-        self.assertNotIn("yes_to_all", saved)
+        approval_path = pathlib.Path(self.temp_dir.name) / ".shai" / "approval_config.json"
+        approvals = json.loads(approval_path.read_text(encoding="utf-8"))
+        self.assertFalse(approvals["all"])
+        self.assertNotIn("approve", saved)
         self.assertEqual(saved["provider"], "ollama")
 
     def test_global_approval_applies_when_category_is_not_explicitly_denied(self):

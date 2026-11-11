@@ -16,7 +16,9 @@ class ModelRoutingTests(unittest.TestCase):
         self.original_template = model_routing.TEMPLATE_FILE
         self.template = self.project / "template.json"
         self.template.write_text(json.dumps({
-            "version": 1, "models": {role: [] for role in model_routing.ROLES}
+            "version": 1,
+            "default": {"provider": "openrouter", "model": "shared-default"},
+            "models": {role: [] for role in model_routing.ROLES},
         }), encoding="utf-8")
         model_routing.TEMPLATE_FILE = self.template
         model_routing.clear_availability_cache()
@@ -35,6 +37,43 @@ class ModelRoutingTests(unittest.TestCase):
         config = model_routing.load_routing_config(self.project)
         self.assertEqual(set(config["models"]), set(model_routing.ROLES))
         self.assertTrue(all(config["models"][role] == [] for role in model_routing.ROLES))
+
+    def test_default_provider_model_loads_from_assets_and_project_override(self):
+        shared = model_routing.load_default_model(self.project)
+        self.assertEqual(shared, {
+            "provider": "openrouter", "model": "shared-default"
+        })
+        self.route_file.write_text(json.dumps({
+            "version": 1,
+            "default": {"provider": "ollama", "model": "qwen-local"},
+            "models": {},
+        }), encoding="utf-8")
+        selected = model_routing.load_default_model(self.project)
+        self.assertEqual(selected, {
+            "provider": "ollama", "model": "qwen-local"
+        })
+
+    def test_incomplete_project_default_does_not_mix_with_shared_default(self):
+        self.route_file.write_text(json.dumps({
+            "version": 1,
+            "default": {"provider": "ollama"},
+        }), encoding="utf-8")
+        self.assertEqual(
+            model_routing.load_default_model(self.project),
+            {"provider": "openrouter", "model": "shared-default"},
+        )
+
+    def test_saving_default_preserves_existing_task_routes(self):
+        self.write_routes({"code": [
+            {"provider": "ollama", "model": "qwen-code", "priority": 1}
+        ]})
+        model_routing.save_default_model(self.project, "gemini", "gemini-flash")
+        saved = json.loads(self.route_file.read_text(encoding="utf-8"))
+        self.assertEqual(saved["default"], {
+            "provider": "gemini", "model": "gemini-flash"
+        })
+        self.assertEqual(saved["models"]["code"][0]["model"], "qwen-code")
+        self.assertFalse((self.route_file.parent / "provider_model.json").exists())
 
     def test_project_routes_override_template_by_role_only(self):
         self.write_routes({"code": [
