@@ -118,9 +118,15 @@ that computer's LAN address and ensure its server accepts LAN connections.
 
 ## Switching providers and models
 
-Use `/model` (or `/switch`, `/switch-model`) in Chat or Agent mode. Shai fetches
-the selected provider's model list, lets you choose a model, and persists the
-selection in `assets/shai_config.json`; provider endpoint and authentication overrides live in `assets/provider_config.json`.
+Use `/model` (or `/switch`, `/switch-model`) in Chat or Agent mode. Shai first
+shows the provider list and asks you to choose a provider. It then fetches the
+provider's model IDs only, displays the filtered model list, and asks you to
+choose a model. It does not fetch or save metadata for every model in that
+list. After you select a model, Shai makes one best-effort, short-timeout
+request for that model's details only; metadata lookup failure does not block
+selection or the next model request. The selection is persisted in
+`assets/shai_config.json`; provider endpoint and authentication overrides live
+in `assets/provider_config.json`.
 
 ## Model capabilities and context windows
 
@@ -158,9 +164,10 @@ means unknown rather than unsupported. Content type values are extensible.
 
 Shai supports project-local model routing by task category. Configure candidate
 models in `.shai/model_routing.json`; use `assets/model_routing.json` as the
-tracked template. Candidates are ordered by ascending `priority` (1 is highest)
-and must exist in the selected provider's discovered model list. A missing or
-unavailable route uses the normal default provider/model. See
+tracked template. Candidates are ordered by ascending `priority` (1 is highest).
+Model IDs are used as configured; Shai does not download a provider catalogue
+to validate them. An unavailable route is skipped in favour of the next
+candidate, then the normal default provider/model. See
 [CONFIGURATION.md](CONFIGURATION.md#model-routing) for the complete schema and
 supported roles. `.shai/` is ignored by Git so project-specific preferences are
 not committed accidentally.

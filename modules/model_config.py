@@ -81,8 +81,8 @@ def _normalize_config(config):
         values = config.get(name, {})
         if not isinstance(values, dict):
             return {}
-        return {key: normalize_attributes(value) for key, value in values.items()
-                if isinstance(key, str) and isinstance(value, dict)}
+        return {key: normalize_attributes(values[key]) for key in sorted(values)
+                if isinstance(key, str) and isinstance(values[key], dict)}
     return {"version": SCHEMA_VERSION, "defaults": defaults,
             "models": section("models"), "overrides": section("overrides")}
 

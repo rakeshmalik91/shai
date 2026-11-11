@@ -24,7 +24,12 @@ from modules.terminal_style import colorize
 from modules.commands.shai_command import resolve_shai_command
 from modules.commands.registry import normalize_command
 from modules.ui.spinner import Spinner
-from modules.model_routing import resolve_model as resolve_routed_model
+from modules.model_routing import (
+    resolve_model as resolve_routed_model,
+    resolve_model_candidates,
+    request_with_model_fallback,
+    is_model_unavailable_error,
+)
 from modules.provider_selection import (
     PROVIDERS, initialize_provider, get_provider_config,
     provider_api_key, build_provider_url, build_provider_headers,
@@ -56,6 +61,7 @@ DEFAULT_API_TIMEOUT_SECONDS = 300
 # Define the logger before loading configuration: API_TIMEOUT_SECONDS is
 # initialized at import time and load_config() may need to report bad JSON.
 LOGGER = get_logger("shai.chat")
+_INACTIVE_MODEL_ROUTE = False
 
 
 def _merge_config_section(base, extra):
@@ -180,8 +186,14 @@ def request_json(url, key, provider, body=None):
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")
         log_api_payload(LOGGER, "API ERROR RESPONSE", detail)
-        LOGGER.warning("HTTP API error provider=%s status=%s body=%s",
-                       provider, error.code, detail[:1000])
+        if _INACTIVE_MODEL_ROUTE and is_model_unavailable_error(detail):
+            LOGGER.debug(
+                "Inactive model route unavailable; trying next route provider=%s status=%s",
+                provider, error.code,
+            )
+        else:
+            LOGGER.warning("HTTP API error provider=%s status=%s body=%s",
+                           provider, error.code, detail[:1000])
         raise RuntimeError(
             "API error {}: {}".format(error.code, detail[:2000])
         )
@@ -227,46 +239,51 @@ def choose_model(models, preferred=None):
 
 
 def api_request(history, provider, model, task_role="chat"):
-    route = resolve_routed_model(task_role, ROOT, provider, model)
-    provider, model = route["provider"], route["model"]
-    LOGGER.info("Chat model role=%s provider=%s model=%s routed=%s reason=%s",
-                task_role, provider, model, route["routed"], route["reason"])
-    LOGGER.debug("Chat API request provider=%s model=%s history_messages=%d",
-                 provider, model, len(history))
-    key = provider_api_key(provider)
+    global _INACTIVE_MODEL_ROUTE
+    previous_inactive_route = _INACTIVE_MODEL_ROUTE
+    routes = resolve_model_candidates(task_role, ROOT, provider, model)
 
-    # Determine if provider supports tools
-    supports_tools = get_provider_config(provider)["format"] in ("openai", "anthropic")
+    def request_for_route(route):
+        global _INACTIVE_MODEL_ROUTE
+        _INACTIVE_MODEL_ROUTE = bool(route["routed"])
+        selected_provider, selected_model = route["provider"], route["model"]
+        LOGGER.info("Chat model role=%s provider=%s model=%s routed=%s reason=%s",
+                    task_role, selected_provider, selected_model,
+                    route["routed"], route["reason"])
+        LOGGER.debug("Chat API request provider=%s model=%s history_messages=%d",
+                     selected_provider, selected_model, len(history))
+        key = provider_api_key(selected_provider)
+        supports_tools = get_provider_config(selected_provider)["format"] in ("openai", "anthropic")
 
-    if get_provider_config(provider)["format"] == "anthropic":
-        messages = [
-            item for item in history
-            if item.get("role") != "system"
-        ]
-        body = {
-            "model": model,
-            "max_tokens": 8192,
-            "system": SYSTEM_PROMPT,
-            "messages": messages,
-        }
-        if supports_tools:
-            body["tools"] = FUNCTIONS_READ_ONLY
-    else:
-        body = {
-            "model": model,
-            "messages": history,
-        }
-        if provider == "openai":
-            body["max_completion_tokens"] = 8192
+        if get_provider_config(selected_provider)["format"] == "anthropic":
+            messages = [item for item in history if item.get("role") != "system"]
+            body = {
+                "model": selected_model,
+                "max_tokens": 8192,
+                "system": SYSTEM_PROMPT,
+                "messages": messages,
+            }
+            if supports_tools:
+                body["tools"] = FUNCTIONS_READ_ONLY
         else:
-            body["temperature"] = 0.2
-            body["max_tokens"] = 8192
-        if supports_tools:
-            body["tools"] = FUNCTIONS_READ_ONLY
+            body = {"model": selected_model, "messages": history}
+            if selected_provider == "openai":
+                body["max_completion_tokens"] = 8192
+            else:
+                body["temperature"] = 0.2
+                body["max_tokens"] = 8192
+            if supports_tools:
+                body["tools"] = FUNCTIONS_READ_ONLY
 
-    return request_json(
-        build_provider_url(provider, "chat"), key, provider, body
-    )
+        return request_json(
+            build_provider_url(selected_provider, "chat"), key,
+            selected_provider, body
+        )
+
+    try:
+        return request_with_model_fallback(routes, request_for_route)
+    finally:
+        _INACTIVE_MODEL_ROUTE = previous_inactive_route
 
 
 def response_text(response, provider):

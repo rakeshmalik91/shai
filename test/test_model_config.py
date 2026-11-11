@@ -75,6 +75,27 @@ class ModelConfigTests(unittest.TestCase):
         self.assertEqual(resolved["context_window"], 2000)
         self.assertTrue(resolved["supports_tools"])
 
+    def test_model_and_override_entries_are_sorted_when_saved(self):
+        save_model_config({
+            "version": 1,
+            "models": {
+                "z-provider::z-model": {"context_window": 1},
+                "a-provider::b-model": {"context_window": 2},
+                "a-provider::a-model": {"context_window": 3},
+            },
+            "overrides": {
+                "z-provider::model": {"context_window": 4},
+                "a-provider::model": {"context_window": 5},
+            },
+        }, self.path)
+        raw = json.loads(self.path.read_text(encoding="utf-8"))
+        self.assertEqual(list(raw["models"]), [
+            "a-provider::a-model", "a-provider::b-model", "z-provider::z-model"
+        ])
+        self.assertEqual(list(raw["overrides"]), [
+            "a-provider::model", "z-provider::model"
+        ])
+
     def test_round_trip_preserves_additional_attributes(self):
         save_model_config({"version": 1, "models": {
             "p::m": {"context_window": 100, "provider_extra": "value"}

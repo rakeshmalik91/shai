@@ -11,11 +11,15 @@ SCRIPT_DIR = pathlib.Path(__file__).resolve().parent.parent
 CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
 
 MODEL_CONTEXT_WINDOWS = {}
+# Retain catalogue records only in memory so Kilo metadata can be persisted
+# for the one model the user selects, without a second undocumented request.
+MODEL_CATALOGUE_ITEMS = {}
 
 DEFAULT_PROVIDERS = {
     "openrouter": {
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "models_url": "https://openrouter.ai/api/v1/models",
+        "model_detail_url": "https://openrouter.ai/api/v1/models/{model}/endpoints",
         "key_env": "OPENROUTER_API_KEY",
         "format": "openai",
         "auth_type": "bearer",
@@ -25,6 +29,7 @@ DEFAULT_PROVIDERS = {
     "gemini": {
         "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         "models_url": "https://generativelanguage.googleapis.com/v1beta/models",
+        "model_detail_url": "https://generativelanguage.googleapis.com/v1beta/models/{model}",
         "key_env": "GEMINI_API_KEY",
         "format": "openai",
         "auth_type": "query",
@@ -34,6 +39,7 @@ DEFAULT_PROVIDERS = {
     "anthropic": {
         "url": "https://api.anthropic.com/v1/messages",
         "models_url": "https://api.anthropic.com/v1/models?limit=1000",
+        "model_detail_url": "https://api.anthropic.com/v1/models/{model}",
         "key_env": "ANTHROPIC_API_KEY",
         "format": "anthropic",
         "auth_type": "header",
@@ -44,6 +50,7 @@ DEFAULT_PROVIDERS = {
     "openai": {
         "url": "https://api.openai.com/v1/chat/completions",
         "models_url": "https://api.openai.com/v1/models",
+        "model_detail_url": "https://api.openai.com/v1/models/{model}",
         "key_env": "OPENAI_API_KEY",
         "format": "openai",
         "auth_type": "bearer",
@@ -214,7 +221,7 @@ def save_config(provider, model, context_window_tokens=None):
     save_model_config(model_config, CONFIG_FILE.parent / "model_config.json")
 
 
-def _get_json(url, key, provider):
+def _get_json(url, key, provider, timeout=None):
     config = get_provider_config(provider)
     # Preserve caller-supplied URL for backwards-compatible tests/custom calls.
     if config.get("auth_type") == "query" and key:
@@ -225,7 +232,7 @@ def _get_json(url, key, provider):
     headers = build_provider_headers(provider, key)
     request = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=provider_timeout(provider)) as response:
+        with urllib.request.urlopen(request, timeout=(timeout or provider_timeout(provider))) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")
@@ -257,43 +264,9 @@ def get_saved_context_window(provider, model):
 
 
 def _model_metadata(item, provider=None):
-    """Extract only capability fields explicitly advertised by a provider."""
-    if not isinstance(item, dict):
-        return {}
-    metadata = {}
-    context = _model_context_limit(item)
-    if context:
-        metadata["context_window"] = context
-    for key in ("max_output_tokens", "max_completion_tokens", "output_token_limit", "outputTokenLimit"):
-        value = item.get(key)
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-            metadata["max_output_tokens"] = value
-            break
-    input_types = item.get("supported_input_types", item.get("input_modalities"))
-    output_types = item.get("supported_output_types", item.get("output_modalities"))
-    if isinstance(item.get("architecture"), dict):
-        architecture = item["architecture"]
-        input_types = input_types or architecture.get("input_modalities")
-        output_types = output_types or architecture.get("output_modalities")
-    aliases = {"image": "image", "audio": "audio", "video": "video", "text": "text"}
-    if isinstance(input_types, list):
-        metadata["supported_input_types"] = [aliases.get(str(v).lower(), str(v).lower()) for v in input_types]
-    if isinstance(output_types, list):
-        metadata["supported_output_types"] = [aliases.get(str(v).lower(), str(v).lower()) for v in output_types]
-    if isinstance(item.get("tool_calling"), bool):
-        metadata["supports_tools"] = item["tool_calling"]
-    elif isinstance(item.get("supports_tools"), bool):
-        metadata["supports_tools"] = item["supports_tools"]
-    if isinstance(item.get("supports_structured_output"), bool):
-        metadata["supports_structured_output"] = item["supports_structured_output"]
-    if isinstance(item.get("supports_reasoning"), bool):
-        metadata["supports_reasoning"] = item["supports_reasoning"]
-    if provider == "gemini":
-        if isinstance(item.get("inputTokenLimit"), int) and item["inputTokenLimit"] > 0:
-            metadata["context_window"] = item["inputTokenLimit"]
-        if isinstance(item.get("outputTokenLimit"), int) and item["outputTokenLimit"] > 0:
-            metadata["max_output_tokens"] = item["outputTokenLimit"]
-    return metadata
+    """Compatibility wrapper; provider-specific parsing lives in handlers."""
+    from modules.providers import get_handler
+    return get_handler(provider or "openai").metadata(item)
 
 
 def _save_discovered_metadata(provider, model, metadata):
@@ -308,48 +281,18 @@ def _save_discovered_metadata(provider, model, metadata):
 
 
 def get_available_models(provider):
+    """Fetch model IDs only; never fetch or persist metadata for the catalogue."""
     config = get_provider_config(provider)
     key = provider_api_key(provider)
     url = build_provider_url(provider, "models", key)
-    # _get_json handles auth headers; query-auth URLs are already complete.
+    # This request is only for the list of model IDs. Detailed metadata is
+    # fetched later, once the user has selected exactly one model.
     data = _get_json(url, None if config.get("auth_type") == "query" else key, provider)
-    MODEL_CONTEXT_WINDOWS.clear()
 
-    if config.get("models_filter") == "ollama":
-        items = data.get("models", []) if isinstance(data, dict) else []
-        models = []
-        for item in items:
-            name = item.get("name") or item.get("model") if isinstance(item, dict) else ""
-            if name:
-                models.append(name)
-                metadata = _model_metadata(item)
-                if metadata.get("context_window"):
-                    MODEL_CONTEXT_WINDOWS[name] = metadata["context_window"]
-                _save_discovered_metadata(provider, name, metadata)
-    elif provider == "gemini":
-        models = []
-        for item in data.get("models", []):
-            if "generateContent" not in item.get("supportedGenerationMethods", []):
-                continue
-            name = item.get("name", "")
-            if name.startswith("models/"):
-                name = name[len("models/"):]
-            if name:
-                models.append(name)
-                metadata = _model_metadata(item, provider="gemini")
-                if metadata.get("context_window"):
-                    MODEL_CONTEXT_WINDOWS[name] = metadata["context_window"]
-                _save_discovered_metadata(provider, name, metadata)
-    else:
-        models = []
-        for item in data.get("data", []):
-            model_name = item.get("id", "")
-            if model_name:
-                models.append(model_name)
-                metadata = _model_metadata(item)
-                if metadata.get("context_window"):
-                    MODEL_CONTEXT_WINDOWS[model_name] = metadata["context_window"]
-                _save_discovered_metadata(provider, model_name, metadata)
+    from modules.providers import get_handler
+    handler = get_handler(provider)
+    models = handler.discover_models(data)
+    handler.cache_catalogue(data, MODEL_CATALOGUE_ITEMS, provider)
 
     filter_mode = config.get("models_filter", "all")
     if filter_mode == "free_only":
@@ -357,6 +300,53 @@ def get_available_models(provider):
     elif filter_mode == "exclude_free":
         models = [model for model in models if not model.endswith(":free")]
     return sorted(set(model for model in models if model))
+
+
+def get_selected_model_details(provider, model, timeout=8):
+    """Fetch metadata for exactly one explicitly selected model.
+
+    This deliberately avoids the provider-wide model catalogue. Detail lookup
+    is best-effort: unsupported detail endpoints or discontinued models do not
+    prevent the user from selecting the model and trying a completion request.
+    """
+    config = get_provider_config(provider)
+    from modules.providers import get_handler
+    handler = get_handler(provider)
+    if handler.uses_catalogue_metadata:
+        metadata = handler.catalogue_metadata(model, MODEL_CATALOGUE_ITEMS, provider)
+        if metadata:
+            _save_discovered_metadata(provider, model, metadata)
+            if metadata.get("context_window"):
+                MODEL_CONTEXT_WINDOWS[model] = metadata["context_window"]
+        return metadata
+
+    template = config.get("model_detail_url")
+    if not template or provider == "ollama":
+        return {}
+    encoded_model = urllib.parse.quote(str(model).strip(), safe="/:")
+    url = str(template).format(model=encoded_model)
+    key = provider_api_key(provider)
+    if config.get("auth_type") == "query" and key:
+        parameter = config.get("auth_query_param", "key")
+        separator = "&" if "?" in url else "?"
+        url += separator + urllib.parse.urlencode({parameter: key})
+    try:
+        payload = _get_json(
+            url, None if config.get("auth_type") == "query" else key,
+            provider, timeout=timeout
+        )
+    except (RuntimeError, OSError, ValueError, TypeError):
+        return {}
+
+    item = payload
+    if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+        item = payload["data"]
+    metadata = _model_metadata(item, provider=provider)
+    if metadata:
+        _save_discovered_metadata(provider, model, metadata)
+        if metadata.get("context_window"):
+            MODEL_CONTEXT_WINDOWS[model] = metadata["context_window"]
+    return metadata
 
 
 def choose_model(models, preferred=None):
@@ -389,34 +379,30 @@ def choose_model(models, preferred=None):
 
 
 def initialize_provider(auto_select=False):
-    """Prompt for provider, then model, on every invocation.
+    """Prompt for provider, list model IDs, then fetch details for the selection.
 
-    Provider 0 reuses the last provider/model pair and skips the model prompt.
+    Provider 0 reuses the last provider/model pair and skips model discovery.
 
     If auto_select is True, automatically use the last saved provider/model
-    if valid (provider exists and model is available), otherwise fall back
-    to interactive selection.
+    when the provider and model are configured; no catalogue request is made.
     """
     saved = load_config()
     saved_provider = saved.get("provider")
     saved_model = saved.get("model")
 
-    # Auto-select: try to use saved provider/model without prompting
+    # Startup must not depend on a live model-catalogue request. Reuse the
+    # explicitly saved provider/model. Interactive selection fetches model IDs
+    # only, then metadata for the single model selected by the user.
     if auto_select and saved_provider in PROVIDERS and saved_model:
-        try:
-            models = get_available_models(saved_provider)
-            if saved_model in models:
-                context_limit = get_saved_context_window(saved_provider, saved_model) or MODEL_CONTEXT_WINDOWS.get(saved_model)
-                if context_limit:
-                    print("Model context window: {:,} tokens".format(context_limit))
-                else:
-                    print("Model context window: unknown (configure it in model_config.json if needed)")
-                print("Selected: {} / {} (auto-selected)".format(saved_provider, saved_model))
-                return saved_provider, saved_model
-            else:
-                print("Saved model '{}' not available for provider '{}'; falling back to interactive selection.".format(saved_model, saved_provider))
-        except Exception as error:
-            print("Could not validate saved selection ({}); falling back to interactive selection.".format(error))
+        context_limit = get_saved_context_window(saved_provider, saved_model)
+        if context_limit:
+            print("Model context window: {:,} tokens".format(context_limit))
+        else:
+            print("Model context window: unknown (configure it in model_config.json if needed)")
+        print("Selected: {} / {} (auto-selected; model discovery skipped)".format(
+            saved_provider, saved_model
+        ))
+        return saved_provider, saved_model
 
     names = list(PROVIDERS)
     print("\nSelect provider:")
@@ -454,13 +440,22 @@ def initialize_provider(auto_select=False):
     print("\nProvider:", provider)
     print("Loading available models...")
     models = get_available_models(provider)
-    if not models:
-        raise RuntimeError("No models are currently available for " + provider + ".")
-
     preferred = saved_model if saved_provider == provider else None
-    model = choose_model(models, preferred)
-    context_limit = MODEL_CONTEXT_WINDOWS.get(model)
-    save_config(provider, model, context_limit)
+    if not models:
+        raise RuntimeError("No models are currently available for provider '{}'.".format(provider))
+    model = choose_model(models, preferred=preferred)
+
+    # Persist the user's explicit selection immediately. Model-detail lookup is
+    # best-effort and must never be a prerequisite for updating the active
+    # provider/model in shai_config.json. This also protects the selection if
+    # the detail endpoint is slow, unavailable, or interrupted.
+    save_config(provider, model)
+
+    print("Fetching details for selected model...")
+    metadata = get_selected_model_details(provider, model)
+    context_limit = metadata.get("context_window") or get_saved_context_window(provider, model)
+    if context_limit:
+        save_config(provider, model, context_limit)
     context_limit = get_saved_context_window(provider, model) or context_limit
     if context_limit:
         print("Model context window: {:,} tokens".format(context_limit))

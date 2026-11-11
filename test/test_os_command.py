@@ -1,6 +1,7 @@
 import tempfile
 import os
 import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 from pathlib import Path
@@ -57,8 +58,15 @@ class OSCommandTests(unittest.TestCase):
         self.assertEqual(self.calls[0][1], self.root)
 
     def test_configured_commands_are_not_restricted_by_hardcoded_argument_rules(self):
-        result = self.execute("python", ["-c", "print('hello')"])
-        self.assertEqual(result["status"], "completed")
+        # This is a policy test, not an interpreter-installation test. iSH and
+        # some Linux environments expose python3 but do not provide a `python`
+        # alias, so resolve the configured command deterministically.
+        with patch("modules.tools.os_command.shutil.which", return_value=sys.executable):
+            result = self.execute("python", ["-c", "print('hello')"])
+        self.assertEqual(
+            result.get("status"), "completed",
+            "Configured command unexpectedly rejected: {}".format(result.get("error")),
+        )
 
     def test_unrestricted_command_skips_routine_approval(self):
         self.settings["unrestricted_commands"] = {"common": [], "unix": ["grep"], "windows": []}

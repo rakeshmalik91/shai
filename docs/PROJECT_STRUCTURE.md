@@ -37,7 +37,7 @@ This document provides a complete overview of the Shai project structure, includ
 ├── modules/                  # Core implementation packages
 │   ├── commands/
 │   ├── engine/
-│   ├── reasoning_handlers/
+│   ├── providers/              # Provider-specific model discovery and metadata handlers\n│   │   ├── base.py\n│   │   ├── registry.py\n│   │   ├── openai.py\n│   │   ├── anthropic.py\n│   │   ├── openrouter.py\n│   │   ├── gemini.py\n│   │   ├── kilo.py\n│   │   └── ollama.py\n│   ├── reasoning_handlers/
 │   ├── tools/
 │   └── ui/
 ├── pytest.ini
@@ -65,7 +65,7 @@ This document provides a complete overview of the Shai project structure, includ
 | `conversation_history.py` | Agent/chat history, prompt history, input navigation |
 | `file_change_display.py` | Bounded diff previews |
 | `logging_config.py` | Run-based logs, retention, console settings, API payload redaction |
-| `provider_selection.py` | Provider definitions, API keys, model discovery, selection, persistence |
+| `provider_selection.py` | Shared provider configuration, API transport/authentication, interactive selection and persistence |\n| `providers/` | Provider-specific model discovery and capability metadata handlers, dispatched through a registry |
 | `model_routing.py` | Project-specific task-role routing, priority resolution and availability cache |
 | `reasoning_handlers/` | Provider-specific reasoning summary extraction |
 | `terminal_style.py` | Terminal styling utilities |

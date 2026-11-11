@@ -87,49 +87,20 @@ class ProviderSelectionTests(unittest.TestCase):
             "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions?token=abc"
         )
 
-    def test_model_context_window_metadata_is_captured_and_saved(self):
+    def test_model_catalogue_fetches_ids_without_saving_metadata(self):
         with mock.patch.dict("os.environ", {"KILO_API_KEY": "test-key"}):
             with mock.patch.object(selection, "_get_json", return_value={
                 "data": [{
                     "id": "provider/model-a:free",
                     "context_length": 131072,
-                }]
-            }):
-                models = selection.get_available_models("kilo-free")
-        self.assertEqual(models, ["provider/model-a:free"])
-        self.assertEqual(
-            selection.MODEL_CONTEXT_WINDOWS["provider/model-a:free"], 131072
-        )
-        selection.save_config(
-            "kilo-free", "provider/model-a:free",
-            selection.MODEL_CONTEXT_WINDOWS["provider/model-a:free"]
-        )
-        saved = json.loads((selection.CONFIG_FILE.parent / "model_config.json").read_text(encoding="utf-8"))
-        self.assertEqual(saved["models"]["kilo-free::provider/model-a:free"]["context_window"], 131072)
-
-    def test_discovery_saves_output_limit_and_supported_modalities(self):
-        with mock.patch.dict("os.environ", {"KILO_API_KEY": "test-key"}):
-            with mock.patch.object(selection, "_get_json", return_value={
-                "data": [{
-                    "id": "vendor/multimodal-model:free",
-                    "context_length": 131072,
                     "max_completion_tokens": 8192,
-                    "architecture": {
-                        "input_modalities": ["text", "image", "audio"],
-                        "output_modalities": ["text"],
-                    },
                     "tool_calling": True,
                 }]
             }):
                 models = selection.get_available_models("kilo-free")
-        self.assertEqual(models, ["vendor/multimodal-model:free"])
-        saved = json.loads((selection.CONFIG_FILE.parent / "model_config.json").read_text())
-        metadata = saved["models"]["kilo-free::vendor/multimodal-model:free"]
-        self.assertEqual(metadata["context_window"], 131072)
-        self.assertEqual(metadata["max_output_tokens"], 8192)
-        self.assertEqual(metadata["supported_input_types"], ["text", "image", "audio"])
-        self.assertEqual(metadata["supported_output_types"], ["text"])
-        self.assertTrue(metadata["supports_tools"])
+        self.assertEqual(models, ["provider/model-a:free"])
+        model_config_path = selection.CONFIG_FILE.parent / "model_config.json"
+        self.assertFalse(model_config_path.exists())
 
     def test_saved_model_context_override_is_preserved_and_preferred(self):
         selection.CONFIG_FILE.write_text("{}", encoding="utf-8")
@@ -148,6 +119,18 @@ class ProviderSelectionTests(unittest.TestCase):
             98304,
         )
 
+    def test_auto_select_saved_model_skips_live_model_discovery(self):
+        selection.CONFIG_FILE.write_text(json.dumps({
+            "provider": "kilo-free",
+            "model": "provider/model-a:free",
+        }), encoding="utf-8")
+        with mock.patch.object(selection, "get_available_models",
+                               side_effect=AssertionError("startup must not fetch model catalogue")) as discover, \
+             mock.patch("builtins.print"):
+            result = selection.initialize_provider(auto_select=True)
+        self.assertEqual(result, ("kilo-free", "provider/model-a:free"))
+        discover.assert_not_called()
+
     def test_provider_zero_reuses_saved_provider_and_model(self):
         selection.CONFIG_FILE.write_text(json.dumps({
             "provider": "kilo-free",
@@ -156,6 +139,74 @@ class ProviderSelectionTests(unittest.TestCase):
         with mock.patch("builtins.input", return_value="0"), mock.patch("builtins.print"):
             result = selection.initialize_provider()
         self.assertEqual(result, ("kilo-free", "provider/model-a:free"))
+
+    def test_interactive_selection_persists_only_selected_kilo_model_metadata(self):
+        selection.CONFIG_FILE.write_text(json.dumps({
+            "provider": "kilo-free",
+            "model": "old/model:free",
+        }), encoding="utf-8")
+        catalogue_payload = {"data": [
+            {"id": "vendor/first-model:free", "context_length": 32768},
+            {"id": "vendor/new-model:free", "context_length": 65536,
+             "top_provider": {"max_completion_tokens": 4096},
+             "supported_parameters": ["tools", "tool_choice", "response_format"],
+             "architecture": {"input_modalities": ["text", "image"],
+                              "output_modalities": ["text"]}},
+        ]}
+        with mock.patch("builtins.input", side_effect=["6", "2"]), \
+             mock.patch("builtins.print"), \
+             mock.patch.dict("os.environ", {"KILO_API_KEY": "test-key"}), \
+             mock.patch.object(selection, "_get_json", return_value=catalogue_payload) as get_json:
+            result = selection.initialize_provider()
+
+        self.assertEqual(result, ("kilo-free", "vendor/new-model:free"))
+        self.assertEqual(get_json.call_count, 1, "Kilo must not make an undocumented per-model request")
+        saved = json.loads((selection.CONFIG_FILE.parent / "model_config.json").read_text())
+        self.assertEqual(set(saved["models"]), {"kilo-free::vendor/new-model:free"})
+        metadata = saved["models"]["kilo-free::vendor/new-model:free"]
+        self.assertEqual(metadata["context_window"], 65536)
+        self.assertEqual(metadata["max_output_tokens"], 4096)
+        self.assertTrue(metadata["supports_tools"])
+        self.assertTrue(metadata["supports_structured_output"])
+        self.assertEqual(metadata["supported_input_types"], ["text", "image"])
+
+
+    def test_selection_is_saved_before_model_detail_lookup(self):
+        with mock.patch("builtins.input", side_effect=["6", "1"]), \
+             mock.patch("builtins.print"), \
+             mock.patch.dict("os.environ", {"KILO_API_KEY": "test-key"}), \
+             mock.patch.object(selection, "get_available_models", return_value=[
+                 "vendor/selected-model:free"
+             ]), \
+             mock.patch.object(selection, "get_selected_model_details",
+                               side_effect=lambda provider, model: (
+                                   self.assertEqual(
+                                       json.loads(selection.CONFIG_FILE.read_text())["provider"],
+                                       provider
+                                   ),
+                                   self.assertEqual(
+                                       json.loads(selection.CONFIG_FILE.read_text())["model"],
+                                       model
+                                   ),
+                                   {}
+                               )[-1]):
+            result = selection.initialize_provider()
+
+        self.assertEqual(result, ("kilo-free", "vendor/selected-model:free"))
+        saved = json.loads(selection.CONFIG_FILE.read_text(encoding="utf-8"))
+        self.assertEqual(saved["provider"], "kilo-free")
+        self.assertEqual(saved["model"], "vendor/selected-model:free")
+
+    def test_kilo_missing_selected_catalogue_record_is_non_blocking(self):
+        selection.MODEL_CATALOGUE_ITEMS["kilo-free"] = {}
+        with mock.patch.dict("os.environ", {"KILO_API_KEY": "test-key"}), \
+             mock.patch.object(selection, "_get_json",
+                               side_effect=AssertionError("no undocumented detail endpoint")) as get_json:
+            metadata = selection.get_selected_model_details(
+                "kilo-free", "vendor/discontinued:free"
+            )
+        self.assertEqual(metadata, {})
+        get_json.assert_not_called()
 
     def test_save_provider_preserves_other_configuration(self):
         selection.CONFIG_FILE.write_text(json.dumps({

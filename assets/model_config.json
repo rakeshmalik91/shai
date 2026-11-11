@@ -14,29 +14,68 @@
     "supports_reasoning": null
   },
   "models": {
-    "gemini::gemini-3.5-flash": {
-      "context_window": 1048576
-    },
     "gemini::gemini-3.8-flash": {
-      "context_window": 1048576
+      "context_window": 1048576,
+      "max_output_tokens": 65536,
+      "supported_input_types": [
+        "text"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supported_generation_methods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ],
+      "display_name": "Gemini 3.8 Flash",
+      "description": "Gemini 3.8 Flash",
+      "version": "3.0",
+      "temperature": 1,
+      "top_p": 0.95,
+      "top_k": 64,
+      "max_temperature": 2
     },
-    "kilo-free::cohere/north-mini-code:free": {
-      "context_window": 256000
-    },
-    "kilo-free::dots-studio/dots-3-note-preview:free": {
-      "context_window": 512000
+    "kilo-free::baidu/ernie-5.5-flash-preview:free": {
+      "context_window": 1024000,
+      "max_output_tokens": 921600,
+      "supported_input_types": [
+        "text"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true,
+      "supports_structured_output": true,
+      "supports_reasoning": true
     },
     "kilo-free::nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
-      "context_window": 256000
+      "context_window": 256000,
+      "max_output_tokens": 65536,
+      "supported_input_types": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true,
+      "supports_reasoning": true
     },
     "kilo-free::nvidia/nemotron-3-ultra-550b-a55b:free": {
-      "context_window": 1000000
-    },
-    "openrouter::liquid/lfm-2.5-2.6b:free": {
-      "context_window": 65536
-    },
-    "openrouter::nvidia/nemotron-3-ultra-550b-a55b:free": {
-      "context_window": 1000000
+      "context_window": 1000000,
+      "max_output_tokens": 65536,
+      "supported_input_types": [
+        "text"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true,
+      "supports_reasoning": true
     }
   },
   "overrides": {

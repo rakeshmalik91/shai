@@ -30,7 +30,7 @@ flowchart TD
     end
 
     subgraph SharedModules["Shared Modules"]
-        ProviderSel[modules/provider_selection.py]
+        ProviderSel[modules/provider_selection.py\nShared config, auth, selection & persistence]\n    ProviderHandlers[modules/providers/\nProvider-specific discovery & metadata]
         ConvHist[modules/conversation_history.py]
         Safeguards[modules/agent_safeguards.py]
         Logging[modules/logging_config.py]
@@ -47,7 +47,7 @@ flowchart TD
     Editing --> ProjectDir
     GitOps --> ProjectDir
 
-    ProviderSel -->|API Calls| LLM[(LLM Provider APIs)]
+    ProviderSel --> ProviderHandlers\n    ProviderHandlers -->|Normalized model data| ProviderSel\n    ProviderSel -->|API Calls| LLM[(LLM Provider APIs)]
     Loop --> LLM
     ChatLoop --> LLM
 

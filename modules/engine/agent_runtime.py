@@ -46,7 +46,12 @@ from modules.tools import (
     require_access, ProjectAccessDenied,
     FUNCTIONS_READ_ONLY, TOOL_DISPATCH_READ_ONLY,
 )
-from modules.model_routing import resolve_model as resolve_routed_model
+from modules.model_routing import (
+    resolve_model as resolve_routed_model,
+    resolve_model_candidates,
+    request_with_model_fallback,
+    is_model_unavailable_error,
+)
 from modules.provider_selection import (
     PROVIDERS, initialize_provider, get_available_models,
     get_provider_config, provider_api_key, build_provider_url,
@@ -90,6 +95,10 @@ LOGGER = get_logger("shai.agent")
 # Set by main() after provider selection; defaults keep helpers import-testable.
 PROVIDER = "unknown"
 MODEL = ""
+# True only while a non-active project routing candidate is being attempted.
+# The provider adapter uses this to keep expected discontinued-model responses
+# out of warning/error logs while the router silently falls through.
+MODEL_ROUTE_IS_INACTIVE = False
 # Install domain functions into this module's shared namespace. The extracted
 # modules intentionally share runtime state to preserve existing monkeypatches,
 # configuration overrides, task-plan state and provider integrations.
@@ -103,20 +112,30 @@ del _engine_module
 
 
 def _call_with_routed_model(messages, task_role, request_callable):
-    """Temporarily select a project route for one provider request."""
-    global PROVIDER, MODEL
+    """Try configured routes; silently skip discontinued inactive models."""
+    global PROVIDER, MODEL, MODEL_ROUTE_IS_INACTIVE
     default_provider, default_model = PROVIDER, MODEL
-    route = resolve_routed_model(task_role, ROOT, default_provider, default_model)
-    LOGGER.info(
-        "Agent model route role=%s provider=%s model=%s routed=%s reason=%s",
-        task_role, route["provider"], route["model"],
-        route["routed"], route["reason"]
+    previous_inactive_route = MODEL_ROUTE_IS_INACTIVE
+    routes = resolve_model_candidates(
+        task_role, ROOT, default_provider, default_model
     )
-    try:
+
+    def request_for_route(route):
+        global PROVIDER, MODEL, MODEL_ROUTE_IS_INACTIVE
+        LOGGER.info(
+            "Agent model route role=%s provider=%s model=%s routed=%s reason=%s",
+            task_role, route["provider"], route["model"],
+            route["routed"], route["reason"]
+        )
         PROVIDER, MODEL = route["provider"], route["model"]
+        MODEL_ROUTE_IS_INACTIVE = bool(route["routed"])
         return request_callable(messages)
+
+    try:
+        return request_with_model_fallback(routes, request_for_route)
     finally:
         PROVIDER, MODEL = default_provider, default_model
+        MODEL_ROUTE_IS_INACTIVE = previous_inactive_route
 
 
 def api_request_for_role(messages, task_role="orchestrator"):
