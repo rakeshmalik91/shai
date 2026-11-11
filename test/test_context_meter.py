@@ -41,32 +41,26 @@ class ContextMeterTests(unittest.TestCase):
         self.assertGreater(with_system, base)
 
     def test_reads_model_specific_context_limit(self):
-        config = {
-            "model_context_windows": {
-                "kilo-free::example:model": 65536
-            }
-        }
+        config = {"models": {"kilo-free::example:model": {"context_window": 65536}}}
         self.assertEqual(
             get_context_window("kilo-free", "example:model", config), 65536
         )
 
     def test_model_specific_override_takes_precedence_over_provider_metadata(self):
         config = {
-            "model_context_windows": {"kilo-free::example:model": 65536},
-            "model_context_window_overrides": {"kilo-free::example:model": 98304},
+            "models": {"kilo-free::example:model": {"context_window": 65536}},
+            "overrides": {"kilo-free::example:model": {"context_window": 98304}},
         }
         self.assertEqual(
             get_context_window("kilo-free", "example:model", config), 98304
         )
 
     def test_get_context_window_rejects_booleans_and_negatives(self):
-        config = {
-            "model_context_windows": {
-                "p::bool": True,
-                "p::negative": -1000,
-                "p::zero": 0,
-            }
-        }
+        config = {"models": {
+            "p::bool": {"context_window": True},
+            "p::negative": {"context_window": -1000},
+            "p::zero": {"context_window": 0},
+        }}
         self.assertIsNone(get_context_window("p", "bool", config))
         self.assertIsNone(get_context_window("p", "negative", config))
         self.assertIsNone(get_context_window("p", "zero", config))
@@ -122,7 +116,7 @@ class ContextMeterTests(unittest.TestCase):
             "context limit unknown", format_context_status(250, None)
         )
 
-    def test_fallback_to_assets_context_window_config_for_known_models(self):
+    def test_fallback_to_assets_model_config_for_known_models(self):
         # Even with empty config, default model context limits from assets are resolved
         self.assertEqual(
             get_context_window("kilo-free", "cohere/north-mini-code:free", {}), 256000

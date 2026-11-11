@@ -122,34 +122,18 @@ Use `/model` (or `/switch`, `/switch-model`) in Chat or Agent mode. Shai fetches
 the selected provider's model list, lets you choose a model, and persists the
 selection in `assets/shai_config.json`; provider endpoint and authentication overrides live in `assets/provider_config.json`.
 
-## Context windows
+## Model capabilities and context windows
 
-Shai captures provider-reported context limits in `model_context_windows`.
-You can set a separate, explicit per-model override in
-`assets/context_window_config.json`. Overrides take precedence over metadata
-returned by the provider and are keyed by `provider::model`:
+Shai stores provider-discovered model limits and capabilities in
+`assets/model_config.json`. The `models` section contains discovered metadata,
+while the `overrides` section holds explicit per-model values. Overrides take
+precedence over discovered metadata, and `defaults` provide fallbacks. Entries
+are keyed by `provider::model`.
 
-```json
-{
-  "model_context_windows": {
-    "ollama::llama3.2": 131072,
-    "openrouter::provider/model:free": 131072
-  },
-  "model_context_window_overrides": {
-    "ollama::llama3.2": 65536,
-    "openrouter::provider/model:free": 98304
-  }
-}
-```
-
-`model_context_windows` is provider-discovered metadata; normally let Shai
-manage it. `model_context_window_overrides` is user-managed and is never
-replaced when model metadata is refreshed or a provider/model is selected.
-Values must be positive integer token counts. Remove an override entry to
-return to the provider-reported value. The legacy `context_window_tokens`
-setting remains supported for the currently selected model when no
-model-specific value is available.
-
+For example, a model can declare `context_window`, `max_output_tokens`,
+`supported_input_types`, `supported_output_types`, `supports_tools`,
+`supports_structured_output`, and `supports_reasoning`. A `null` capability
+means unknown rather than unsupported. Content type values are extensible.
 
 ## Troubleshooting
 

@@ -26,7 +26,7 @@ This document provides a complete overview of the Shai project structure, includ
 │   ├── provider_config.json
 │   ├── model_routing.json
 │   ├── command_config.json
-│   ├── context_window_config.json
+│   ├── model_config.json
 │   ├── cli_config.json
 │   ├── logging_config.json
 │   ├── command_registry.json

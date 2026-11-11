@@ -86,14 +86,18 @@ def load_config():
         # Split configuration files are merged for existing consumers.
         for filename in (
             "provider_config.json", "command_config.json",
-            "context_window_config.json", "cli_config.json",
+            "model_config.json", "cli_config.json",
             "logging_config.json",
         ):
             try:
                 with (CONFIG_FILE.parent / filename).open("r", encoding="utf-8") as extra:
                     section = json.load(extra)
                 if isinstance(section, dict):
-                    _merge_config_section(value, section)
+                    if filename == "model_config.json":
+                        value.setdefault("model_config", {})
+                        _merge_config_section(value["model_config"], section)
+                    else:
+                        _merge_config_section(value, section)
             except (FileNotFoundError, OSError, ValueError, TypeError):
                 pass
         return value

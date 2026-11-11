@@ -29,50 +29,27 @@ def estimate_messages_tokens(messages, tools=None, system_text=None):
 
 
 def get_context_window(provider, model, config=None):
-    """Resolve only explicit or provider-reported limits; never guess."""
-    config = config if isinstance(config, dict) else {}
+    """Resolve context capacity from model metadata and user overrides."""
+    from modules.model_config import get_model_config, load_model_config
+
+    source = config if isinstance(config, dict) else {}
+    model_config = source.get("model_config")
+    if not isinstance(model_config, dict):
+        # Accept the new model-config object directly.
+        model_config = source if any(k in source for k in ("models", "overrides", "defaults")) else None
+    if model_config is None:
+        model_config = load_model_config()
+    value = get_model_config(provider, model, model_config).get("context_window")
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+
+    # Compatibility with callers passing the old flattened merged config.
     key = "{}::{}".format(provider, model)
-    # Explicit user overrides always win over provider-reported metadata.
-    overrides = config.get("model_context_window_overrides", {})
-    if isinstance(overrides, dict):
-        value = overrides.get(key)
+    for section in ("model_context_window_overrides", "model_context_windows"):
+        mapping = source.get(section, {})
+        value = mapping.get(key) if isinstance(mapping, dict) else None
         if isinstance(value, int) and not isinstance(value, bool) and value > 0:
             return value
-    mapping = config.get("model_context_windows", {})
-    if isinstance(mapping, dict):
-        value = mapping.get(key)
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-            return value
-    if config.get("provider") == provider and config.get("model") == model:
-        value = config.get("context_window_tokens")
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-            return value
-
-    # Fallback to assets/context_window_config.json when not present in config
-    try:
-        import pathlib
-        cfg_path = pathlib.Path(__file__).resolve().parents[1] / "assets" / "context_window_config.json"
-        if cfg_path.is_file():
-            with cfg_path.open("r", encoding="utf-8") as handle:
-                fallback_cfg = json.load(handle)
-            if isinstance(fallback_cfg, dict):
-                fallback_overrides = fallback_cfg.get("model_context_window_overrides", {})
-                if isinstance(fallback_overrides, dict):
-                    val = fallback_overrides.get(key)
-                    if isinstance(val, int) and not isinstance(val, bool) and val > 0:
-                        return val
-                fallback_mapping = fallback_cfg.get("model_context_windows", {})
-                if isinstance(fallback_mapping, dict):
-                    val = fallback_mapping.get(key)
-                    if isinstance(val, int) and not isinstance(val, bool) and val > 0:
-                        return val
-                if fallback_cfg.get("provider") == provider and fallback_cfg.get("model") == model:
-                    val = fallback_cfg.get("context_window_tokens")
-                    if isinstance(val, int) and not isinstance(val, bool) and val > 0:
-                        return val
-    except (OSError, ValueError, TypeError):
-        pass
-
     return None
 
 

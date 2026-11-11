@@ -91,7 +91,7 @@ class InteractionHandlerTests(unittest.TestCase):
         handler = DefaultCliInteractionHandler()
         output = []
         with mock.patch("builtins.print", side_effect=lambda *args, **kwargs: output.append(" ".join(map(str, args)))):
-            with mock.patch.object(handler, "_prompt", return_value="1"):
+            with mock.patch.object(handler, "_prompt", return_value="a"):
                 self.assertEqual(
                     handler.request_os_command_permission("rd /s /q test_dir", None),
                     "once"

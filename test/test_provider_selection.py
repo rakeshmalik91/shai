@@ -104,19 +104,39 @@ class ProviderSelectionTests(unittest.TestCase):
             "kilo-free", "provider/model-a:free",
             selection.MODEL_CONTEXT_WINDOWS["provider/model-a:free"]
         )
-        saved = json.loads((selection.CONFIG_FILE.parent / "context_window_config.json").read_text(encoding="utf-8"))
-        self.assertEqual(saved["context_window_tokens"], 131072)
-        self.assertEqual(
-            saved["model_context_windows"]["kilo-free::provider/model-a:free"],
-            131072
-        )
+        saved = json.loads((selection.CONFIG_FILE.parent / "model_config.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["models"]["kilo-free::provider/model-a:free"]["context_window"], 131072)
+
+    def test_discovery_saves_output_limit_and_supported_modalities(self):
+        with mock.patch.dict("os.environ", {"KILO_API_KEY": "test-key"}):
+            with mock.patch.object(selection, "_get_json", return_value={
+                "data": [{
+                    "id": "vendor/multimodal-model:free",
+                    "context_length": 131072,
+                    "max_completion_tokens": 8192,
+                    "architecture": {
+                        "input_modalities": ["text", "image", "audio"],
+                        "output_modalities": ["text"],
+                    },
+                    "tool_calling": True,
+                }]
+            }):
+                models = selection.get_available_models("kilo-free")
+        self.assertEqual(models, ["vendor/multimodal-model:free"])
+        saved = json.loads((selection.CONFIG_FILE.parent / "model_config.json").read_text())
+        metadata = saved["models"]["kilo-free::vendor/multimodal-model:free"]
+        self.assertEqual(metadata["context_window"], 131072)
+        self.assertEqual(metadata["max_output_tokens"], 8192)
+        self.assertEqual(metadata["supported_input_types"], ["text", "image", "audio"])
+        self.assertEqual(metadata["supported_output_types"], ["text"])
+        self.assertTrue(metadata["supports_tools"])
 
     def test_saved_model_context_override_is_preserved_and_preferred(self):
         selection.CONFIG_FILE.write_text("{}", encoding="utf-8")
-        context_path = selection.CONFIG_FILE.parent / "context_window_config.json"
-        context_path.write_text(json.dumps({
-            "model_context_windows": {"kilo-free::vendor/model": 65536},
-            "model_context_window_overrides": {"kilo-free::vendor/model": 98304},
+        context_path = selection.CONFIG_FILE.parent / "model_config.json"
+        context_path.write_text(json.dumps({"version": 1,
+            "models": {"kilo-free::vendor/model": {"context_window": 65536}},
+            "overrides": {"kilo-free::vendor/model": {"context_window": 98304}},
         }), encoding="utf-8")
         self.assertEqual(selection.get_saved_context_window(
             "kilo-free", "vendor/model"
@@ -124,7 +144,7 @@ class ProviderSelectionTests(unittest.TestCase):
         selection.save_config("kilo-free", "vendor/model", 65536)
         saved = json.loads(context_path.read_text(encoding="utf-8"))
         self.assertEqual(
-            saved["model_context_window_overrides"]["kilo-free::vendor/model"],
+            saved["overrides"]["kilo-free::vendor/model"]["context_window"],
             98304,
         )
 

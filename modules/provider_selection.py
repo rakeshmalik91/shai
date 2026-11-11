@@ -97,12 +97,16 @@ def load_config():
             data = json.load(handle)
         if not isinstance(data, dict):
             return {}
-        for filename in ("provider_config.json", "context_window_config.json", "cli_config.json", "logging_config.json", "command_config.json"):
+        for filename in ("provider_config.json", "model_config.json", "cli_config.json", "logging_config.json", "command_config.json"):
             try:
                 with (CONFIG_FILE.parent / filename).open("r", encoding="utf-8") as handle:
                     section = json.load(handle)
                 if isinstance(section, dict):
-                    _merge_config_section(data, section)
+                    if filename == "model_config.json":
+                        data.setdefault("model_config", {})
+                        _merge_config_section(data["model_config"], section)
+                    else:
+                        _merge_config_section(data, section)
             except (OSError, ValueError, TypeError):
                 pass
         return data
@@ -187,47 +191,28 @@ def provider_timeout(provider, fallback=300):
 
 
 def save_config(provider, model, context_window_tokens=None):
-    """Persist provider/model in core config and context limits separately."""
+    """Persist selected provider/model and provider-reported model metadata."""
     config = {}
     if CONFIG_FILE.exists():
         try:
             config = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
             config = {}
-    config["provider"] = provider
-    config["model"] = model
+    config["provider"], config["model"] = provider, model
     temporary = CONFIG_FILE.with_name(CONFIG_FILE.name + ".tmp")
     with temporary.open("w", encoding="utf-8") as handle:
         json.dump(config, handle, indent=2, ensure_ascii=False)
         handle.write("\n")
     temporary.replace(CONFIG_FILE)
 
-    context_path = CONFIG_FILE.parent / "context_window_config.json"
-    context = {}
-    if context_path.exists():
-        try:
-            context = json.loads(context_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError, TypeError):
-            context = {}
-    mapping = context.get("model_context_windows", {})
-    if not isinstance(mapping, dict):
-        mapping = {}
-    context_key = "{}::{}".format(provider, model)
+    from modules.model_config import load_model_config, save_model_config
+    model_config = load_model_config(CONFIG_FILE.parent / "model_config.json")
+    key = "{}::{}".format(provider, model)
+    metadata = model_config["models"].setdefault(key, {})
     if isinstance(context_window_tokens, int) and not isinstance(context_window_tokens, bool) and context_window_tokens > 0:
-        mapping[context_key] = context_window_tokens
-        context["context_window_tokens"] = context_window_tokens
-    else:
-        saved_limit = mapping.get(context_key)
-        if isinstance(saved_limit, int) and saved_limit > 0:
-            context["context_window_tokens"] = saved_limit
-        else:
-            context.pop("context_window_tokens", None)
-    context["model_context_windows"] = dict(sorted(mapping.items()))
-    temporary = context_path.with_name(context_path.name + ".tmp")
-    with temporary.open("w", encoding="utf-8") as handle:
-        json.dump(context, handle, indent=2, ensure_ascii=False)
-        handle.write("\n")
-    temporary.replace(context_path)
+        metadata["context_window"] = context_window_tokens
+    save_model_config(model_config, CONFIG_FILE.parent / "model_config.json")
+
 
 def _get_json(url, key, provider):
     config = get_provider_config(provider)
@@ -264,24 +249,62 @@ def _model_context_limit(item):
 
 
 def get_saved_context_window(provider, model):
-    """Return a persisted provider-reported or user-configured context limit."""
-    config = load_config()
-    key = "{}::{}".format(provider, model)
-    overrides = config.get("model_context_window_overrides", {})
-    if isinstance(overrides, dict):
-        value = overrides.get(key)
+    """Return the effective model context limit, including user overrides."""
+    from modules.model_config import get_model_config, load_model_config
+    return get_model_config(provider, model, load_model_config(
+        CONFIG_FILE.parent / "model_config.json"
+    )).get("context_window")
+
+
+def _model_metadata(item, provider=None):
+    """Extract only capability fields explicitly advertised by a provider."""
+    if not isinstance(item, dict):
+        return {}
+    metadata = {}
+    context = _model_context_limit(item)
+    if context:
+        metadata["context_window"] = context
+    for key in ("max_output_tokens", "max_completion_tokens", "output_token_limit", "outputTokenLimit"):
+        value = item.get(key)
         if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-            return value
-    mapping = config.get("model_context_windows", {})
-    if isinstance(mapping, dict):
-        value = mapping.get(key)
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-            return value
-    if config.get("provider") == provider and config.get("model") == model:
-        value = config.get("context_window_tokens")
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-            return value
-    return None
+            metadata["max_output_tokens"] = value
+            break
+    input_types = item.get("supported_input_types", item.get("input_modalities"))
+    output_types = item.get("supported_output_types", item.get("output_modalities"))
+    if isinstance(item.get("architecture"), dict):
+        architecture = item["architecture"]
+        input_types = input_types or architecture.get("input_modalities")
+        output_types = output_types or architecture.get("output_modalities")
+    aliases = {"image": "image", "audio": "audio", "video": "video", "text": "text"}
+    if isinstance(input_types, list):
+        metadata["supported_input_types"] = [aliases.get(str(v).lower(), str(v).lower()) for v in input_types]
+    if isinstance(output_types, list):
+        metadata["supported_output_types"] = [aliases.get(str(v).lower(), str(v).lower()) for v in output_types]
+    if isinstance(item.get("tool_calling"), bool):
+        metadata["supports_tools"] = item["tool_calling"]
+    elif isinstance(item.get("supports_tools"), bool):
+        metadata["supports_tools"] = item["supports_tools"]
+    if isinstance(item.get("supports_structured_output"), bool):
+        metadata["supports_structured_output"] = item["supports_structured_output"]
+    if isinstance(item.get("supports_reasoning"), bool):
+        metadata["supports_reasoning"] = item["supports_reasoning"]
+    if provider == "gemini":
+        if isinstance(item.get("inputTokenLimit"), int) and item["inputTokenLimit"] > 0:
+            metadata["context_window"] = item["inputTokenLimit"]
+        if isinstance(item.get("outputTokenLimit"), int) and item["outputTokenLimit"] > 0:
+            metadata["max_output_tokens"] = item["outputTokenLimit"]
+    return metadata
+
+
+def _save_discovered_metadata(provider, model, metadata):
+    if not metadata:
+        return
+    try:
+        from modules.model_config import update_model_metadata
+        update_model_metadata(provider, model, metadata,
+                              CONFIG_FILE.parent / "model_config.json")
+    except (OSError, ValueError, TypeError) as error:
+        print("Warning: could not save model metadata: {}".format(error))
 
 
 def get_available_models(provider):
@@ -299,9 +322,10 @@ def get_available_models(provider):
             name = item.get("name") or item.get("model") if isinstance(item, dict) else ""
             if name:
                 models.append(name)
-                limit = _model_context_limit(item)
-                if limit:
-                    MODEL_CONTEXT_WINDOWS[name] = limit
+                metadata = _model_metadata(item)
+                if metadata.get("context_window"):
+                    MODEL_CONTEXT_WINDOWS[name] = metadata["context_window"]
+                _save_discovered_metadata(provider, name, metadata)
     elif provider == "gemini":
         models = []
         for item in data.get("models", []):
@@ -312,18 +336,20 @@ def get_available_models(provider):
                 name = name[len("models/"):]
             if name:
                 models.append(name)
-                limit = _model_context_limit(item)
-                if limit:
-                    MODEL_CONTEXT_WINDOWS[name] = limit
+                metadata = _model_metadata(item, provider="gemini")
+                if metadata.get("context_window"):
+                    MODEL_CONTEXT_WINDOWS[name] = metadata["context_window"]
+                _save_discovered_metadata(provider, name, metadata)
     else:
         models = []
         for item in data.get("data", []):
             model_name = item.get("id", "")
             if model_name:
                 models.append(model_name)
-                limit = _model_context_limit(item)
-                if limit:
-                    MODEL_CONTEXT_WINDOWS[model_name] = limit
+                metadata = _model_metadata(item)
+                if metadata.get("context_window"):
+                    MODEL_CONTEXT_WINDOWS[model_name] = metadata["context_window"]
+                _save_discovered_metadata(provider, model_name, metadata)
 
     filter_mode = config.get("models_filter", "all")
     if filter_mode == "free_only":
@@ -384,7 +410,7 @@ def initialize_provider(auto_select=False):
                 if context_limit:
                     print("Model context window: {:,} tokens".format(context_limit))
                 else:
-                    print("Model context window: unknown (configure it in context_window_config.json if needed)")
+                    print("Model context window: unknown (configure it in model_config.json if needed)")
                 print("Selected: {} / {} (auto-selected)".format(saved_provider, saved_model))
                 return saved_provider, saved_model
             else:
@@ -439,6 +465,6 @@ def initialize_provider(auto_select=False):
     if context_limit:
         print("Model context window: {:,} tokens".format(context_limit))
     else:
-        print("Model context window: unknown (configure it in context_window_config.json if needed)")
+        print("Model context window: unknown (configure it in model_config.json if needed)")
     print("Selected:", provider, "/", model)
     return provider, model

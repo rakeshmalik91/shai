@@ -53,30 +53,28 @@ class ConfigTests(unittest.TestCase):
 
     def test_load_config_merges_split_config_files(self):
         self.write_config({"provider": "kilo-free", "model": "cohere/north-mini-code:free"})
-        split_file = pathlib.Path(self.temp_dir.name) / "context_window_config.json"
-        split_file.write_text(json.dumps({
-            "model_context_windows": {"kilo-free::cohere/north-mini-code:free": 256000}
-        }), encoding="utf-8")
+        split_file = pathlib.Path(self.temp_dir.name) / "model_config.json"
+        split_file.write_text(json.dumps({"version": 1, "models": {
+            "kilo-free::cohere/north-mini-code:free": {"context_window": 256000}
+        }}), encoding="utf-8")
         loaded = agent.load_config()
-        self.assertIn("model_context_windows", loaded)
-        self.assertEqual(loaded["model_context_windows"]["kilo-free::cohere/north-mini-code:free"], 256000)
+        self.assertIn("model_config", loaded)
+        self.assertEqual(loaded["model_config"]["models"]["kilo-free::cohere/north-mini-code:free"]["context_window"], 256000)
 
     def test_load_config_preserves_explicit_overrides_over_split_configs(self):
         self.write_config({
             "provider": "kilo-free",
             "model": "cohere/north-mini-code:free",
-            "model_context_windows": {"kilo-free::cohere/north-mini-code:free": 500000}
+            "model_config": {"version": 1, "models": {"kilo-free::cohere/north-mini-code:free": {"context_window": 500000}}}
         })
-        split_file = pathlib.Path(self.temp_dir.name) / "context_window_config.json"
-        split_file.write_text(json.dumps({
-            "model_context_windows": {
-                "kilo-free::cohere/north-mini-code:free": 256000,
-                "other::model": 128000
-            }
-        }), encoding="utf-8")
+        split_file = pathlib.Path(self.temp_dir.name) / "model_config.json"
+        split_file.write_text(json.dumps({"version": 1, "models": {
+            "kilo-free::cohere/north-mini-code:free": {"context_window": 256000},
+            "other::model": {"context_window": 128000}
+        }}), encoding="utf-8")
         loaded = agent.load_config()
-        self.assertEqual(loaded["model_context_windows"]["kilo-free::cohere/north-mini-code:free"], 500000)
-        self.assertEqual(loaded["model_context_windows"]["other::model"], 128000)
+        self.assertEqual(loaded["model_config"]["models"]["kilo-free::cohere/north-mini-code:free"]["context_window"], 500000)
+        self.assertEqual(loaded["model_config"]["models"]["other::model"]["context_window"], 128000)
 
     def test_load_api_timeout_seconds_defaults_and_validation(self):
         # Default when missing
@@ -224,8 +222,8 @@ class ConfigTests(unittest.TestCase):
     def test_save_approval_settings_does_not_leak_split_configs_into_shai_config(self):
         self.write_config({"provider": "kilo-free", "model": "test-model"})
         # Place sibling split config files in the same directory
-        (pathlib.Path(self.temp_dir.name) / "context_window_config.json").write_text(
-            json.dumps({"model_context_windows": {"kilo-free::test-model": 128000}}),
+        (pathlib.Path(self.temp_dir.name) / "model_config.json").write_text(
+            json.dumps({"version": 1, "models": {"kilo-free::test-model": {"context_window": 128000}}}),
             encoding="utf-8"
         )
         (pathlib.Path(self.temp_dir.name) / "cli_config.json").write_text(
@@ -238,7 +236,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(saved["model"], "test-model")
         self.assertTrue(saved["approve"]["all"])
         # Crucial check: split files must not be copied/leaked into shai_config.json
-        self.assertNotIn("model_context_windows", saved)
+        self.assertNotIn("model_config", saved)
         self.assertNotIn("tool_call_display", saved)
 
     def test_provider_selection_load_config_preserves_shai_config_overrides(self):

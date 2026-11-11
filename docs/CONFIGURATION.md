@@ -8,7 +8,51 @@ Shai configuration is stored under `assets/` and split by responsibility:
 - `assets/project_access_config.json` — generic project path access defaults and administrator-authored path rules.
 - `assets/provider_config.json` — provider endpoint/authentication overrides under `providers`.
 - `assets/command_config.json` — Shai slash-command and OS command settings (`shai_command`, `os_command`).
-- `assets/context_window_config.json` — provider-reported per-model context limits, user-defined `model_context_window_overrides`, and the legacy active context token limit. Explicit model overrides take precedence over provider metadata.
+- `assets/model_config.json` — per-model technical limits and capabilities, including context windows, output limits, supported input/output content types, tool calling, structured output, and reasoning. Model-specific `overrides` take precedence over model metadata, which takes precedence over global `defaults`.
+
+
+### Model metadata configuration
+
+`assets/model_config.json` is the shared model metadata registry. Model keys use
+`provider::model` so identifiers remain unambiguous across providers. The file
+is divided into three layers:
+
+- `defaults`: fallback values for attributes not advertised or configured.
+- `models`: provider-discovered or curated metadata for each model.
+- `overrides`: explicit user values, applied last and therefore highest priority.
+
+Example:
+
+```json
+{
+  "version": 1,
+  "defaults": {
+    "context_window": null,
+    "max_output_tokens": null,
+    "supported_input_types": ["text"],
+    "supported_output_types": ["text"],
+    "supports_tools": null,
+    "supports_structured_output": null,
+    "supports_reasoning": null
+  },
+  "models": {
+    "provider::model-id": {
+      "context_window": 128000,
+      "max_output_tokens": 8192,
+      "supported_input_types": ["text", "image"],
+      "supported_output_types": ["text"],
+      "supports_tools": true
+    }
+  },
+  "overrides": {}
+}
+```
+
+`null` means unknown; it does not mean unsupported. Content type arrays are
+extensible, and additional provider/model attributes are preserved. Provider
+model discovery updates `models` without replacing explicit `overrides`. The
+old `context_window_config.json` format is migrated automatically when the new
+file is absent.
 - `assets/cli_config.json` — terminal/CLI presentation, tool-call display, reasoning display, and file-change display.
 - `assets/logging_config.json` — log level, output location (`.shai/logs/` by default), rotation, retention, and console logging.
 - `assets/command_registry.json` — natural-language command registry.

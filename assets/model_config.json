@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "defaults": {
+    "context_window": null,
+    "max_output_tokens": null,
+    "supported_input_types": [
+      "text"
+    ],
+    "supported_output_types": [
+      "text"
+    ],
+    "supports_tools": null,
+    "supports_structured_output": null,
+    "supports_reasoning": null
+  },
+  "models": {
+    "gemini::gemini-3.5-flash": {
+      "context_window": 1048576
+    },
+    "gemini::gemini-3.8-flash": {
+      "context_window": 1048576
+    },
+    "kilo-free::cohere/north-mini-code:free": {
+      "context_window": 256000
+    },
+    "kilo-free::dots-studio/dots-3-note-preview:free": {
+      "context_window": 512000
+    },
+    "kilo-free::nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+      "context_window": 256000
+    },
+    "kilo-free::nvidia/nemotron-3-ultra-550b-a55b:free": {
+      "context_window": 1000000
+    },
+    "openrouter::liquid/lfm-2.5-2.6b:free": {
+      "context_window": 65536
+    },
+    "openrouter::nvidia/nemotron-3-ultra-550b-a55b:free": {
+      "context_window": 1000000
+    }
+  },
+  "overrides": {
+    "ollama::llama3.2": {
+      "context_window": 65536
+    }
+  }
+}
