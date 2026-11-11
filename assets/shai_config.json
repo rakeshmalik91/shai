@@ -1,6 +1,6 @@
 {
   "provider": "kilo-free",
-  "model": "baidu/ernie-5.5-flash-preview:free",
+  "model": "nvidia/nemotron-3.5-lightning:free",
   "max_tool_call_iterations": 500,
   "api_timeout_seconds": 300,
   "approve": {

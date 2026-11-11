@@ -7,6 +7,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from modules.conversation_history import input_without_history
+
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent.parent
 CONFIG_FILE = SCRIPT_DIR / "assets" / "shai_config.json"
 
@@ -366,7 +368,7 @@ def choose_model(models, preferred=None):
         prompt = "\nChoose model number: "
 
     while True:
-        choice = input(prompt).strip()
+        choice = input_without_history(prompt).strip()
         if not choice and default_number is not None:
             return models[default_number - 1]
         try:
@@ -420,7 +422,7 @@ def initialize_provider(auto_select=False):
         print("{:3}. {}".format(number, label))
 
     while True:
-        choice = input("\nChoose provider number: ").strip()
+        choice = input_without_history("\nChoose provider number: ").strip()
         if choice == "0":
             if saved_provider not in PROVIDERS or not saved_model:
                 print("No previous provider/model selection is saved.")

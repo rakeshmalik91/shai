@@ -38,7 +38,9 @@ from modules.provider_selection import (
 )
 from modules.logging_config import init_default_logging, get_logger, log_api_payload
 from modules.reasoning_handlers import display_reasoning_summary
-from modules.conversation_history import ConversationHistory, input_with_history
+from modules.conversation_history import (
+    ConversationHistory, input_with_history, input_without_history
+)
 from modules.agent_safeguards import compact_conversation_history
 from modules.context_meter import (
     estimate_messages_tokens, get_context_window, format_context_status,
@@ -227,7 +229,7 @@ def choose_model(models, preferred=None):
         prompt = "\nChoose model number: "
 
     while True:
-        choice = input(prompt).strip()
+        choice = input_without_history(prompt).strip()
         if not choice and default_number is not None:
             return models[default_number - 1]
         try:

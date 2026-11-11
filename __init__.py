@@ -25,6 +25,7 @@ from modules.provider_selection import (
     provider_timeout,
 )
 from modules.logging_config import init_default_logging, get_logger
+from modules.conversation_history import input_without_history
 
 # -------------------------------------------------------------------
 # Configuration
@@ -897,7 +898,7 @@ def confirm_action(prompt):
     if YES_TO_ALL:
         return True
     try:
-        answer = input(prompt).strip().lower()
+        answer = input_without_history(prompt).strip().lower()
     except EOFError:
         raise IterationInterrupted()
     if answer in ("a", "all"):

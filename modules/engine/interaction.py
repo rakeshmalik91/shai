@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 import sys
 
+from modules.conversation_history import input_without_history
+
 LOGGER = logging.getLogger("shai.engine.interaction")
 
 
@@ -57,7 +59,7 @@ class DefaultCliInteractionHandler(InteractionHandler):
         if not getattr(sys.stdin, "isatty", lambda: False)():
             return ""
         try:
-            return input(message).strip()
+            return input_without_history(message).strip()
         except (EOFError, KeyboardInterrupt):
             from modules.engine.process_control import IterationInterrupted
             raise IterationInterrupted()

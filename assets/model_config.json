@@ -14,6 +14,20 @@
     "supports_reasoning": null
   },
   "models": {
+    "gemini::gemini-3.5-flash": {
+      "context_window": 1048576,
+      "max_output_tokens": 8192,
+      "supported_input_types": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true
+    },
     "gemini::gemini-3.8-flash": {
       "context_window": 1048576,
       "max_output_tokens": 65536,
@@ -50,6 +64,17 @@
       "supports_structured_output": true,
       "supports_reasoning": true
     },
+    "kilo-free::cohere/north-mini-code:free": {
+      "context_window": 256000,
+      "max_output_tokens": 8192,
+      "supported_input_types": [
+        "text"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true
+    },
     "kilo-free::nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
       "context_window": 256000,
       "max_output_tokens": 65536,
@@ -77,30 +102,17 @@
       "supports_tools": true,
       "supports_reasoning": true
     },
-    "kilo-free::cohere/north-mini-code:free": {
-      "context_window": 256000,
-      "max_output_tokens": 8192,
+    "kilo-free::nvidia/nemotron-3.5-lightning:free": {
+      "context_window": 1000000,
+      "max_output_tokens": 65536,
       "supported_input_types": [
         "text"
       ],
       "supported_output_types": [
         "text"
       ],
-      "supports_tools": true
-    },
-    "gemini::gemini-3.5-flash": {
-      "context_window": 1048576,
-      "max_output_tokens": 8192,
-      "supported_input_types": [
-        "text",
-        "image",
-        "audio",
-        "video"
-      ],
-      "supported_output_types": [
-        "text"
-      ],
-      "supports_tools": true
+      "supports_tools": true,
+      "supports_reasoning": true
     }
   },
   "overrides": {
