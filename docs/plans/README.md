@@ -26,17 +26,20 @@ Implemented feature references and current architecture contracts live in [`../`
    - Bounded runtime failover and failure classification across candidate models.
    - Availability cache invalidation semantics, cooldowns, and specialist role call-site wiring (`planner`, `code`, `debug`, `test`, `review`, `documentation`, `research`).
 
-3. [`TOOLS.md`](TOOLS.md)
+3. [`MODEL_TOOL_CALL_EFFICIENCY.md`](MODEL_TOOL_CALL_EFFICIENCY.md)
+   - Audit of the delivered toolset and roadmap to reduce model round-trips through richer results, batched inspection, consolidated verification/Git inspection, caching, and measurable benchmarks.
+
+4. [`TOOLS.md`](TOOLS.md)
    - Detailed technical specifications for future tool candidates: `search_logs`, `check_environment`, `get_import_graph`, `git_log`, `git_blame`, `compare_files`, `apply_patch`, persistent task plans, and semantic code navigation.
    - Parameter schemas, error behaviors, access policy enforcement, and output limits.
 
-4. [`OS_COMMAND_SANDBOX.md`](OS_COMMAND_SANDBOX.md)
+5. [`OS_COMMAND_SANDBOX.md`](OS_COMMAND_SANDBOX.md)
    - Platform-specific sandboxing (Linux user namespaces/bwrap, macOS sandbox-exec, iSH/container isolation).
    - Project-only filesystem mounts, network denial for child processes (especially Python tests), resource quotas, process-tree cleanup, and approval previews.
 
-5. [`LLM_CLARIFICATION_QUESTIONS.md`](LLM_CLARIFICATION_QUESTIONS.md)
+6. [`LLM_CLARIFICATION_QUESTIONS.md`](LLM_CLARIFICATION_QUESTIONS.md)
    - Specification for `ask_user` tool interaction.
    - Request suspension and resumption state machine, conversational prompt handling, choice presentation, and loop-protection budgets.
 
-6. [`TESTING_STRATEGY.md`](TESTING_STRATEGY.md)
+7. [`TESTING_STRATEGY.md`](TESTING_STRATEGY.md)
    - Quality and test hardening roadmap: exhaustive unit coverage across configuration and tool layers, fault injection, edge-case testing (boundary values, corruption, Unicode, symlinks), and non-interactive determinism.
