@@ -1,4 +1,6 @@
 import tempfile
+import os
+import subprocess
 import unittest
 from unittest.mock import patch
 from pathlib import Path
@@ -33,7 +35,13 @@ class OSCommandTests(unittest.TestCase):
         self.temp.cleanup()
 
     def runner(self, command, cwd, timeout, output_settings, env=None):
-        self.calls.append((command, cwd, timeout, output_settings, env))
+        git_config_contents = None
+        if env and env.get("GIT_CONFIG_GLOBAL") != __import__("os").devnull:
+            try:
+                git_config_contents = Path(env["GIT_CONFIG_GLOBAL"]).read_text(encoding="utf-8")
+            except OSError:
+                pass
+        self.calls.append((command, cwd, timeout, output_settings, env, git_config_contents))
         return {"timed_out": False, "returncode": 0, "stdout": "ok\n", "stderr": "",
                 "duration_seconds": 0.01, "output_truncated": False,
                 "stdout_total_bytes": 3, "stderr_total_bytes": 0}
@@ -63,6 +71,71 @@ class OSCommandTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "completed")
 
+    def test_model_command_requires_approval_when_not_unrestricted(self):
+        self.settings["requires_approval"] = True
+        self.settings["unrestricted_commands"] = {"common": [], "unix": [], "windows": []}
+        result = execute_os_command(
+            "grep", ["bird", "notes.txt"], root=self.root, settings=self.settings,
+            confirm=lambda _preview: False, runner=self.runner,
+        )
+        self.assertEqual(result["status"], "rejected")
+        self.assertEqual(len(self.calls), 0)
+
+    def test_configured_readonly_git_subcommands_skip_approval(self):
+        self.settings["requires_approval"] = True
+        self.settings["unrestricted_subcommands"] = {
+            "common": {}, "unix": {"git": ["status", "diff", "log", "branch --list"]},
+            "windows": {},
+        }
+        for arguments in (["status"], ["diff", "--stat"], ["log", "--oneline", "-5"],
+                          ["branch", "--list"]):
+            with self.subTest(arguments=arguments):
+                result = execute_os_command(
+                    "git", arguments, root=self.root, settings=self.settings,
+                    confirm=lambda _preview: self.fail("Read-only Git command prompted"),
+                    runner=self.runner,
+                )
+                self.assertEqual(result["status"], "completed")
+
+    def test_unlisted_git_subcommand_still_requires_approval(self):
+        self.settings["requires_approval"] = True
+        self.settings["unrestricted_subcommands"] = {
+            "common": {}, "unix": {"git": ["status", "diff", "log"]},
+            "windows": {},
+        }
+        result = execute_os_command(
+            "git", ["branch", "-d", "old-branch"], root=self.root,
+            settings=self.settings, confirm=lambda _preview: False,
+            runner=self.runner,
+        )
+        self.assertEqual(result["status"], "rejected")
+        self.assertEqual(len(self.calls), 0)
+
+    def test_readonly_git_rule_does_not_bypass_blocked_rule(self):
+        self.settings["requires_approval"] = True
+        self.settings["unrestricted_subcommands"] = {
+            "common": {}, "unix": {"git": ["status", "diff", "log"]},
+            "windows": {},
+        }
+        result = self.execute("git", ["push", "origin", "main"])
+        self.assertEqual(result["status"], "blocked_confirmation_required")
+        self.assertEqual(len(self.calls), 0)
+
+    def test_git_read_rule_with_output_or_external_diff_option_requires_approval(self):
+        self.settings["requires_approval"] = True
+        self.settings["unrestricted_subcommands"] = {
+            "common": {}, "unix": {"git": ["diff", "log", "show"]},
+            "windows": {},
+        }
+        for arguments in (["diff", "--output=patch.txt"], ["diff", "--ext-diff"],
+                          ["log", "--output", "history.txt"]):
+            with self.subTest(arguments=arguments):
+                result = execute_os_command(
+                    "git", arguments, root=self.root, settings=self.settings,
+                    confirm=lambda _preview: False, runner=self.runner,
+                )
+                self.assertEqual(result["status"], "rejected")
+
     def test_unrestricted_command_does_not_bypass_blocked_rule(self):
         self.settings["unrestricted_commands"] = {"common": [], "unix": ["git"], "windows": []}
         result = self.execute("git", ["push", "origin", "main"])
@@ -84,6 +157,7 @@ class OSCommandTests(unittest.TestCase):
                 "common": {
                     "allowed_commands": ["git"],
                     "unrestricted_commands": [],
+                    "unrestricted_subcommands": {},
                     "blocked_commands": [],
                     "blocked_command_exceptions": {},
                     "blocked_command_rules": {},
@@ -100,6 +174,7 @@ class OSCommandTests(unittest.TestCase):
                 "windows": {
                     "allowed_commands": [],
                     "unrestricted_commands": [],
+                    "unrestricted_subcommands": {},
                     "blocked_commands": [],
                     "blocked_command_exceptions": {},
                     "blocked_command_rules": {},
@@ -113,6 +188,17 @@ class OSCommandTests(unittest.TestCase):
             runner=self.runner,
         )
         self.assertEqual(result["status"], "completed")
+
+    def test_manual_cli_bypasses_allowlist_and_blocklist(self):
+        result = self.execute("rm", ["-rf", "temporary-folder"], manual=True)
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(len(self.calls), 1)
+
+    def test_manual_cli_works_when_os_command_policy_is_disabled(self):
+        self.settings["enabled"] = False
+        result = self.execute("true", [], manual=True)
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(len(self.calls), 1)
 
     def test_unconfigured_command_requests_whitelisting(self):
         result = self.execute("ipconfig", ["/all"])
@@ -139,6 +225,57 @@ class OSCommandTests(unittest.TestCase):
         result = self.execute("su", ["-"])
         self.assertEqual(result["status"], "blocked_confirmation_required")
         self.assertEqual(len(self.calls), 0)
+
+    def test_git_receives_project_scoped_safe_directory_config(self):
+        result = self.execute("git", ["status"])
+        self.assertEqual(result["status"], "completed")
+        command = self.calls[0][0]
+        self.assertEqual(command[1:], ["status"])
+        git_config = self.calls[0][4]["GIT_CONFIG_GLOBAL"]
+        self.assertTrue(git_config.startswith("/tmp/shai-git-safe-"))
+        self.assertFalse(Path(git_config).exists())
+        self.assertIn('[safe]', self.calls[0][5])
+        self.assertIn('directory = "{}"'.format(self.root), self.calls[0][5])
+
+    def test_git_status_accepts_project_scoped_protected_safe_directory(self):
+        repository = self.root
+        initialized = subprocess.run(
+            ["git", "init", str(repository)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        if initialized.returncode != 0:
+            self.skipTest("Git is unavailable: {}".format(initialized.stderr))
+
+        def real_git_runner(command, cwd, timeout, output_settings, env=None):
+            child_env = os.environ.copy()
+            child_env.update(env or {})
+            # Ask Git to simulate a repository owned by another user. This
+            # verifies safe.directory comes from a protected config scope.
+            child_env["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1"
+            completed = subprocess.run(
+                command, cwd=str(cwd), env=child_env, text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout
+            )
+            return {
+                "timed_out": False, "returncode": completed.returncode,
+                "stdout": completed.stdout, "stderr": completed.stderr,
+                "duration_seconds": 0.01, "output_truncated": False,
+                "stdout_total_bytes": len(completed.stdout.encode()),
+                "stderr_total_bytes": len(completed.stderr.encode()),
+            }
+
+        result = execute_os_command(
+            "git", ["status"], root=self.root,
+            settings=self.settings, confirm=lambda _preview: True,
+            runner=real_git_runner,
+        )
+        self.assertEqual(result["status"], "completed", result.get("stderr"))
+        self.assertNotIn("dubious ownership", result.get("stderr", "").lower())
+
+    def test_non_git_commands_do_not_receive_git_configuration(self):
+        result = self.execute("grep", ["bird", "notes.txt"])
+        self.assertEqual(result["status"], "completed")
+        self.assertNotIn("-c", self.calls[0][0])
 
     def test_destructive_git_subcommands_are_blocked_but_read_only_commands_work(self):
         for args in (["reset", "--hard"], ["push", "origin", "main"], ["clean", "-fd"],

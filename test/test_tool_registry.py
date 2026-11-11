@@ -11,6 +11,7 @@ class ToolRegistryTests(unittest.TestCase):
         registry = load_tool_registry()
         self.assertEqual(len(registry), len(set(registry)))
         self.assertIn("os_command", registry)
+        self.assertFalse(registry["os_command"].get("chat_available", False))
         self.assertIn("update_task_plan", registry)
 
     def test_agent_and_chat_declarations_come_from_registry(self):
@@ -20,6 +21,7 @@ class ToolRegistryTests(unittest.TestCase):
         self.assertTrue({"list_files", "read_file", "git_status"}.issubset(
             {item["function"]["name"] for item in chat_tools}
         ))
+        self.assertIn("os_command", {item["function"]["name"] for item in all_tools})
         self.assertNotIn("os_command", {item["function"]["name"] for item in chat_tools})
 
     def test_each_schema_has_function_parameters(self):

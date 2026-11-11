@@ -387,36 +387,37 @@
     {
       "function": {
         "name": "os_command",
-        "description": "Run a command enabled in command_config.json using an argument array (not a shell). Supports configured command-line utilities and scripts; execution is bounded and may require approval.",
+        "description": "Execute one operating-system command through Shai's bounded command runner. Use only when dedicated project/Git tools are insufficient. This is an LLM tool, so command_config.json applies: executable allowlists, platform blocked commands/rules, exceptions, project access, timeout/output limits, and approval. Commands listed in platform unrestricted_commands skip routine approval only; all block rules still apply. Commands not configured as unrestricted require interactive user approval. Never emulate or invoke the human-only /exec or /os-command CLI commands. Pass one executable and literal argument array; no shell operators, pipes, redirects, or command chaining.",
         "parameters": {
           "type": "object",
           "properties": {
             "executable": {
               "type": "string",
-              "description": "Executable name enabled in command_config.json."
+              "description": "Executable name (must be in the configured allowlist)."
             },
             "args": {
               "type": "array",
               "items": {
-                "type": "string",
-                "description": "One literal command-line argument; shell syntax is not interpreted."
+                "type": "string"
               },
-              "maxItems": 100
+              "description": "Literal arguments passed to the executable."
             },
             "cwd": {
               "type": "string",
-              "default": "."
+              "description": "Project-relative working directory; defaults to the project root."
             },
             "timeout_seconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 120
+              "maximum": 120,
+              "description": "Optional execution timeout in seconds."
             }
           },
           "required": [
             "executable",
             "args"
-          ]
+          ],
+          "additionalProperties": false
         }
       },
       "chat_available": false

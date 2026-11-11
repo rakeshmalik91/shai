@@ -2,6 +2,7 @@
 import os
 import shlex
 import shutil
+import tempfile
 from pathlib import Path
 
 from modules.engine.process_control import IterationInterrupted
@@ -66,10 +67,34 @@ def _minimal_environment():
 
 
 def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
-                       root, settings, confirm, runner, allow_blocked_once=False):
-    """Run a configured executable with an argument vector and bounded output."""
-    if not isinstance(settings, dict) or settings.get("enabled") is not True:
+                       root, settings, confirm, runner, allow_blocked_once=False,
+                       manual=False):
+    """Run an executable with an argument vector and bounded output.
+
+    Model calls enforce command_config allow/block/approval policy. Explicit
+    human CLI calls bypass command policy and routine approval, but retain
+    project-root working-directory checks and bounded process execution.
+    """
+    if not isinstance(settings, dict):
+        settings = {}
+    if not manual and settings.get("enabled") is not True:
         return {"error": "os_command is disabled in command_config.json."}
+    if manual:
+        # Do not let model command policy/configuration constrain a command
+        # explicitly typed by the human in the CLI.
+        empty_platform = {
+            "allowed_commands": [], "blocked_commands": [],
+            "blocked_command_exceptions": {}, "blocked_command_rules": {},
+            "blocked_command_rule_exceptions": {}, "unrestricted_commands": [],
+            "unrestricted_subcommands": {},
+        }
+        settings = dict(settings)
+        settings["enabled"] = True
+        settings["platforms"] = {
+            "common": dict(empty_platform),
+            "unix": dict(empty_platform),
+            "windows": dict(empty_platform),
+        }
     platform_key = "windows" if os.name == "nt" else "unix"
     platforms = settings.get("platforms")
 
@@ -105,6 +130,7 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
             blocked_rules = policy_value("blocked_command_rules", {})
             rule_exceptions = policy_value("blocked_command_rule_exceptions", {})
             unrestricted = policy_value("unrestricted_commands", [])
+            unrestricted_subcommands = policy_value("unrestricted_subcommands", {})
         else:
             # Backward compatibility for projects upgrading from the previous
             # top-level platform maps.
@@ -116,12 +142,14 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
             blocked_rules = settings.get("blocked_command_rules", {})
             rule_exceptions = settings.get("blocked_command_rule_exceptions", {})
             unrestricted = settings.get("unrestricted_commands", [])
+            unrestricted_subcommands = settings.get("unrestricted_subcommands", {})
             for name, value, default in (
                 ("blocked_commands", blocked, []),
                 ("blocked_command_exceptions", blocked_exceptions, {}),
                 ("blocked_command_rules", blocked_rules, {}),
                 ("blocked_command_rule_exceptions", rule_exceptions, {}),
                 ("unrestricted_commands", unrestricted, []),
+                ("unrestricted_subcommands", unrestricted_subcommands, {}),
             ):
                 if isinstance(value, dict) and any(k in value for k in ("common", "unix", "windows")):
                     if isinstance(default, list):
@@ -132,7 +160,8 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
                 elif name == "blocked_command_exceptions": blocked_exceptions = value
                 elif name == "blocked_command_rules": blocked_rules = value
                 elif name == "blocked_command_rule_exceptions": rule_exceptions = value
-                else: unrestricted = value
+                elif name == "unrestricted_commands": unrestricted = value
+                else: unrestricted_subcommands = value
 
         if not isinstance(allowed, list) or not all(isinstance(x, str) for x in allowed):
             return {"error": "platform allowed_commands must contain command arrays."}
@@ -140,9 +169,17 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
             return {"error": "platform blocked_commands must be an array of command names."}
         if not isinstance(unrestricted, list) or not all(isinstance(x, str) for x in unrestricted):
             return {"error": "platform unrestricted_commands must be an array of command names."}
+        if not isinstance(unrestricted_subcommands, dict) or not all(
+            isinstance(name, str) and isinstance(entries, list)
+            and all(isinstance(entry, str) and entry.strip() for entry in entries)
+            for name, entries in unrestricted_subcommands.items()
+        ):
+            return {"error": "platform unrestricted_subcommands must map executable names to non-empty argument-rule strings."}
         if not all(isinstance(value, dict) for value in (blocked_exceptions, blocked_rules, rule_exceptions)):
             return {"error": "Platform blocked exception/rule settings must be objects."}
-        if not isinstance(executable, str) or not executable or "/" in executable or "\\\\" in executable:
+        if not isinstance(executable, str) or not executable:
+            return {"error": "Executable must be a non-empty command name or path."}
+        if not manual and ("/" in executable or "\\\\" in executable):
             return {"error": "Executable must be a command name, not a path."}
 
         tokens = _validate_tokens(args)
@@ -187,6 +224,11 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
             for rule in allowed_rule_exceptions
         )
         blocked_exception = tokens in exception_args or rule_exception
+        if manual:
+            # /exec and /os-command are explicit human CLI entry points.
+            # They intentionally bypass the LLM command allow/block policy.
+            blocked_invocation = False
+            blocked_exception = True
         if blocked_invocation and not blocked_exception and not allow_blocked_once:
             return {
                 "error": "{} invocation is blocked by os_command configuration.".format(executable),
@@ -195,26 +237,56 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
                 "executable": executable,
                 "arguments": tokens,
             }
+
+        # Subcommand-level unrestricted rules are argument prefixes, not
+        # executable-wide grants. Blocked commands/rules above always win.
+        unrestricted_subcommand_rules = unrestricted_subcommands.get(executable, [])
+        parsed_unrestricted_subcommands = [
+            rule_tokens(rule, "unrestricted_subcommands")
+            for rule in unrestricted_subcommand_rules
+        ]
+        unrestricted_subcommand = any(
+            len(tokens) >= len(rule) and tokens[:len(rule)] == rule
+            for rule in parsed_unrestricted_subcommands
+        )
+        # Prevent common Git read commands from becoming a route to writing
+        # output files or executing external diff/text-conversion programs.
+        unsafe_read_options = {
+            "--output", "--ext-diff", "--textconv", "--exec",
+            "--upload-pack", "--receive-pack",
+        }
+        if executable == "git" and any(
+            token.split("=", 1)[0] in unsafe_read_options for token in tokens
+        ):
+            unrestricted_subcommand = False
+        if manual:
+            unrestricted_subcommand = False
+
         project_root = Path(root).resolve()
         working_directory = _safe_project_path(project_root, cwd, "cwd")
         require_access(cwd, "execute", root=project_root)
         # Existing project paths passed as arguments must also satisfy execute
         # access policy; ordinary flags, patterns and text arguments are untouched.
-        for token in tokens:
+        for token in ([] if manual else tokens):
             if token.startswith("-") or not token or not ("/" in token or (project_root / token).exists()):
                 continue
             candidate = (project_root / token.split("::", 1)[0]).resolve()
             if candidate.exists():
                 _safe_project_path(project_root, token.split("::", 1)[0], "command path")
                 require_access(token.split("::", 1)[0], "execute", root=project_root)
-        if executable not in allowed and not blocked_exception and not (blocked_invocation and allow_blocked_once):
+        if not manual and executable not in allowed and not blocked_exception and not (blocked_invocation and allow_blocked_once):
             return {"error": "{} is not in os_command.allowed_commands.".format(executable),
                     "status": "whitelist_required", "whitelist_scope": "executable"}
         if not working_directory.is_dir():
             raise OSCommandRejected("cwd must be an existing project directory.")
-        binary = shutil.which(executable)
-        if not binary:
-            raise OSCommandRejected("{} executable was not found on PATH.".format(executable))
+        binary = (
+            str(Path(executable).expanduser().resolve())
+            if manual and (os.sep in executable or (os.altsep and os.altsep in executable))
+            else shutil.which(executable)
+        )
+        if not binary or (manual and (os.sep in executable or (os.altsep and os.altsep in executable))
+                          and not (Path(binary).is_file() and os.access(binary, os.X_OK))):
+            raise OSCommandRejected("{} executable was not found or is not executable.".format(executable))
         timeout = timeout_seconds if timeout_seconds is not None else settings.get("default_timeout_seconds", 30)
         maximum = settings.get("max_timeout_seconds", 120)
         if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout < 1:
@@ -225,6 +297,10 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
     except (OSCommandRejected, ProjectAccessDenied, OSError, ValueError) as error:
         return {"error": str(error)}
 
+    # Git only honors safe.directory from protected configuration scopes
+    # (system/global). A command-line `git -c safe.directory=...` is not a
+    # reliable trust grant. Supply a temporary global config for this process
+    # only; never modify the user's real global Git configuration.
     command = [binary] + tokens
     preview = "\n".join((
         "Full command: {}".format(shlex.join(command)),
@@ -238,7 +314,9 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
     # Unrestricted commands bypass routine approval only; blocked rules above
     # still take precedence and require explicit permission.
     requires_approval = (
-        executable not in unrestricted
+        not manual
+        and executable not in unrestricted
+        and not unrestricted_subcommand
         and settings.get("requires_approval", command_profile.get("requires_approval", True)) is True
     )
     if requires_approval and not confirm(preview):
@@ -257,12 +335,39 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
         "preserve_output_tail_bytes": bounded_setting("preserve_output_tail_bytes", 4096, 0),
         "terminate_child_processes": settings.get("terminate_child_processes", True) is True,
     }
+    temporary_git_config = None
+    command_environment = _minimal_environment()
+    if executable == "git":
+        try:
+            descriptor, temporary_git_config = tempfile.mkstemp(
+                prefix="shai-git-safe-", suffix=".config"
+            )
+            escaped_root = str(project_root).replace("\\\\", "\\\\\\\\").replace('"', '\\"')
+            with os.fdopen(descriptor, "w", encoding="utf-8") as config_handle:
+                config_handle.write('[safe]\n\tdirectory = "{}"\n'.format(escaped_root))
+            command_environment["GIT_CONFIG_GLOBAL"] = temporary_git_config
+        except OSError as error:
+            if temporary_git_config:
+                try:
+                    os.unlink(temporary_git_config)
+                except OSError:
+                    pass
+            return {"error": "Could not prepare temporary Git ownership configuration: {}".format(error)}
     try:
-        result = runner(command, working_directory, timeout, output_settings, env=_minimal_environment())
+        result = runner(
+            command, working_directory, timeout, output_settings,
+            env=command_environment
+        )
     except IterationInterrupted:
         raise
     except Exception as error:
         return {"error": "os_command failed to start: {}".format(error)}
+    finally:
+        if temporary_git_config:
+            try:
+                os.unlink(temporary_git_config)
+            except OSError:
+                pass
     status = "timed_out" if result.get("timed_out") else "completed" if result.get("returncode") == 0 else "failed"
     return {
         "status": status, "executable": executable, "arguments": tokens,

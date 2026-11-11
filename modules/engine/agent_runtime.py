@@ -299,6 +299,30 @@ Rules:
 - Never expose environment variables.
 - Ask for approval before changing files.
 - Do not try to bypass approval.
+
+Command execution boundary:
+- You MAY execute operating-system commands using the model-facing `os_command`
+  tool when needed for the user's task. This tool is governed by
+  `assets/command_config.json` and its approval workflow.
+- Never claim a command ran unless `os_command` returned an execution result.
+- The model-facing `os_command` tool is restricted: executable allowlists,
+  blocked executables, blocked argument rules, exceptions, project access
+  controls, execution timeouts/output limits, and configured approval all apply.
+- Routine approval may be skipped only for commands explicitly listed in the
+  active platform's `unrestricted_commands` configuration. Otherwise obtain
+  approval through the tool's interactive approval flow; never work around a
+  denied or blocked command.
+- Use dedicated Git/file/test tools when they are the appropriate supported
+  operation. Use `os_command` for legitimate command-line tasks that those
+  tools cannot perform.
+- `/exec` and `/os-command` are separate interactive CLI commands reserved
+  exclusively for commands typed directly by the human. They are not aliases
+  for the model-facing tool. They bypass command_config allowlists, blocklists,
+  blocked rules, and routine approval, while retaining bounded execution and
+  project-root working-directory constraints. Never invoke, simulate, or ask
+  another tool to invoke these manual CLI entry points.
+- Do not use `os_command` to read secrets, credentials, environment files, or
+  data outside the project. Do not expose environment variables or secrets.
 """
 
 # -------------------------------------------------------------------
@@ -544,8 +568,8 @@ def _valid_os_subcommand(executable, args):
     return args[0] if args[0] and not args[0].startswith(("-", "/")) else None
 
 
-def os_command(executable, args, cwd=".", timeout_seconds=None):
-    """Run one configured OS command through the bounded execution boundary."""
+def os_command(executable, args, cwd=".", timeout_seconds=None, manual=False):
+    """Run one configured OS command; manual=True denotes explicit CLI input."""
     settings = _load_os_command_settings()
     LOGGER.info("os_command request executable=%s cwd=%s argument_count=%s",
                 executable, cwd, len(args) if isinstance(args, list) else "invalid")
@@ -561,7 +585,9 @@ def os_command(executable, args, cwd=".", timeout_seconds=None):
         )
 
     def approve(preview):
-        if blocked_permission_granted or permission_is_saved(settings):
+        # A command typed directly after /exec is an explicit user action.
+        # It bypasses routine approval, but not the allowlist or block policy.
+        if manual or blocked_permission_granted or permission_is_saved(settings):
             return True
         if approval_granted("execution", "os_command", include_all=False):
             LOGGER.info("os_command approved by explicit execution configuration")
@@ -586,7 +612,7 @@ def os_command(executable, args, cwd=".", timeout_seconds=None):
     result = execute_os_command(
         executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
         root=ROOT, settings=settings, confirm=approve,
-        runner=run_bounded_interruptible_command,
+        runner=run_bounded_interruptible_command, manual=manual,
     )
 
     if result.get("status") == "blocked_confirmation_required":
@@ -601,6 +627,7 @@ def os_command(executable, args, cwd=".", timeout_seconds=None):
                 executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
                 root=ROOT, settings=settings, confirm=approve,
                 runner=run_bounded_interruptible_command, allow_blocked_once=True,
+                manual=manual,
             )
         elif choice in ("command", "subcommand", "exact"):
             try:
@@ -610,7 +637,7 @@ def os_command(executable, args, cwd=".", timeout_seconds=None):
                 result = execute_os_command(
                     executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
                     root=ROOT, settings=settings, confirm=approve,
-                    runner=run_bounded_interruptible_command,
+                    runner=run_bounded_interruptible_command, manual=manual,
                 )
             except (OSError, ValueError, TypeError, KeyError) as error:
                 result = {"error": "Could not persist permission: {}".format(error), "status": "rejected"}
@@ -644,7 +671,7 @@ def os_command(executable, args, cwd=".", timeout_seconds=None):
                 result = execute_os_command(
                     executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
                     root=ROOT, settings=settings, confirm=approve,
-                    runner=run_bounded_interruptible_command,
+                    runner=run_bounded_interruptible_command, manual=manual,
                 )
             except (OSError, ValueError, TypeError, KeyError) as error:
                 result = {"error": "Could not persist command allowlist: {}".format(error), "status": "rejected"}

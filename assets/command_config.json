@@ -37,7 +37,30 @@
         "blocked_commands": [],
         "blocked_command_exceptions": {},
         "blocked_command_rules": {},
-        "blocked_command_rule_exceptions": {}
+        "blocked_command_rule_exceptions": {},
+        "unrestricted_subcommands": {
+          "git": [
+            "status",
+            "diff",
+            "log",
+            "show",
+            "rev-parse",
+            "ls-files",
+            "describe",
+            "diff-tree",
+            "cat-file",
+            "for-each-ref",
+            "name-rev",
+            "check-ignore",
+            "count-objects",
+            "remote -v",
+            "tag -l",
+            "branch --list",
+            "branch --show-current",
+            "branch -a",
+            "branch -r"
+          ]
+        }
       },
       "unix": {
         "allowed_commands": [
@@ -289,7 +312,8 @@
             "-c"
           ]
         },
-        "blocked_command_rule_exceptions": {}
+        "blocked_command_rule_exceptions": {},
+        "unrestricted_subcommands": {}
       },
       "windows": {
         "allowed_commands": [
@@ -421,7 +445,8 @@
             "-enc"
           ]
         },
-        "blocked_command_rule_exceptions": {}
+        "blocked_command_rule_exceptions": {},
+        "unrestricted_subcommands": {}
       }
     }
   }

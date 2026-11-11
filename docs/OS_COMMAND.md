@@ -4,41 +4,37 @@
 
 ## Purpose
 
-`os_command` gives Agent mode a controlled way to run a small set of approved
-operating-system commands. It is **not an interactive shell** and must not be
-expanded into unrestricted shell execution by passing command strings to a
-shell.
+Shai exposes two separate command-execution paths:
 
-The canonical CLI command is `/exec`. The older `/os-command` spelling
-remains a backward-compatible alias. Both route to the same `os_command` tool
-and execution policy. Arguments are parsed into an array and executed with
-`shell=False`; this is not an interactive shell.
+- The model-facing `os_command` tool is available to the coding agent. It
+  enforces `assets/command_config.json`, including executable allowlists,
+  blocked commands/rules, exceptions, project access controls, execution
+  bounds, and interactive approval.
+- `/exec` and its `/os-command` alias are CLI-only entry points for commands
+  typed directly by the human. They bypass command_config allowlists,
+  blocklists, blocked rules, and routine approval. They retain bounded process
+  execution and a project-root working-directory boundary.
+
+The two paths share the bounded process runner but do not share command-policy
+permissions. Arguments are parsed into an array and executed with `shell=False`;
+shell operators are not interpreted automatically. A human may explicitly
+invoke a shell executable through `/exec` if desired.
 
 ## Supported command profiles
 
-| Executable | Supported operations | Approval |
-|---|---|---|
-| `git` | Configurable. Restricted mode uses the subcommands and argument rules in `assets/command_config.json`; unrestricted mode accepts any Git subcommand and arguments. | Configurable with `requires_approval` |
-| `python3` | `-m pytest`, `-m unittest discover`, `-m compileall` | Approval required by default |
-
-The executable is resolved by Shai; the model cannot supply an arbitrary
-executable path. Commands listed in `blocked_commands` are denied outright,
-except for exact argument vectors explicitly listed in
-`blocked_command_exceptions`. The checked-in examples permit only the
-informational `sudo --help`, `sudo --version`, `su --help`, and `su --version`
-forms; variants with extra arguments remain blocked. These narrow exceptions
-still pass through project-path checks, bounded execution, and the normal
-approval setting. Python script execution, package installation, arbitrary
-interpreters, privileged commands, pipes, redirects, command substitution, and
-shell expansion are not supported. Git may be configured as restricted or
-unrestricted; unrestricted Git can perform mutations, remote/network operations,
-and other actions supported by the installed Git executable.
+The model-facing executable is resolved from the configured allowlist.
+Manual `/exec` accepts any executable available on PATH (or an explicit
+executable path). Model calls remain subject to blocked executable and argument
+rules, except for configured exact exceptions. The checked-in examples permit
+only informational `sudo --help`, `sudo --version`, `su --help`, and
+`su --version` forms for the model. Manual CLI commands bypass these rules.
 
 Python test modules execute project code. A test suite or `conftest.py` can
 perform arbitrary actions, including network access. Shai does not currently
-provide an OS-level sandbox or enforce network isolation for child processes;
-that is why Python execution requires approval by default. Do not run
-untrusted project tests merely because the command is allowlisted.
+provide an OS-level sandbox or enforce network isolation for child processes.
+Model-initiated execution requires configured approval unless the executable
+is explicitly listed in `unrestricted_commands`; manual `/exec` is always an
+explicit human action and skips command-policy approval.
 
 
 ## Destructive-operation defaults
@@ -57,8 +53,8 @@ also requires an explicit exception because the nested script can perform
 destructive operations that cannot be safely inferred from the outer argv. The rules are argument-sequence matches, so `git status`,
 `git diff`, and `git log` remain available.
 
-When approval is required (including a blocked destructive operation), the
-interactive prompt offers:
+When a command is not allowlisted or a blocked operation needs an explicit
+exception, the interactive prompt offers:
 
 1. **Allow once** — run this invocation once; do not change configuration.
 2. **Allow command permanently** — approve every invocation of this executable.
@@ -96,8 +92,9 @@ expressions merely because their top-level executable is allowlisted.
 
 ## Tool interface
 
-The model-callable tool is named `os_command` and is registered only in Agent
-mode. Its parameters are:
+The model-facing `os_command` tool is registered in
+`assets/tools_registry.json` (Agent mode only) and dispatched to
+`modules.engine.agent_runtime.os_command`. Its parameters are:
 
 | Parameter | Type | Description |
 |---|---|---|
@@ -106,18 +103,19 @@ mode. Its parameters are:
 | `cwd` | string | Optional project-relative working directory; defaults to `.` |
 | `timeout_seconds` | integer | Optional timeout, capped by configuration and a hard 120-second ceiling |
 
-Example tool requests:
+Examples of model tool arguments (approval/policy applies):
 
 ```json
 {"executable":"git","args":["status","--short","--branch"]}
 {"executable":"python3","args":["-m","pytest","-q"]}
 ```
 
-The CLI equivalent is:
+Examples of direct human CLI usage (no command_config approval or allowlist):
 
 ```text
 /exec git status --short --branch
 /exec python3 -m pytest -q
+/exec rm -rf build
 ```
 
 The built-in `/push` and `/commit-push` commands route their push operation
@@ -133,8 +131,10 @@ bounded process runner in `modules/engine/process_control.py`.
 
 Before a process starts, Shai:
 
-1. Checks that `os_command.enabled` is true.
-2. Resolves the executable from the fixed allowlist.
+1. For model calls, checks that `os_command.enabled` is true. Manual CLI calls
+   bypass this command-policy enable switch.
+2. For model calls, resolves the executable from the configured allowlist.
+   Manual CLI calls resolve any available executable or explicit executable path.
 3. Applies the configured Git policy (or Python module policy). In Git
    unrestricted mode, positive allowlists and argument rules are bypassed, but
    the configured Git blacklists are still enforced.
@@ -148,12 +148,17 @@ Before a process starts, Shai:
 8. Returns structured status, exit code, duration, output, and truncation data.
 
 Git receives a minimal environment with system/global configuration disabled,
-pager interaction suppressed, and terminal prompting disabled. In restricted
-mode, configured per-invocation options can disable fsmonitor and external
-diff/textconv. The default configuration adds the canonical project root as a
-per-invocation `safe.directory` value; it does not modify global Git
-configuration. Unrestricted mode bypasses Git argument validation and does not
-inject restricted-mode subcommand options. Child processes receive a minimal
+pager interaction suppressed, and terminal prompting disabled. The Git-specific
+tool uses its restricted invocation options. `/exec git ...` creates a temporary
+global Git config file containing only the canonical project root as
+`safe.directory`, points `GIT_CONFIG_GLOBAL` at that file for the child process,
+and deletes the file immediately after execution. This protected global-config
+scope is required because Git may ignore command-line `-c safe.directory`
+settings for ownership checks. The user's real global Git configuration is
+never modified. In restricted Git-tool mode, configured per-invocation options
+can also disable fsmonitor and external diff/textconv.
+Unrestricted mode bypasses Git argument validation and does not inject
+restricted-mode subcommand options. Child processes receive a minimal
 environment rather than the full parent environment.
 
 The project-root check is an application-level boundary, not a complete OS
@@ -165,9 +170,9 @@ operating system. Use OS/container sandboxing if stronger isolation is needed.
 All command lists and destructive-operation policies live inside
 `os_command.platforms.common`, `os_command.platforms.unix`, and
 `os_command.platforms.windows`. Each platform block contains its own
-`allowed_commands`, `unrestricted_commands`, `blocked_commands`,
-`blocked_command_exceptions`, `blocked_command_rules`, and
-`blocked_command_rule_exceptions`.
+`allowed_commands`, `unrestricted_commands`, `unrestricted_subcommands`,
+`blocked_commands`, `blocked_command_exceptions`, `blocked_command_rules`,
+and `blocked_command_rule_exceptions`.
 
 `common` entries are inherited by both Unix and Windows. The active platform
 block adds its entries. This keeps platform-specific policy together and avoids
@@ -183,6 +188,15 @@ Example:
       "common": {
         "allowed_commands": ["git", "python3"],
         "unrestricted_commands": [],
+        "unrestricted_subcommands": {
+          "git": [
+            "status", "diff", "log", "show", "rev-parse", "ls-files",
+            "describe", "diff-tree", "cat-file", "for-each-ref",
+            "name-rev", "check-ignore", "count-objects", "remote -v",
+            "tag -l", "branch --list", "branch --show-current",
+            "branch -a", "branch -r"
+          ]
+        },
         "blocked_commands": [],
         "blocked_command_exceptions": {},
         "blocked_command_rules": {},
@@ -196,6 +210,7 @@ Example:
           "free", "uname", "hostname", "id", "whoami", "date",
           "which", "whereis", "printenv", "env", "jq", "tree"
         ],
+        "unrestricted_subcommands": {},
         "blocked_commands": ["sudo", "su", "rm", "rmdir", "shred"],
         "blocked_command_exceptions": {
           "sudo": ["--help", "--version"],
@@ -215,6 +230,7 @@ Example:
           "netstat", "ping", "tracert", "nslookup", "tasklist",
           "driverquery", "tree", "findstr", "find", "fc", "vol"
         ],
+        "unrestricted_subcommands": {},
         "blocked_commands": ["del", "erase", "rd", "format", "diskpart", "shutdown"],
         "blocked_command_exceptions": {},
         "blocked_command_rules": {
@@ -230,11 +246,24 @@ Example:
 }
 ```
 
-`unrestricted_commands` bypasses only routine execution approval. It does not
-bypass blocked commands/rules, project access checks, executable allowlisting,
-or bounded execution. Only simple read-only utilities are unrestricted by
-default; commands capable of modifying files, processes, services, or system
-configuration remain subject to approval or explicit blocked-command handling.
+`unrestricted_commands` bypasses routine execution approval for an entire
+executable. Use `unrestricted_subcommands` for safer, argument-prefix-specific
+exceptions. Each value is a string tokenized like blocked-rule entries; for
+example, `"branch --list"` matches `git branch --list` and its additional
+read-only options, but not `git branch -d`.
+
+The default common Git policy marks read-only operations such as `status`,
+`diff`, `log`, `show`, `rev-parse`, `ls-files`, `describe`, `remote -v`,
+`tag -l`, and read-only branch listing as unrestricted. Other Git operations
+still require approval. Blocked commands/rules always take precedence over
+unrestricted subcommands. Git output-writing (`--output`) and external
+diff/text-conversion options (`--ext-diff`, `--textconv`) also disable the
+unrestricted approval bypass.
+
+Neither setting bypasses project access checks, executable allowlisting, or
+bounded execution. Commands capable of modifying files, processes, services,
+or system configuration remain subject to explicit approval or blocked-command
+handling.
 
 `blocked_command_exceptions` contains exact argument strings. For example,
 `"--version"` permits exactly that argument list and rejects
@@ -314,8 +343,8 @@ applies in both modes: `blocked_subcommands`, `forbidden_options`,
 are performed against the supplied argument vector before any injected options
 are added. This does **not** turn `/exec` into a shell: arguments remain an
 array and execution still uses `shell=False`, the bounded process runner,
-configured timeout/output limits, project-relative working directory, and the
-configured approval setting.
+configured timeout/output limits, and project-relative working directory.
+Because `/exec` is explicitly typed by the human, routine approval is skipped.
 
 To customize policy, edit `subcommands`, `argument_rules`,
 `blocked_subcommands`, `forbidden_options`, `forbidden_option_prefixes`,
@@ -341,15 +370,13 @@ configuration-driven; adding a subcommand with a corresponding rule does not
 require editing the validator. Unrestricted mode bypasses those Git-specific
 rules entirely.
 
-Python execution approval uses the existing `approve.tools.os_command` or
-`approve.execution` policy. An explicit tool-level `false` takes precedence.
-If neither an explicit approval setting nor a prior approved configuration
-applies, Shai asks for a one-time confirmation showing the executable,
-arguments, working directory, and timeout. The broad `approve.all` setting is
-not sufficient by itself for this new execution boundary. The checked-in
-configuration sets `approve.tools.os_command` to `false`, which forces a fresh
-confirmation for Python execution even if the broader `approve.execution`
-category is enabled.
+The interactive `/exec` command skips routine execution approval because
+the command is explicitly typed by the human operator. This does not bypass
+the executable allowlist, blocked-command rules, project access checks, or
+execution limits. A command that matches a blocked rule still follows the
+explicit blocked-command confirmation/exception flow. LLM tool calls cannot
+reach this execution path because `os_command` is not registered as a model
+tool.
 
 ## Result semantics
 
@@ -366,9 +393,8 @@ based on an ambiguous timeout.
 
 `test/test_os_command.py` covers executable allowlisting, exact informational
 exceptions for blocked commands, rejection of extra arguments to those
-exceptions, path traversal, working-directory restrictions, approval
-rejection, disabled configuration, argument-vector parsing, and tool
-registration.
+exceptions, path traversal, working-directory restrictions, approval-policy handling, disabled configuration, argument-vector parsing,
+manual-CLI policy bypass, and the LLM-facing approval workflow.
 
 ### Interactive Git allowlisting
 
@@ -409,3 +435,18 @@ checks use generic rules from
 `.shai/project_access.json`. They cannot be bypassed by command whitelisting or
 approval. Absolute paths, parent
 traversal and symlink escapes remain rejected. See `docs/CONFIGURATION.md`.
+
+
+## Guidance for the coding model
+
+The model may invoke the registered `os_command` tool for legitimate
+command-line tasks. The tool follows the model command policy and interactive
+approval flow. It must not emulate or invoke the manual `/exec` or
+`/os-command` CLI entry points. Those are reserved for commands typed directly
+by the human and bypass command_config allowlists, blocklists, blocked rules,
+and routine approval.
+
+Prefer dedicated Git/file/test tools when they directly support the requested
+operation. Use `os_command` when a command-line operation is needed and no
+dedicated tool is suitable. Never work around a denied model command by
+switching to a different tool or pretending the human ran `/exec`.

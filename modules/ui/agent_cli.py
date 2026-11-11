@@ -47,6 +47,42 @@ from modules.ui.chat_runtime import response_text
 LOGGER = get_logger("shai.cli")
 
 
+def display_os_command_result(result):
+    """Render an os_command result like a terminal, not as a JSON payload."""
+    if not isinstance(result, dict):
+        print("[Shai] OS command returned an invalid result.")
+        return
+
+    stdout = result.get("stdout") or ""
+    stderr = result.get("stderr") or ""
+    if stdout:
+        sys.stdout.write(stdout)
+        if not stdout.endswith("\\n"):
+            sys.stdout.write("\\n")
+    if stderr:
+        sys.stderr.write(stderr)
+        if not stderr.endswith("\\n"):
+            sys.stderr.write("\\n")
+
+    status = result.get("status", "unknown")
+    exit_code = result.get("exit_code")
+    if status == "completed":
+        if not stdout and not stderr:
+            print("[Shai] Command completed successfully (no output).")
+        return
+
+    # Policy and approval outcomes have no process exit code. Surface their
+    # actual explanation instead of dumping the internal result dictionary.
+    error = result.get("error")
+    if error:
+        print(colorize("[Shai] {}".format(error), "error"))
+    if exit_code is not None:
+        print(colorize("[Shai] Command {} (exit code {}).".format(status, exit_code), "error"))
+    elif not error:
+        print(colorize("[Shai] Command status: {}.".format(status), "error"))
+
+
+
 def main() -> int:
     """Run the interactive coding agent CLI REPL."""
     init_default_logging(engine.load_config())
@@ -240,8 +276,8 @@ def main() -> int:
                 command_text = user_text.split(None, 1)[1] if len(user_text.split(None, 1)) > 1 else ""
                 try:
                     executable, arguments = parse_os_command_line(command_text)
-                    result = engine.os_command(executable, arguments)
-                    print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+                    result = engine.os_command(executable, arguments, manual=True)
+                    display_os_command_result(result)
                 except IterationInterrupted:
                     print("\n[Shai] OS command interrupted.")
                 except OSCommandRejected as error:
