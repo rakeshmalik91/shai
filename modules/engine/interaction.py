@@ -41,15 +41,12 @@ class InteractionHandler:
         """Prompt the user to approve execution of an allowlisted OS command."""
         raise NotImplementedError
 
-    def request_git_whitelist_scope(self, command: str, args: list[str]) -> str:
-        """Prompt the user to select a whitelisting scope when Git command is blocked.
+    def request_command_whitelist(self, command: str) -> bool:
+        """Ask whether to add an executable to the configured command allowlist."""
+        raise NotImplementedError
 
-        Returns:
-            '1' for exact command,
-            '2' for subcommand,
-            '3' for unrestricted,
-            '0' to keep blocked.
-        """
+    def request_os_command_permission(self, command: str, subcommand: str | None = None) -> str:
+        """Return once, command, subcommand, exact, or deny."""
         raise NotImplementedError
 
 
@@ -84,21 +81,43 @@ class DefaultCliInteractionHandler(InteractionHandler):
         return answer or (default or "")
 
     def confirm_os_command(self, preview: str) -> bool:
+        # Backward-compatible confirmation hook for integrations that still use it.
         print("\n[Shai] os_command approval required:\n" + preview)
-        answer = self._prompt("Run this exact command? [y/N]: ").lower()
-        return answer in ("y", "yes")
+        return self._prompt("Run this exact command? [y/N]: ").lower() in ("y", "yes")
 
-    def request_git_whitelist_scope(self, command: str, args: list[str]) -> str:
-        full_command = "git " + " ".join(args)
-        print("\n[Shai] Git command blocked by the configured allowlist:")
-        print("  " + full_command)
-        print("\nWhitelist this command? Choose the scope:")
-        print("  1. This exact command and parameters only")
-        print("  2. All parameters for git {}".format(args[0] if args else "(no subcommand)"))
-        print("  3. All Git commands and subcommands (unrestricted)")
-        print("  0. No, keep it blocked")
-        choice = self._prompt("Whitelist scope [0-3]: ")
-        return choice if choice in ("1", "2", "3") else "0"
+    def request_os_command_permission(self, command: str, subcommand: str | None = None) -> str:
+        executable = command.split(None, 1)[0] if command.strip() else command
+        print("\\n[Shai] Command approval required:")
+        print("  " + command)
+        print("  A) Allow once")
+        print("  C) Allow command permanently ({})".format(executable))
+        if subcommand:
+            print("  S) Allow subcommand permanently ({} {})".format(executable, subcommand))
+        print("  E) Allow exact command permanently ({})".format(command))
+        print("  D) Deny")
+        prompt_choices = "[A/C/S/E/D]" if subcommand else "[A/C/E/D]"
+        while True:
+            answer = self._prompt("Choose {}: ".format(prompt_choices)).strip().lower()
+            choices = {
+                "a": "once", "once": "once",
+                "c": "command", "command": "command",
+                "s": "subcommand", "subcommand": "subcommand",
+                "e": "exact", "exact": "exact",
+                "d": "deny", "deny": "deny", "": "deny",
+            }
+            choice = choices.get(answer)
+            if choice == "subcommand" and not subcommand:
+                print("A valid subcommand is not available for this invocation.")
+                continue
+            if choice:
+                return choice
+            print("Please choose one of the displayed letters.")
+
+    def request_command_whitelist(self, command: str) -> bool:
+        print("\n[Shai] Command is not in command_config.json's allowed_commands:")
+        print("  " + command)
+        answer = self._prompt("Allow this executable in future? [y/N]: ").lower()
+        return answer in ("y", "yes")
 
 
 _CURRENT_HANDLER: InteractionHandler = DefaultCliInteractionHandler()

@@ -445,19 +445,143 @@ def _load_os_command_settings():
         return {}
 
 
+def _persist_os_command_permission(executable, args, scope, blocked=False):
+    """Persist the narrowest selected command permission atomically."""
+    command_file = CONFIG_FILE.parent / "command_config.json"
+    with command_file.open("r", encoding="utf-8") as handle:
+        persisted = json.load(handle)
+    os_settings = persisted.setdefault("os_command", {})
+    tokens = list(args)
+    platform_key = "windows" if os.name == "nt" else "unix"
+    platforms = os_settings.setdefault("platforms", {})
+    platforms.setdefault("common", {})
+    platform_config = platforms.setdefault(platform_key, {})
+
+    def platform_rule_map(setting):
+        common_map = platforms["common"].setdefault(setting, {})
+        active_map = platform_config.setdefault(setting, {})
+        if not isinstance(common_map, dict) or not isinstance(active_map, dict):
+            raise ValueError("{} platform configuration must be an object".format(setting))
+        return active_map
+
+    if blocked:
+        if scope == "command":
+            common_blocked = platforms["common"].setdefault("blocked_commands", [])
+            active_blocked = platform_config.setdefault("blocked_commands", [])
+            for blocked_list in (common_blocked, active_blocked):
+                if executable in blocked_list:
+                    blocked_list.remove(executable)
+            allowed = platform_config.setdefault("allowed_commands", [])
+            common_allowed = platforms["common"].setdefault("allowed_commands", [])
+            if executable not in common_allowed and executable not in allowed:
+                allowed.append(executable)
+        elif scope == "subcommand":
+            subcommand = _valid_os_subcommand(executable, tokens)
+            if not subcommand:
+                raise ValueError("No valid subcommand is available for this invocation")
+            rules = platform_rule_map("blocked_command_rule_exceptions").setdefault(executable, [])
+            if subcommand not in rules:
+                rules.append(subcommand)
+        elif scope == "exact":
+            rules = platform_rule_map("blocked_command_exceptions").setdefault(executable, [])
+            exact_text = shlex.join(tokens)
+            if exact_text not in rules:
+                rules.append(exact_text)
+        # A permanent blocked-command exception also records approval at the
+        # same scope, preventing a second generic approval prompt on retry.
+        if scope == "command":
+            entries = os_settings.setdefault("approved_commands", [])
+            if executable not in entries:
+                entries.append(executable)
+        elif scope == "subcommand":
+            entries = os_settings.setdefault("approved_subcommands", {}).setdefault(executable, [])
+            if [subcommand] not in entries:
+                entries.append([subcommand])
+        elif scope == "exact":
+            entries = os_settings.setdefault("approved_invocations", {}).setdefault(executable, [])
+            if tokens not in entries:
+                entries.append(tokens)
+    else:
+        if scope == "command":
+            entries = os_settings.setdefault("approved_commands", [])
+            if executable not in entries:
+                entries.append(executable)
+        elif scope == "subcommand":
+            subcommand = _valid_os_subcommand(executable, tokens)
+            if not subcommand:
+                raise ValueError("No valid subcommand is available for this invocation")
+            entries = os_settings.setdefault("approved_subcommands", {}).setdefault(executable, [])
+            if [subcommand] not in entries:
+                entries.append([subcommand])
+        elif scope == "exact":
+            entries = os_settings.setdefault("approved_invocations", {}).setdefault(executable, [])
+            if tokens not in entries:
+                entries.append(tokens)
+    temporary = command_file.with_name(command_file.name + ".tmp")
+    with temporary.open("w", encoding="utf-8") as handle:
+        json.dump(persisted, handle, indent=2, ensure_ascii=False)
+        handle.write("\n")
+    temporary.replace(command_file)
+
+
+def _valid_os_subcommand(executable, args):
+    """Return a simple first positional subcommand, excluding flags and inline scripts."""
+    if not isinstance(args, list) or not args:
+        return None
+    # Only command-oriented tools have meaningful subcommands. For utilities
+    # such as rm, the first positional token is a target, not a subcommand.
+    subcommand_hosts = {
+        "git", "pip", "pip3", "pytest", "npm", "npx", "node", "docker",
+        "podman", "kubectl", "cargo", "rustup", "go", "gh", "brew",
+        "apt", "apt-get", "systemctl", "service", "netsh", "reg",
+        "winget", "choco", "conda", "uv", "poetry", "terraform",
+    }
+    if executable.lower() not in subcommand_hosts:
+        return None
+    # Interpreter/code and shell-script switches are not subcommands.
+    if args[0] in ("-c", "-m", "-e", "/c", "/k", "-Command", "-File", "-EncodedCommand"):
+        return None
+    return args[0] if args[0] and not args[0].startswith(("-", "/")) else None
+
+
 def os_command(executable, args, cwd=".", timeout_seconds=None):
-    """Run one allowlisted OS command through the bounded execution boundary."""
+    """Run one configured OS command through the bounded execution boundary."""
     settings = _load_os_command_settings()
     LOGGER.info("os_command request executable=%s cwd=%s argument_count=%s",
                 executable, cwd, len(args) if isinstance(args, list) else "invalid")
+    tokens = list(args) if isinstance(args, list) else []
+    subcommand = _valid_os_subcommand(executable, tokens)
+    blocked_permission_granted = False
+
+    def permission_is_saved(current):
+        return (
+            executable in current.get("approved_commands", [])
+            or tokens in current.get("approved_invocations", {}).get(executable, [])
+            or (subcommand is not None and [subcommand] in current.get("approved_subcommands", {}).get(executable, []))
+        )
 
     def approve(preview):
+        if blocked_permission_granted or permission_is_saved(settings):
+            return True
         if approval_granted("execution", "os_command", include_all=False):
-            LOGGER.info("os_command approved by explicit configuration")
+            LOGGER.info("os_command approved by explicit execution configuration")
             return True
         STATUS.suspend_line()
         from modules.engine.interaction import get_interaction_handler
-        return get_interaction_handler().confirm_os_command(preview)
+        choice = get_interaction_handler().request_os_command_permission(
+            executable + (" " + shlex.join(tokens) if tokens else ""), subcommand
+        )
+        if choice == "once":
+            return True
+        if choice in ("command", "subcommand", "exact"):
+            try:
+                _persist_os_command_permission(executable, tokens, choice, blocked=False)
+                settings.update(_load_os_command_settings())
+                print("[Shai] Permanently allowed {} permission. Retrying.".format(choice))
+                return True
+            except (OSError, ValueError, TypeError, KeyError) as error:
+                print("[Shai] Could not persist permission: {}".format(error))
+        return False
 
     result = execute_os_command(
         executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
@@ -465,40 +589,57 @@ def os_command(executable, args, cwd=".", timeout_seconds=None):
         runner=run_bounded_interruptible_command,
     )
 
-    # When a positive Git allowlist blocks a request, offer narrowly scoped
-    # persistent whitelisting in the interactive chat. Blacklist failures
-    # never reach this branch and cannot be overridden here.
-    if result.get("status") == "whitelist_required" and executable == "git":
+    if result.get("status") == "blocked_confirmation_required":
         STATUS.suspend_line()
-        full_command = "git " + shlex.join(args)
         from modules.engine.interaction import get_interaction_handler
-        choice = get_interaction_handler().request_git_whitelist_scope(full_command, args)
-        if choice in ("1", "2", "3"):
+        choice = get_interaction_handler().request_os_command_permission(
+            executable + (" " + shlex.join(tokens) if tokens else ""), subcommand
+        )
+        if choice == "once":
+            blocked_permission_granted = True
+            result = execute_os_command(
+                executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
+                root=ROOT, settings=settings, confirm=approve,
+                runner=run_bounded_interruptible_command, allow_blocked_once=True,
+            )
+        elif choice in ("command", "subcommand", "exact"):
             try:
-                command_config_file = CONFIG_FILE.parent / "command_config.json"
-                with command_config_file.open("r", encoding="utf-8") as handle:
+                _persist_os_command_permission(executable, tokens, choice, blocked=True)
+                settings = _load_os_command_settings()
+                print("[Shai] Permanently allowed {} permission. Retrying.".format(choice))
+                result = execute_os_command(
+                    executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
+                    root=ROOT, settings=settings, confirm=approve,
+                    runner=run_bounded_interruptible_command,
+                )
+            except (OSError, ValueError, TypeError, KeyError) as error:
+                result = {"error": "Could not persist permission: {}".format(error), "status": "rejected"}
+        else:
+            result = {"error": "User denied command; no process was started.", "status": "rejected"}
+
+    if result.get("status") == "whitelist_required":
+        STATUS.suspend_line()
+        full_command = executable + (" " + shlex.join(tokens) if tokens else "")
+        from modules.engine.interaction import get_interaction_handler
+        if get_interaction_handler().request_command_whitelist(full_command):
+            try:
+                command_file = CONFIG_FILE.parent / "command_config.json"
+                with command_file.open("r", encoding="utf-8") as handle:
                     persisted = json.load(handle)
-                git_profile = persisted.setdefault("os_command", {}).setdefault("commands", {}).setdefault("git", {})
-                if choice == "1":
-                    entries = git_profile.setdefault("approved_commands", [])
-                    if args not in entries:
-                        entries.append(list(args))
-                    scope_label = "exact command"
-                elif choice == "2":
-                    entries = git_profile.setdefault("approved_subcommands", [])
-                    subcommand = args[0]
-                    if subcommand not in entries:
-                        entries.append(subcommand)
-                    scope_label = "git {} subcommand".format(subcommand)
-                else:
-                    git_profile["allow_unrestricted"] = True
-                    scope_label = "all Git commands"
-                temporary = command_config_file.with_name(command_config_file.name + ".tmp")
+                os_settings = persisted.setdefault("os_command", {})
+                platform_key = "windows" if os.name == "nt" else "unix"
+                platforms = os_settings.setdefault("platforms", {})
+                platforms.setdefault("common", {})
+                platform_config = platforms.setdefault(platform_key, {})
+                common_allowed = platforms["common"].setdefault("allowed_commands", [])
+                allowed = platform_config.setdefault("allowed_commands", [])
+                if executable not in common_allowed and executable not in allowed:
+                    allowed.append(executable)
+                temporary = command_file.with_name(command_file.name + ".tmp")
                 with temporary.open("w", encoding="utf-8") as handle:
                     json.dump(persisted, handle, indent=2, ensure_ascii=False)
                     handle.write("\n")
-                temporary.replace(command_config_file)
-                print("[Shai] Whitelisted {}. Retrying the command.".format(scope_label))
+                temporary.replace(command_file)
                 settings = _load_os_command_settings()
                 result = execute_os_command(
                     executable, args, cwd=cwd, timeout_seconds=timeout_seconds,
@@ -506,10 +647,9 @@ def os_command(executable, args, cwd=".", timeout_seconds=None):
                     runner=run_bounded_interruptible_command,
                 )
             except (OSError, ValueError, TypeError, KeyError) as error:
-                print("[Shai] Could not save whitelist: {}".format(error))
-                result = {"error": "Could not persist Git whitelist: {}".format(error), "status": "rejected"}
+                result = {"error": "Could not persist command allowlist: {}".format(error), "status": "rejected"}
         else:
-            result = {"error": "User declined to whitelist the Git command; no process was started.", "status": "rejected"}
+            result = {"error": "User declined to allow {}; no process was started.".format(executable), "status": "rejected"}
 
     LOGGER.info("os_command result executable=%s status=%s exit_code=%s",
                 executable, result.get("status", "rejected"), result.get("exit_code"))

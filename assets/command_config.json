@@ -11,169 +11,417 @@
     "preserve_output_head_bytes": 4096,
     "preserve_output_tail_bytes": 4096,
     "terminate_child_processes": true,
-    "commands": {
-      "git": {
-        "enabled": true,
-        "subcommands": [
-          "status",
+    "requires_approval": true,
+    "platforms": {
+      "common": {
+        "allowed_commands": [
+          "git",
+          "python",
+          "python3",
+          "pip",
+          "pip3",
+          "pytest",
+          "node",
+          "npm",
+          "npx",
+          "java",
+          "javac",
+          "dotnet",
+          "go",
+          "rustc",
+          "cargo",
+          "curl",
+          "tar"
+        ],
+        "unrestricted_commands": [],
+        "blocked_commands": [],
+        "blocked_command_exceptions": {},
+        "blocked_command_rules": {},
+        "blocked_command_rule_exceptions": {}
+      },
+      "unix": {
+        "allowed_commands": [
+          "sh",
+          "bash",
+          "zsh",
+          "fish",
+          "env",
+          "printenv",
+          "which",
+          "whereis",
+          "type",
+          "command",
+          "ls",
+          "dir",
+          "pwd",
+          "cd",
+          "cat",
+          "tac",
+          "less",
+          "more",
+          "head",
+          "tail",
+          "tee",
+          "touch",
+          "mkdir",
+          "rmdir",
+          "cp",
+          "mv",
+          "rm",
+          "ln",
+          "readlink",
+          "realpath",
+          "basename",
+          "dirname",
+          "find",
+          "locate",
+          "updatedb",
+          "xargs",
+          "stat",
+          "file",
+          "du",
+          "df",
+          "mount",
+          "umount",
+          "chmod",
+          "chown",
+          "chgrp",
+          "getfacl",
+          "setfacl",
+          "grep",
+          "egrep",
+          "fgrep",
+          "sed",
+          "awk",
+          "cut",
+          "paste",
+          "tr",
+          "sort",
+          "uniq",
+          "wc",
+          "nl",
+          "fold",
+          "fmt",
+          "column",
+          "join",
           "diff",
-          "log",
-          "branch",
-          "rev-parse",
-          "show"
+          "diff3",
+          "patch",
+          "comm",
+          "tee",
+          "jq",
+          "yq",
+          "xmllint",
+          "ps",
+          "top",
+          "htop",
+          "pgrep",
+          "pkill",
+          "kill",
+          "killall",
+          "lsof",
+          "fuser",
+          "time",
+          "free",
+          "uptime",
+          "uname",
+          "hostname",
+          "id",
+          "whoami",
+          "who",
+          "w",
+          "groups",
+          "date",
+          "cal",
+          "sleep",
+          "watch",
+          "timeout",
+          "nice",
+          "renice",
+          "jobs",
+          "nohup",
+          "ip",
+          "ifconfig",
+          "ipconfig",
+          "netstat",
+          "ss",
+          "ping",
+          "ping6",
+          "traceroute",
+          "tracepath",
+          "nslookup",
+          "dig",
+          "host",
+          "resolvectl",
+          "arp",
+          "route",
+          "nc",
+          "ncat",
+          "telnet",
+          "ssh",
+          "scp",
+          "sftp",
+          "rsync",
+          "wget",
+          "openssl",
+          "gpg",
+          "gzip",
+          "gunzip",
+          "bzip2",
+          "bunzip2",
+          "xz",
+          "unxz",
+          "zip",
+          "unzip",
+          "7z",
+          "make",
+          "cmake",
+          "ninja",
+          "gcc",
+          "g++",
+          "clang",
+          "clang++",
+          "ld",
+          "ar",
+          "pkg-config",
+          "sqlite3",
+          "mysql",
+          "psql",
+          "redis-cli",
+          "mongosh",
+          "systemctl",
+          "service",
+          "journalctl",
+          "dmesg",
+          "lsblk",
+          "blkid",
+          "fdisk",
+          "parted",
+          "crontab",
+          "at",
+          "batch",
+          "tree",
+          "xxd",
+          "hexdump",
+          "od",
+          "strings",
+          "base64",
+          "sha256sum",
+          "md5sum"
         ],
-        "requires_approval": false,
-        "allow_unrestricted": false,
-        "forbidden_options": [
-          "-c",
-          "-C",
-          "--config-env",
-          "--exec-path",
-          "--git-dir",
-          "--work-tree"
+        "unrestricted_commands": [
+          "ls",
+          "pwd",
+          "cat",
+          "head",
+          "tail",
+          "wc",
+          "grep",
+          "stat",
+          "file",
+          "du",
+          "df",
+          "ps",
+          "pgrep",
+          "uptime",
+          "free",
+          "uname",
+          "hostname",
+          "id",
+          "whoami",
+          "date",
+          "cal",
+          "which",
+          "whereis",
+          "printenv",
+          "env",
+          "jq",
+          "tree",
+          "readlink",
+          "realpath",
+          "basename",
+          "dirname",
+          "sha256sum",
+          "md5sum",
+          "strings"
         ],
-        "forbidden_option_prefixes": [
-          "--config-env=",
-          "--git-dir=",
-          "--work-tree="
+        "blocked_commands": [
+          "sudo",
+          "su",
+          "rm",
+          "rmdir",
+          "shred"
         ],
-        "injected_global_options": [
-          "-c",
-          "safe.directory=${PROJECT_ROOT}",
-          "-c",
-          "core.fsmonitor=false",
-          "-c",
-          "core.pager=cat"
-        ],
-        "injected_subcommand_options": {
-          "diff": [
-            "--no-ext-diff",
-            "--no-textconv"
+        "blocked_command_exceptions": {
+          "sudo": [
+            "--help",
+            "--version"
           ],
-          "show": [
-            "--no-ext-diff",
-            "--no-textconv"
+          "su": [
+            "--help",
+            "--version"
           ]
         },
-        "argument_rules": {
-          "status": {
-            "allowed_args": [
-              "--short",
-              "--branch",
-              "--porcelain",
-              "--untracked-files=no",
-              "--untracked-files=normal"
-            ]
-          },
-          "diff": {
-            "allowed_args": [
-              "--stat",
-              "--name-only",
-              "--name-status",
-              "--cached",
-              "--staged",
-              "--check",
-              "--no-ext-diff",
-              "--no-textconv",
-              "--color=never"
-            ],
-            "allow_project_paths_after_separator": true,
-            "require_any": [
-              "--stat",
-              "--name-only",
-              "--name-status",
-              "--check",
-              "<path>"
-            ],
-            "require_any_message": "git diff must use a summary option or an explicit safe path after --."
-          },
-          "log": {
-            "allowed_args": [
-              "--oneline",
-              "--decorate",
-              "--no-decorate",
-              "--pretty=oneline",
-              "--pretty=short",
-              "--pretty=fuller",
-              "--format=short",
-              "--format=fuller",
-              "--pretty=format:%h %s",
-              "--pretty=format:%H %s",
-              "--format=%h %s",
-              "--format=%H %s"
-            ],
-            "numeric_options": [
-              "-n",
-              "--max-count"
-            ],
-            "max_numeric_value": 1000,
-            "patterns": [
-              "--pretty=format:%(?:h|H) %s",
-              "--format=%(?:h|H) %s"
-            ],
-            "numeric_patterns": [
-              {
-                "pattern": "-[1-9][0-9]{0,3}",
-                "max": 1000
-              },
-              {
-                "pattern": "--max-count=[1-9][0-9]{0,3}",
-                "max": 1000
-              }
-            ]
-          },
-          "branch": {
-            "allowed_args": [
-              "--show-current"
-            ]
-          },
-          "rev-parse": {
-            "allowed_args": [
-              "--show-toplevel",
-              "--is-inside-work-tree",
-              "--short",
-              "HEAD"
-            ]
-          },
-          "show": {
-            "allowed_args": [
-              "--stat",
-              "--oneline",
-              "--no-patch",
-              "HEAD"
-            ],
-            "positional_patterns": [
-              "HEAD~[0-9]{1,4}"
-            ],
-            "require_any": [
-              "--stat",
-              "--oneline",
-              "--no-patch"
-            ],
-            "require_any_message": "git show is limited to metadata/summary output; add --stat, --oneline or --no-patch."
-          }
+        "blocked_command_rules": {
+          "git": [
+            "reset",
+            "push",
+            "clean",
+            "checkout --",
+            "restore"
+          ],
+          "sh": [
+            "-c",
+            "-lc",
+            "-ec"
+          ],
+          "bash": [
+            "-c",
+            "-lc",
+            "-ec"
+          ],
+          "zsh": [
+            "-c",
+            "-lc",
+            "-ec"
+          ],
+          "fish": [
+            "-c"
+          ]
         },
-        "blocked_subcommands": [
-          "daemon",
-          "filter-branch"
-        ],
-        "forbidden_argument_patterns": [],
-        "approved_commands": [],
-        "approved_subcommands": [
-          "config",
-          "log",
-          "commit",
-          "ls-files"
-        ]
+        "blocked_command_rule_exceptions": {}
       },
-      "python3": {
-        "enabled": true,
-        "modules": [
-          "pytest",
-          "unittest",
-          "compileall"
+      "windows": {
+        "allowed_commands": [
+          "powershell",
+          "pwsh",
+          "cmd",
+          "where",
+          "whoami",
+          "ver",
+          "systeminfo",
+          "ipconfig",
+          "netstat",
+          "ping",
+          "tracert",
+          "pathping",
+          "nslookup",
+          "arp",
+          "route",
+          "getmac",
+          "netsh",
+          "tasklist",
+          "taskkill",
+          "sc",
+          "schtasks",
+          "driverquery",
+          "wevtutil",
+          "eventcreate",
+          "reg",
+          "regedit",
+          "wmic",
+          "tree",
+          "findstr",
+          "find",
+          "fc",
+          "sort",
+          "more",
+          "typeperf",
+          "xcopy",
+          "robocopy",
+          "attrib",
+          "icacls",
+          "takeown",
+          "compact",
+          "cipher",
+          "fsutil",
+          "chkdsk",
+          "format",
+          "diskpart",
+          "mountvol",
+          "subst",
+          "vol",
+          "label",
+          "manage-bde",
+          "bitsadmin",
+          "certutil",
+          "curl.exe",
+          "tar.exe",
+          "sfc",
+          "dism",
+          "bcdedit",
+          "powercfg",
+          "shutdown",
+          "logman",
+          "lodctr",
+          "fltmc",
+          "openfiles",
+          "qwinsta",
+          "quser",
+          "mstsc"
         ],
-        "requires_approval": true
+        "unrestricted_commands": [
+          "where",
+          "whoami",
+          "ver",
+          "systeminfo",
+          "ipconfig",
+          "netstat",
+          "ping",
+          "tracert",
+          "pathping",
+          "nslookup",
+          "arp",
+          "route",
+          "tasklist",
+          "driverquery",
+          "tree",
+          "findstr",
+          "find",
+          "fc",
+          "sort",
+          "more",
+          "vol",
+          "hostname"
+        ],
+        "blocked_commands": [
+          "del",
+          "erase",
+          "rd",
+          "format",
+          "diskpart",
+          "shutdown"
+        ],
+        "blocked_command_exceptions": {},
+        "blocked_command_rules": {
+          "reg": [
+            "delete"
+          ],
+          "taskkill": [
+            "/F"
+          ],
+          "cmd": [
+            "/c",
+            "/k"
+          ],
+          "powershell": [
+            "-Command",
+            "-File",
+            "-EncodedCommand",
+            "-c",
+            "-f",
+            "-enc"
+          ],
+          "pwsh": [
+            "-Command",
+            "-File",
+            "-EncodedCommand",
+            "-c",
+            "-f",
+            "-enc"
+          ]
+        },
+        "blocked_command_rule_exceptions": {}
       }
     }
   }

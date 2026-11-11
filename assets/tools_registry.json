@@ -387,23 +387,21 @@
     {
       "function": {
         "name": "os_command",
-        "description": "Run a tightly allowlisted operating-system command in the project. This is NOT a shell: use executable=git with read-only subcommands (status, diff, log, branch --show-current, rev-parse, show), or executable=python3 with -m pytest, -m unittest discover, or -m compileall. No pipes, redirects, shell expansion, scripts, arbitrary executables, network commands, or privileged operations are supported.",
+        "description": "Run a command enabled in command_config.json using an argument array (not a shell). Supports configured command-line utilities and scripts; execution is bounded and may require approval.",
         "parameters": {
           "type": "object",
           "properties": {
             "executable": {
               "type": "string",
-              "enum": [
-                "git",
-                "python3"
-              ]
+              "description": "Executable name enabled in command_config.json."
             },
             "args": {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "One literal command-line argument; shell syntax is not interpreted."
               },
-              "maxItems": 40
+              "maxItems": 100
             },
             "cwd": {
               "type": "string",

@@ -27,7 +27,7 @@ Commands:
   /push    - Push commits to remote
   /commit-push - Commit and push in one command
   /project - Switch project folder
-  /exec - Run a controlled, allowlisted OS command 
+  /exec - Run a controlled, configured OS command 
   /os-command - Alias for /exec
   /exit    - Exit Shai
 
@@ -35,7 +35,7 @@ Natural-language requests can select known Shai commands through the
 shai_command feature. Its canonical registry is assets/command_registry.json.
 
 The os_command tool is available only in Agent mode. It is not a shell: only
-allowlisted Git inspection and Python verification profiles are supported.
+commands enabled in command_config.json are supported.
 All execution uses argument arrays, project-root checks, time/output limits,
 and approval policy.
 

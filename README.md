@@ -7,6 +7,8 @@ ShAI is a lightweight terminal AI assistant with two modes:
 
 Shai supports OpenRouter, Gemini, Anthropic, OpenAI, Kilo Gateway (all/non-free and free-only lists), and local Ollama.
 
+> ⚠️ **Disclaimer: This project is actively being developed.** Features, APIs, and behavior may change without notice. Use at your own risk.
+
 ## Requirements
 
 | Requirement | Version | Notes |

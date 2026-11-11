@@ -22,7 +22,13 @@ and execution policy. Arguments are parsed into an array and executed with
 | `python3` | `-m pytest`, `-m unittest discover`, `-m compileall` | Approval required by default |
 
 The executable is resolved by Shai; the model cannot supply an arbitrary
-executable path. Python script execution, package installation, arbitrary
+executable path. Commands listed in `blocked_commands` are denied outright,
+except for exact argument vectors explicitly listed in
+`blocked_command_exceptions`. The checked-in examples permit only the
+informational `sudo --help`, `sudo --version`, `su --help`, and `su --version`
+forms; variants with extra arguments remain blocked. These narrow exceptions
+still pass through project-path checks, bounded execution, and the normal
+approval setting. Python script execution, package installation, arbitrary
 interpreters, privileged commands, pipes, redirects, command substitution, and
 shell expansion are not supported. Git may be configured as restricted or
 unrestricted; unrestricted Git can perform mutations, remote/network operations,
@@ -33,6 +39,60 @@ perform arbitrary actions, including network access. Shai does not currently
 provide an OS-level sandbox or enforce network isolation for child processes;
 that is why Python execution requires approval by default. Do not run
 untrusted project tests merely because the command is allowlisted.
+
+
+## Destructive-operation defaults
+
+The default `assets/command_config.json` platform blocks whole executables inside each `os_command.platforms` block:
+
+- Unix: `rm`, `rmdir`, `shred`
+- Windows: `del`, `erase`, `rd`, `format`, `diskpart`, `shutdown`
+- Privilege escalation: `sudo`, `su`
+
+It also blocks these Git subcommands: `reset`, `push`, `clean`,
+`checkout --`, and `restore`. Windows `reg delete` and forced `taskkill /F`
+are blocked as well. Inline script execution through common shell wrappers
+(`sh -c`, `bash -c`, `cmd /c`, PowerShell `-Command`/`-File`, and equivalents)
+also requires an explicit exception because the nested script can perform
+destructive operations that cannot be safely inferred from the outer argv. The rules are argument-sequence matches, so `git status`,
+`git diff`, and `git log` remain available.
+
+When approval is required (including a blocked destructive operation), the
+interactive prompt offers:
+
+1. **Allow once** — run this invocation once; do not change configuration.
+2. **Allow command permanently** — approve every invocation of this executable.
+   Example: `python3` approves all `python3` commands.
+3. **Allow subcommand permanently** — shown only for command-oriented tools
+   when a valid subcommand is present. Example: `git status` approves all
+   `git status` invocations, but not `git push` or `git reset`.
+4. **Allow exact command permanently** — approve only this executable plus the
+   exact argument vector. Example: `python3 -c 'print(1)'` does not approve a
+   different script or different Python code.
+5. **Deny** — do not start the process.
+
+Permanent choices are stored in `approved_commands`, `approved_subcommands`,
+and `approved_invocations`. For a blocked operation, the matching exception is
+also stored in `blocked_commands`/`blocked_command_rules` exception settings.
+Subcommand approval is deliberately unavailable for ordinary utilities such as
+`rm`, where the first positional argument is a file target rather than a
+subcommand. The subcommand menu is enabled only for known command-oriented
+executables such as Git, pip, npm, Docker, Cargo, and systemctl.
+
+Example configuration:
+
+```json
+{
+  "approved_commands": ["python3"],
+  "approved_subcommands": {"git": [["status"]]},
+  "approved_invocations": {"python3": [["-c", "print(1)"]]}
+}
+```
+
+These controls are an application-level command policy, not a complete
+security sandbox. In particular, a permitted interpreter or shell can invoke
+other operations internally; do not run untrusted scripts or PowerShell
+expressions merely because their top-level executable is allowlisted.
 
 ## Tool interface
 
@@ -59,6 +119,9 @@ The CLI equivalent is:
 /exec git status --short --branch
 /exec python3 -m pytest -q
 ```
+
+The built-in `/push` and `/commit-push` commands route their push operation
+through this same policy; they cannot bypass the default `git push` block.
 
 `/os-command` is accepted as a legacy alias. Arguments are parsed with `shlex` and
 passed as a list to a process runner; shell interpretation is never enabled.
@@ -96,6 +159,89 @@ environment rather than the full parent environment.
 The project-root check is an application-level boundary, not a complete OS
 sandbox. Same-user processes may still access other resources allowed by the
 operating system. Use OS/container sandboxing if stronger isolation is needed.
+
+## Platform-scoped command policy (current schema)
+
+All command lists and destructive-operation policies live inside
+`os_command.platforms.common`, `os_command.platforms.unix`, and
+`os_command.platforms.windows`. Each platform block contains its own
+`allowed_commands`, `unrestricted_commands`, `blocked_commands`,
+`blocked_command_exceptions`, `blocked_command_rules`, and
+`blocked_command_rule_exceptions`.
+
+`common` entries are inherited by both Unix and Windows. The active platform
+block adds its entries. This keeps platform-specific policy together and avoids
+parallel top-level lists.
+
+Example:
+
+```json
+{
+  "os_command": {
+    "requires_approval": true,
+    "platforms": {
+      "common": {
+        "allowed_commands": ["git", "python3"],
+        "unrestricted_commands": [],
+        "blocked_commands": [],
+        "blocked_command_exceptions": {},
+        "blocked_command_rules": {},
+        "blocked_command_rule_exceptions": {}
+      },
+      "unix": {
+        "allowed_commands": ["ls", "grep", "sed", "awk", "jq"],
+        "unrestricted_commands": [
+          "ls", "pwd", "cat", "head", "tail", "wc", "grep",
+          "stat", "file", "du", "df", "ps", "pgrep", "uptime",
+          "free", "uname", "hostname", "id", "whoami", "date",
+          "which", "whereis", "printenv", "env", "jq", "tree"
+        ],
+        "blocked_commands": ["sudo", "su", "rm", "rmdir", "shred"],
+        "blocked_command_exceptions": {
+          "sudo": ["--help", "--version"],
+          "su": ["--help", "--version"]
+        },
+        "blocked_command_rules": {
+          "git": ["reset", "push", "clean", "checkout --", "restore"],
+          "sh": ["-c", "-lc", "-ec"],
+          "bash": ["-c", "-lc", "-ec"]
+        },
+        "blocked_command_rule_exceptions": {}
+      },
+      "windows": {
+        "allowed_commands": ["where", "whoami", "ipconfig", "tasklist"],
+        "unrestricted_commands": [
+          "where", "whoami", "ver", "systeminfo", "ipconfig",
+          "netstat", "ping", "tracert", "nslookup", "tasklist",
+          "driverquery", "tree", "findstr", "find", "fc", "vol"
+        ],
+        "blocked_commands": ["del", "erase", "rd", "format", "diskpart", "shutdown"],
+        "blocked_command_exceptions": {},
+        "blocked_command_rules": {
+          "reg": ["delete"],
+          "taskkill": ["/F"],
+          "cmd": ["/c", "/k"],
+          "powershell": ["-Command", "-File", "-EncodedCommand"]
+        },
+        "blocked_command_rule_exceptions": {}
+      }
+    }
+  }
+}
+```
+
+`unrestricted_commands` bypasses only routine execution approval. It does not
+bypass blocked commands/rules, project access checks, executable allowlisting,
+or bounded execution. Only simple read-only utilities are unrestricted by
+default; commands capable of modifying files, processes, services, or system
+configuration remain subject to approval or explicit blocked-command handling.
+
+`blocked_command_exceptions` contains exact argument strings. For example,
+`"--version"` permits exactly that argument list and rejects
+`"--version extra"`. `blocked_command_rules` contains argument-sequence strings
+matched anywhere in argv; `"checkout --"` therefore catches
+`git checkout -- file` as well as the equivalent invocation with Git global
+options before the subcommand. Strings are tokenized before matching.
 
 ## Configuration
 
@@ -135,6 +281,26 @@ operating system. Use OS/container sandboxing if stronger isolation is needed.
         "modules": ["pytest", "unittest", "compileall"],
         "requires_approval": true
       }
+    },
+    "unrestricted_commands": {
+      "common": [],
+      "unix": [],
+      "windows": []
+    },
+    "blocked_commands": {
+      "common": [],
+      "unix": ["sudo", "su", "rm", "rmdir", "shred"],
+      "windows": ["del", "erase", "rd", "format", "diskpart", "shutdown"]
+    },
+    "blocked_command_exceptions": {
+      "common": {},
+      "unix": {"sudo": ["--help", "--version"], "su": ["--help", "--version"]},
+      "windows": {}
+    },
+    "blocked_command_rules": {
+      "common": {},
+      "unix": {"git": ["reset", "push", "clean", "checkout --", "restore"]},
+      "windows": {"reg": ["delete"], "taskkill": ["/F"]}
     }
   }
 }
@@ -154,8 +320,16 @@ configured approval setting.
 To customize policy, edit `subcommands`, `argument_rules`,
 `blocked_subcommands`, `forbidden_options`, `forbidden_option_prefixes`,
 `forbidden_argument_patterns`, and the injected-option maps in `assets/command_config.json`.
-`forbidden_argument_patterns` contains regular expressions tested against each
-argument token. `argument_rules` supports `allowed_args`, `value_options`,
+`blocked_command_exceptions` is an optional platform-scoped map from a blocked
+executable to an array of argument strings. It is an exception list, not a
+prefix or glob matcher: `["--help", "--version"]` permits exactly those two
+invocations and rejects `--version anything`. `blocked_command_rules` uses
+platform-scoped maps of executable names to argument-sequence strings such as
+`"checkout --"`; each string is tokenized before matching. An exception bypasses the general executable
+allowlist only for that exact invocation; it does not remove the executable
+from `blocked_commands` or permit other arguments. Keep exceptions limited to
+non-mutating informational forms. `forbidden_argument_patterns` contains
+regular expressions tested against each argument token. `argument_rules` supports `allowed_args`, `value_options`,
 `numeric_options`, `max_numeric_value`, regular-expression `patterns`,
 `positional_patterns`, `allow_project_paths_after_separator`, and `require_any`.
 The implementation contains the generic rule evaluator; individual Git option
@@ -190,10 +364,11 @@ based on an ambiguous timeout.
 
 ## Tests
 
-`test/test_os_command.py` covers executable allowlisting, Git read-only
-subcommands, disallowed mutation, Python module restrictions, path traversal,
-working-directory restrictions, approval rejection, disabled configuration,
-argument-vector parsing, and tool registration.
+`test/test_os_command.py` covers executable allowlisting, exact informational
+exceptions for blocked commands, rejection of extra arguments to those
+exceptions, path traversal, working-directory restrictions, approval
+rejection, disabled configuration, argument-vector parsing, and tool
+registration.
 
 ### Interactive Git allowlisting
 
@@ -214,7 +389,10 @@ resolved command, including injected Git options.
 ## Configuration source of truth
 
 All `os_command` enablement and execution policy is read from
-`assets/command_config.json` under the top-level `os_command` object.
+`assets/command_config.json` under `os_command`. Executable allowlists,
+unrestricted commands, and blocked-command policy are grouped under
+`os_command.platforms.common`, `os_command.platforms.unix`, and
+`os_command.platforms.windows`.
 The legacy `assets/shai_config.json` file is not consulted for command
 enablement. Interactive Git whitelist choices are persisted back to
 `assets/command_config.json` (never to the core configuration file), then the

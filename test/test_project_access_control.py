@@ -335,6 +335,10 @@ class ProjectAccessControlTests(unittest.TestCase):
         from unittest.mock import patch
         from modules.engine import agent_runtime as runtime
         original_runtime_root = runtime.ROOT
+        # Importing agent_runtime initializes the shared tools root from the
+        # real project. Re-apply this test's temporary root after that import
+        # so path checks and persisted grants use the same project directory.
+        common.configure_root(self.root)
         runtime.ROOT = self.root
         answers = iter(["1", "r"])
         try:

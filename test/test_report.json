@@ -1,1206 +1,1111 @@
 {
   "status": "passed",
-  "started_at": "2026-11-06T11:25:21.202714+00:00",
-  "finished_at": "2026-11-06T11:25:42.503729+00:00",
-  "duration_seconds": 21.3,
-  "python_version": "3.9.16",
+  "started_at": "2026-11-11T00:56:54.604428+00:00",
+  "finished_at": "2026-11-11T00:57:00.951548+00:00",
+  "duration_seconds": 6.35,
+  "python_version": "3.13.5",
   "unittest": {
     "success": true,
-    "tests_run": 296,
+    "tests_run": 272,
     "failures": 0,
     "errors": 0,
     "skipped": 0,
     "details": [
       {
-        "test": "test_approval_settings_support_category_and_tool_overrides (test.test_agent.ConfigTests)",
+        "test": "test_approval_settings_support_category_and_tool_overrides (test.test_agent.ConfigTests.test_approval_settings_support_category_and_tool_overrides)",
         "status": "passed"
       },
       {
-        "test": "test_global_approval_applies_when_category_is_not_explicitly_denied (test.test_agent.ConfigTests)",
+        "test": "test_global_approval_applies_when_category_is_not_explicitly_denied (test.test_agent.ConfigTests.test_global_approval_applies_when_category_is_not_explicitly_denied)",
         "status": "passed"
       },
       {
-        "test": "test_invalid_iteration_limit_uses_default (test.test_agent.ConfigTests)",
+        "test": "test_invalid_iteration_limit_uses_default (test.test_agent.ConfigTests.test_invalid_iteration_limit_uses_default)",
         "status": "passed"
       },
       {
-        "test": "test_iteration_limit_is_capped_to_prevent_unbounded_requests (test.test_agent.ConfigTests)",
+        "test": "test_iteration_limit_is_capped_to_prevent_unbounded_requests (test.test_agent.ConfigTests.test_iteration_limit_is_capped_to_prevent_unbounded_requests)",
         "status": "passed"
       },
       {
-        "test": "test_iteration_limit_is_read_from_config (test.test_agent.ConfigTests)",
+        "test": "test_iteration_limit_is_read_from_config (test.test_agent.ConfigTests.test_iteration_limit_is_read_from_config)",
         "status": "passed"
       },
       {
-        "test": "test_legacy_yes_to_all_migrates_to_approve_all (test.test_agent.ConfigTests)",
+        "test": "test_legacy_yes_to_all_migrates_to_approve_all (test.test_agent.ConfigTests.test_legacy_yes_to_all_migrates_to_approve_all)",
         "status": "passed"
       },
       {
-        "test": "test_retry_settings_validate_and_load (test.test_agent.ConfigTests)",
+        "test": "test_retry_settings_validate_and_load (test.test_agent.ConfigTests.test_retry_settings_validate_and_load)",
         "status": "passed"
       },
       {
-        "test": "test_risky_approval_does_not_inherit_global_all (test.test_agent.ConfigTests)",
+        "test": "test_risky_approval_does_not_inherit_global_all (test.test_agent.ConfigTests.test_risky_approval_does_not_inherit_global_all)",
         "status": "passed"
       },
       {
-        "test": "test_tool_errors_are_printed_after_status_batch_is_closed (test.test_agent.ConfigTests)",
+        "test": "test_tool_errors_are_printed_after_status_batch_is_closed (test.test_agent.ConfigTests.test_tool_errors_are_printed_after_status_batch_is_closed)",
         "status": "passed"
       },
       {
-        "test": "test_tool_safeguards_are_configurable (test.test_agent.ConfigTests)",
+        "test": "test_tool_safeguards_are_configurable (test.test_agent.ConfigTests.test_tool_safeguards_are_configurable)",
         "status": "passed"
       },
       {
-        "test": "test_yes_to_all_is_persisted_without_losing_other_settings (test.test_agent.ConfigTests)",
+        "test": "test_yes_to_all_is_persisted_without_losing_other_settings (test.test_agent.ConfigTests.test_yes_to_all_is_persisted_without_losing_other_settings)",
         "status": "passed"
       },
       {
-        "test": "test_completed_plan_does_not_continue (test.test_agent.PlanContinuationTests)",
+        "test": "test_completed_plan_does_not_continue (test.test_agent.PlanContinuationTests.test_completed_plan_does_not_continue)",
         "status": "passed"
       },
       {
-        "test": "test_continuation_is_bounded (test.test_agent.PlanContinuationTests)",
+        "test": "test_continuation_is_bounded (test.test_agent.PlanContinuationTests.test_continuation_is_bounded)",
         "status": "passed"
       },
       {
-        "test": "test_text_only_response_continues_when_plan_is_incomplete (test.test_agent.PlanContinuationTests)",
+        "test": "test_text_only_response_continues_when_plan_is_incomplete (test.test_agent.PlanContinuationTests.test_text_only_response_continues_when_plan_is_incomplete)",
         "status": "passed"
       },
       {
-        "test": "test_api_retries_transient_http_error (test.test_agent.ToolSafetyTests)",
+        "test": "test_api_retries_transient_http_error (test.test_agent.ToolSafetyTests.test_api_retries_transient_http_error)",
         "status": "passed"
       },
       {
-        "test": "test_edit_file_patch_arguments_are_routed_to_patch_file (test.test_agent.ToolSafetyTests)",
+        "test": "test_edit_file_patch_arguments_are_routed_to_patch_file (test.test_agent.ToolSafetyTests.test_edit_file_patch_arguments_are_routed_to_patch_file)",
         "status": "passed"
       },
       {
-        "test": "test_identical_calls_are_allowed_and_warn_with_parameters (test.test_agent.ToolSafetyTests)",
+        "test": "test_identical_calls_are_allowed_and_warn_with_parameters (test.test_agent.ToolSafetyTests.test_identical_calls_are_allowed_and_warn_with_parameters)",
         "status": "passed"
       },
       {
-        "test": "test_interrupted_request_rolls_back_partial_history (test.test_agent.ToolSafetyTests)",
+        "test": "test_interrupted_request_rolls_back_partial_history (test.test_agent.ToolSafetyTests.test_interrupted_request_rolls_back_partial_history)",
         "status": "passed"
       },
       {
-        "test": "test_invalid_tool_selection_has_bounded_recovery (test.test_agent.ToolSafetyTests)",
+        "test": "test_invalid_tool_selection_has_bounded_recovery (test.test_agent.ToolSafetyTests.test_invalid_tool_selection_has_bounded_recovery)",
         "status": "passed"
       },
       {
-        "test": "test_kilo_schema_preserves_file_search_and_pagination_guidance (test.test_agent.ToolSafetyTests)",
+        "test": "test_kilo_schema_preserves_file_search_and_pagination_guidance (test.test_agent.ToolSafetyTests.test_kilo_schema_preserves_file_search_and_pagination_guidance)",
         "status": "passed"
       },
       {
-        "test": "test_provider_switch_history_discards_tool_records (test.test_agent.ToolSafetyTests)",
+        "test": "test_provider_switch_history_discards_tool_records (test.test_agent.ToolSafetyTests.test_provider_switch_history_discards_tool_records)",
         "status": "passed"
       },
       {
-        "test": "test_search_files_accepts_single_file_path (test.test_agent.ToolSafetyTests)",
+        "test": "test_search_files_accepts_single_file_path (test.test_agent.ToolSafetyTests.test_search_files_accepts_single_file_path)",
         "status": "passed"
       },
       {
-        "test": "test_three_identical_tool_errors_stop_request (test.test_agent.ToolSafetyTests)",
+        "test": "test_three_identical_tool_errors_stop_request (test.test_agent.ToolSafetyTests.test_three_identical_tool_errors_stop_request)",
         "status": "passed"
       },
       {
-        "test": "test_tool_is_executed_once_per_call (test.test_agent.ToolSafetyTests)",
+        "test": "test_tool_is_executed_once_per_call (test.test_agent.ToolSafetyTests.test_tool_is_executed_once_per_call)",
         "status": "passed"
       },
       {
-        "test": "test_tool_name_resolution_accepts_prefix_and_close_typo (test.test_agent.ToolSafetyTests)",
+        "test": "test_tool_name_resolution_accepts_prefix_and_close_typo (test.test_agent.ToolSafetyTests.test_tool_name_resolution_accepts_prefix_and_close_typo)",
         "status": "passed"
       },
       {
-        "test": "test_compaction_keeps_anthropic_tool_result_pair_together (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_compaction_keeps_anthropic_tool_result_pair_together (test.test_agent_safeguards.AgentSafeguardModuleTests.test_compaction_keeps_anthropic_tool_result_pair_together)",
         "status": "passed"
       },
       {
-        "test": "test_compaction_preserves_latest_user_request_and_caps_results (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_compaction_preserves_latest_user_request_and_caps_results (test.test_agent_safeguards.AgentSafeguardModuleTests.test_compaction_preserves_latest_user_request_and_caps_results)",
         "status": "passed"
       },
       {
-        "test": "test_compaction_preserves_summary_of_completed_tool_work (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_compaction_preserves_summary_of_completed_tool_work (test.test_agent_safeguards.AgentSafeguardModuleTests.test_compaction_preserves_summary_of_completed_tool_work)",
         "status": "passed"
       },
       {
-        "test": "test_file_edit_does_not_affect_read_execution (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_file_edit_does_not_affect_read_execution (test.test_agent_safeguards.AgentSafeguardModuleTests.test_file_edit_does_not_affect_read_execution)",
         "status": "passed"
       },
       {
-        "test": "test_handle_tool_selection_rejects_bad_arguments_before_execution (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_handle_tool_selection_rejects_bad_arguments_before_execution (test.test_agent_safeguards.AgentSafeguardModuleTests.test_handle_tool_selection_rejects_bad_arguments_before_execution)",
         "status": "passed"
       },
       {
-        "test": "test_invalid_arguments_do_not_permanently_disable_tool (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_invalid_arguments_do_not_permanently_disable_tool (test.test_agent_safeguards.AgentSafeguardModuleTests.test_invalid_arguments_do_not_permanently_disable_tool)",
         "status": "passed"
       },
       {
-        "test": "test_no_progress_distinguishes_failed_argument_variations_from_success (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_no_progress_distinguishes_failed_argument_variations_from_success (test.test_agent_safeguards.AgentSafeguardModuleTests.test_no_progress_distinguishes_failed_argument_variations_from_success)",
         "status": "passed"
       },
       {
-        "test": "test_parameterized_signatures_distinguish_read_file_pages (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_parameterized_signatures_distinguish_read_file_pages (test.test_agent_safeguards.AgentSafeguardModuleTests.test_parameterized_signatures_distinguish_read_file_pages)",
         "status": "passed"
       },
       {
-        "test": "test_patch_file_is_registered_for_execution (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_patch_file_is_registered_for_execution (test.test_agent_safeguards.AgentSafeguardModuleTests.test_patch_file_is_registered_for_execution)",
         "status": "passed"
       },
       {
-        "test": "test_read_file_can_be_reread_even_if_previous_result_is_in_history (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_read_file_can_be_reread_even_if_previous_result_is_in_history (test.test_agent_safeguards.AgentSafeguardModuleTests.test_read_file_can_be_reread_even_if_previous_result_is_in_history)",
         "status": "passed"
       },
       {
-        "test": "test_read_file_schema_accepts_offset_and_limit (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_read_file_schema_accepts_offset_and_limit (test.test_agent_safeguards.AgentSafeguardModuleTests.test_read_file_schema_accepts_offset_and_limit)",
         "status": "passed"
       },
       {
-        "test": "test_read_file_supports_offset_limit_and_continuation (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_read_file_supports_offset_limit_and_continuation (test.test_agent_safeguards.AgentSafeguardModuleTests.test_read_file_supports_offset_limit_and_continuation)",
         "status": "passed"
       },
       {
-        "test": "test_repeated_read_file_executes_instead_of_synthetic_suppression (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_repeated_read_file_executes_instead_of_synthetic_suppression (test.test_agent_safeguards.AgentSafeguardModuleTests.test_repeated_read_file_executes_instead_of_synthetic_suppression)",
         "status": "passed"
       },
       {
-        "test": "test_repeated_successful_batch_resets_no_progress (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_repeated_successful_batch_resets_no_progress (test.test_agent_safeguards.AgentSafeguardModuleTests.test_repeated_successful_batch_resets_no_progress)",
         "status": "passed"
       },
       {
-        "test": "test_repeated_successful_tool_batch_does_not_stop_progress (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_repeated_successful_tool_batch_does_not_stop_progress (test.test_agent_safeguards.AgentSafeguardModuleTests.test_repeated_successful_tool_batch_does_not_stop_progress)",
         "status": "passed"
       },
       {
-        "test": "test_tool_argument_schema_checks_required_and_types (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_tool_argument_schema_checks_required_and_types (test.test_agent_safeguards.AgentSafeguardModuleTests.test_tool_argument_schema_checks_required_and_types)",
         "status": "passed"
       },
       {
-        "test": "test_tool_argument_schema_rejects_unknown_parameters (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_tool_argument_schema_rejects_unknown_parameters (test.test_agent_safeguards.AgentSafeguardModuleTests.test_tool_argument_schema_rejects_unknown_parameters)",
         "status": "passed"
       },
       {
-        "test": "test_tool_call_display_shows_pagination_parameters (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_tool_call_display_shows_pagination_parameters (test.test_agent_safeguards.AgentSafeguardModuleTests.test_tool_call_display_shows_pagination_parameters)",
         "status": "passed"
       },
       {
-        "test": "test_tool_result_is_bounded_and_keeps_both_ends (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_tool_result_is_bounded_and_keeps_both_ends (test.test_agent_safeguards.AgentSafeguardModuleTests.test_tool_result_is_bounded_and_keeps_both_ends)",
         "status": "passed"
       },
       {
-        "test": "test_truncated_provider_response_stops_without_retry_loop (test.test_agent_safeguards.AgentSafeguardModuleTests)",
+        "test": "test_truncated_provider_response_stops_without_retry_loop (test.test_agent_safeguards.AgentSafeguardModuleTests.test_truncated_provider_response_stops_without_retry_loop)",
         "status": "passed"
       },
       {
-        "test": "test_atomic_file_edit_creates_backup_under_shai (test.test_backup_management.BackupManagementTests)",
+        "test": "test_atomic_file_edit_creates_backup_under_shai (test.test_backup_management.BackupManagementTests.test_atomic_file_edit_creates_backup_under_shai)",
         "status": "passed"
       },
       {
-        "test": "test_atomic_replace_creates_new_file_without_backup (test.test_backup_management.BackupManagementTests)",
+        "test": "test_atomic_replace_creates_new_file_without_backup (test.test_backup_management.BackupManagementTests.test_atomic_replace_creates_new_file_without_backup)",
         "status": "passed"
       },
       {
-        "test": "test_backup_config_is_project_local (test.test_backup_management.BackupManagementTests)",
+        "test": "test_backup_config_is_project_local (test.test_backup_management.BackupManagementTests.test_backup_config_is_project_local)",
         "status": "passed"
       },
       {
-        "test": "test_backup_config_negative_retention_days_uses_default (test.test_backup_management.BackupManagementTests)",
+        "test": "test_backup_config_negative_retention_days_uses_default (test.test_backup_management.BackupManagementTests.test_backup_config_negative_retention_days_uses_default)",
         "status": "passed"
       },
       {
-        "test": "test_backup_directory_is_nested_under_shai (test.test_backup_management.BackupManagementTests)",
+        "test": "test_backup_directory_is_nested_under_shai (test.test_backup_management.BackupManagementTests.test_backup_directory_is_nested_under_shai)",
         "status": "passed"
       },
       {
-        "test": "test_cleanup_uses_project_local_retention_policy (test.test_backup_management.BackupManagementTests)",
+        "test": "test_cleanup_uses_project_local_retention_policy (test.test_backup_management.BackupManagementTests.test_cleanup_uses_project_local_retention_policy)",
         "status": "passed"
       },
       {
-        "test": "test_disabled_cleanup_still_migrates_legacy_directory (test.test_backup_management.BackupManagementTests)",
+        "test": "test_disabled_cleanup_still_migrates_legacy_directory (test.test_backup_management.BackupManagementTests.test_disabled_cleanup_still_migrates_legacy_directory)",
         "status": "passed"
       },
       {
-        "test": "test_legacy_backup_directory_is_migrated (test.test_backup_management.BackupManagementTests)",
+        "test": "test_legacy_backup_directory_is_migrated (test.test_backup_management.BackupManagementTests.test_legacy_backup_directory_is_migrated)",
         "status": "passed"
       },
       {
-        "test": "test_missing_or_invalid_backup_config_uses_defaults (test.test_backup_management.BackupManagementTests)",
+        "test": "test_missing_or_invalid_backup_config_uses_defaults (test.test_backup_management.BackupManagementTests.test_missing_or_invalid_backup_config_uses_defaults)",
         "status": "passed"
       },
       {
-        "test": "test_large_command_output_is_bounded (test.test_bounded_execution.BoundedOutputCaptureTests)",
+        "test": "test_large_command_output_is_bounded (test.test_bounded_execution.BoundedOutputCaptureTests.test_large_command_output_is_bounded)",
         "status": "passed"
       },
       {
-        "test": "test_large_output_keeps_head_and_tail (test.test_bounded_execution.BoundedOutputCaptureTests)",
+        "test": "test_large_output_keeps_head_and_tail (test.test_bounded_execution.BoundedOutputCaptureTests.test_large_output_keeps_head_and_tail)",
         "status": "passed"
       },
       {
-        "test": "test_long_running_command_times_out (test.test_bounded_execution.BoundedOutputCaptureTests)",
+        "test": "test_long_running_command_times_out (test.test_bounded_execution.BoundedOutputCaptureTests.test_long_running_command_times_out)",
         "status": "passed"
       },
       {
-        "test": "test_small_output_is_preserved_exactly (test.test_bounded_execution.BoundedOutputCaptureTests)",
+        "test": "test_small_output_is_preserved_exactly (test.test_bounded_execution.BoundedOutputCaptureTests.test_small_output_is_preserved_exactly)",
         "status": "passed"
       },
       {
-        "test": "test_stderr_and_stdout_are_both_drained (test.test_bounded_execution.BoundedOutputCaptureTests)",
+        "test": "test_stderr_and_stdout_are_both_drained (test.test_bounded_execution.BoundedOutputCaptureTests.test_stderr_and_stdout_are_both_drained)",
         "status": "passed"
       },
       {
-        "test": "test_anthropic_response_extracts_text (test.test_chat.ChatTests)",
+        "test": "test_anthropic_response_extracts_text (test.test_chat.ChatTests.test_anthropic_response_extracts_text)",
         "status": "passed"
       },
       {
-        "test": "test_model_command_switches_provider_without_api_call (test.test_chat.ChatTests)",
+        "test": "test_model_command_switches_provider_without_api_call (test.test_chat.ChatTests.test_model_command_switches_provider_without_api_call)",
         "status": "passed"
       },
       {
-        "test": "test_provider_switch_keeps_text_and_removes_provider_specific_content (test.test_chat.ChatTests)",
+        "test": "test_provider_switch_keeps_text_and_removes_provider_specific_content (test.test_chat.ChatTests.test_provider_switch_keeps_text_and_removes_provider_specific_content)",
         "status": "passed"
       },
       {
-        "test": "test_anthropic_style_response_is_supported (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "test": "test_anthropic_style_response_is_supported (test.test_commit_message_routing.CommitMessageRoutingTests.test_anthropic_style_response_is_supported)",
         "status": "passed"
       },
       {
-        "test": "test_disabled_llm_does_not_call_router (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "test": "test_disabled_llm_does_not_call_router (test.test_commit_message_routing.CommitMessageRoutingTests.test_disabled_llm_does_not_call_router)",
         "status": "passed"
       },
       {
-        "test": "test_explicit_commit_message_bypasses_model_generation (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "test": "test_explicit_commit_message_bypasses_model_generation (test.test_commit_message_routing.CommitMessageRoutingTests.test_explicit_commit_message_bypasses_model_generation)",
         "status": "passed"
       },
       {
-        "test": "test_failed_routed_request_returns_to_pattern_fallback (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "test": "test_failed_routed_request_returns_to_pattern_fallback (test.test_commit_message_routing.CommitMessageRoutingTests.test_failed_routed_request_returns_to_pattern_fallback)",
         "status": "passed"
       },
       {
-        "test": "test_llm_commit_generation_uses_shared_commit_message_role_router (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "test": "test_llm_commit_generation_uses_shared_commit_message_role_router (test.test_commit_message_routing.CommitMessageRoutingTests.test_llm_commit_generation_uses_shared_commit_message_role_router)",
         "status": "passed"
       },
       {
-        "test": "test_message_only_command_path_invokes_message_generator (test.test_commit_message_routing.CommitMessageRoutingTests)",
+        "test": "test_message_only_command_path_invokes_message_generator (test.test_commit_message_routing.CommitMessageRoutingTests.test_message_only_command_path_invokes_message_generator)",
         "status": "passed"
       },
       {
-        "test": "test_approval_granted_hierarchy (test.test_configuration.ConfigTests)",
+        "test": "test_approval_granted_hierarchy (test.test_configuration.ConfigTests.test_approval_granted_hierarchy)",
         "status": "passed"
       },
       {
-        "test": "test_load_agent_safeguards_bounds (test.test_configuration.ConfigTests)",
+        "test": "test_load_agent_safeguards_bounds (test.test_configuration.ConfigTests.test_load_agent_safeguards_bounds)",
         "status": "passed"
       },
       {
-        "test": "test_load_api_timeout_seconds_defaults_and_validation (test.test_configuration.ConfigTests)",
+        "test": "test_load_api_timeout_seconds_defaults_and_validation (test.test_configuration.ConfigTests.test_load_api_timeout_seconds_defaults_and_validation)",
         "status": "passed"
       },
       {
-        "test": "test_load_config_handles_malformed_json_gracefully (test.test_configuration.ConfigTests)",
+        "test": "test_load_config_handles_malformed_json_gracefully (test.test_configuration.ConfigTests.test_load_config_handles_malformed_json_gracefully)",
         "status": "passed"
       },
       {
-        "test": "test_load_config_handles_missing_file_gracefully (test.test_configuration.ConfigTests)",
+        "test": "test_load_config_handles_missing_file_gracefully (test.test_configuration.ConfigTests.test_load_config_handles_missing_file_gracefully)",
         "status": "passed"
       },
       {
-        "test": "test_load_config_merges_split_config_files (test.test_configuration.ConfigTests)",
+        "test": "test_load_config_merges_split_config_files (test.test_configuration.ConfigTests.test_load_config_merges_split_config_files)",
         "status": "passed"
       },
       {
-        "test": "test_load_config_preserves_explicit_overrides_over_split_configs (test.test_configuration.ConfigTests)",
+        "test": "test_load_config_preserves_explicit_overrides_over_split_configs (test.test_configuration.ConfigTests.test_load_config_preserves_explicit_overrides_over_split_configs)",
         "status": "passed"
       },
       {
-        "test": "test_load_config_rejects_non_dict_root (test.test_configuration.ConfigTests)",
+        "test": "test_load_config_rejects_non_dict_root (test.test_configuration.ConfigTests.test_load_config_rejects_non_dict_root)",
         "status": "passed"
       },
       {
-        "test": "test_load_max_tool_call_iterations_clamping_and_validation (test.test_configuration.ConfigTests)",
+        "test": "test_load_max_tool_call_iterations_clamping_and_validation (test.test_configuration.ConfigTests.test_load_max_tool_call_iterations_clamping_and_validation)",
         "status": "passed"
       },
       {
-        "test": "test_load_retry_settings_exhaustive_validation (test.test_configuration.ConfigTests)",
+        "test": "test_load_retry_settings_exhaustive_validation (test.test_configuration.ConfigTests.test_load_retry_settings_exhaustive_validation)",
         "status": "passed"
       },
       {
-        "test": "test_load_test_execution_settings_clamps_combined_streams (test.test_configuration.ConfigTests)",
+        "test": "test_load_test_execution_settings_clamps_combined_streams (test.test_configuration.ConfigTests.test_load_test_execution_settings_clamps_combined_streams)",
         "status": "passed"
       },
       {
-        "test": "test_load_tool_call_display_settings_validation (test.test_configuration.ConfigTests)",
+        "test": "test_load_tool_call_display_settings_validation (test.test_configuration.ConfigTests.test_load_tool_call_display_settings_validation)",
         "status": "passed"
       },
       {
-        "test": "test_positive_int_setting_helper (test.test_configuration.ConfigTests)",
+        "test": "test_positive_int_setting_helper (test.test_configuration.ConfigTests.test_positive_int_setting_helper)",
         "status": "passed"
       },
       {
-        "test": "test_provider_selection_load_config_preserves_shai_config_overrides (test.test_configuration.ConfigTests)",
+        "test": "test_provider_selection_load_config_preserves_shai_config_overrides (test.test_configuration.ConfigTests.test_provider_selection_load_config_preserves_shai_config_overrides)",
         "status": "passed"
       },
       {
-        "test": "test_save_approval_settings_does_not_leak_split_configs_into_shai_config (test.test_configuration.ConfigTests)",
+        "test": "test_save_approval_settings_does_not_leak_split_configs_into_shai_config (test.test_configuration.ConfigTests.test_save_approval_settings_does_not_leak_split_configs_into_shai_config)",
         "status": "passed"
       },
       {
-        "test": "test_tool_safeguards_invalid_boolean_flags (test.test_configuration.ConfigTests)",
+        "test": "test_tool_safeguards_invalid_boolean_flags (test.test_configuration.ConfigTests.test_tool_safeguards_invalid_boolean_flags)",
         "status": "passed"
       },
       {
-        "test": "test_discloses_unknown_limit_instead_of_fabricating_percentage (test.test_context_meter.ContextMeterTests)",
+        "test": "test_discloses_unknown_limit_instead_of_fabricating_percentage (test.test_context_meter.ContextMeterTests.test_discloses_unknown_limit_instead_of_fabricating_percentage)",
         "status": "passed"
       },
       {
-        "test": "test_does_not_guess_unknown_context_limit (test.test_context_meter.ContextMeterTests)",
+        "test": "test_does_not_guess_unknown_context_limit (test.test_context_meter.ContextMeterTests.test_does_not_guess_unknown_context_limit)",
         "status": "passed"
       },
       {
-        "test": "test_estimate_messages_tokens_with_tools_and_system (test.test_context_meter.ContextMeterTests)",
+        "test": "test_estimate_messages_tokens_with_tools_and_system (test.test_context_meter.ContextMeterTests.test_estimate_messages_tokens_with_tools_and_system)",
         "status": "passed"
       },
       {
-        "test": "test_estimate_text_tokens_empty_and_unicode (test.test_context_meter.ContextMeterTests)",
+        "test": "test_estimate_text_tokens_empty_and_unicode (test.test_context_meter.ContextMeterTests.test_estimate_text_tokens_empty_and_unicode)",
         "status": "passed"
       },
       {
-        "test": "test_estimates_nonempty_prompt (test.test_context_meter.ContextMeterTests)",
+        "test": "test_estimates_nonempty_prompt (test.test_context_meter.ContextMeterTests.test_estimates_nonempty_prompt)",
         "status": "passed"
       },
       {
-        "test": "test_extract_usage_anthropic (test.test_context_meter.ContextMeterTests)",
+        "test": "test_extract_usage_anthropic (test.test_context_meter.ContextMeterTests.test_extract_usage_anthropic)",
         "status": "passed"
       },
       {
-        "test": "test_extract_usage_calculates_total_when_missing (test.test_context_meter.ContextMeterTests)",
+        "test": "test_extract_usage_calculates_total_when_missing (test.test_context_meter.ContextMeterTests.test_extract_usage_calculates_total_when_missing)",
         "status": "passed"
       },
       {
-        "test": "test_extract_usage_malformed_returns_empty (test.test_context_meter.ContextMeterTests)",
+        "test": "test_extract_usage_malformed_returns_empty (test.test_context_meter.ContextMeterTests.test_extract_usage_malformed_returns_empty)",
         "status": "passed"
       },
       {
-        "test": "test_extract_usage_openai (test.test_context_meter.ContextMeterTests)",
+        "test": "test_extract_usage_openai (test.test_context_meter.ContextMeterTests.test_extract_usage_openai)",
         "status": "passed"
       },
       {
-        "test": "test_fallback_to_assets_context_window_config_for_known_models (test.test_context_meter.ContextMeterTests)",
+        "test": "test_fallback_to_assets_context_window_config_for_known_models (test.test_context_meter.ContextMeterTests.test_fallback_to_assets_context_window_config_for_known_models)",
         "status": "passed"
       },
       {
-        "test": "test_formats_exact_and_generated_tokens (test.test_context_meter.ContextMeterTests)",
+        "test": "test_formats_exact_and_generated_tokens (test.test_context_meter.ContextMeterTests.test_formats_exact_and_generated_tokens)",
         "status": "passed"
       },
       {
-        "test": "test_formats_percentage_when_limit_is_known (test.test_context_meter.ContextMeterTests)",
+        "test": "test_formats_percentage_when_limit_is_known (test.test_context_meter.ContextMeterTests.test_formats_percentage_when_limit_is_known)",
         "status": "passed"
       },
       {
-        "test": "test_get_context_window_rejects_booleans_and_negatives (test.test_context_meter.ContextMeterTests)",
+        "test": "test_get_context_window_rejects_booleans_and_negatives (test.test_context_meter.ContextMeterTests.test_get_context_window_rejects_booleans_and_negatives)",
         "status": "passed"
       },
       {
-        "test": "test_model_specific_override_takes_precedence_over_provider_metadata (test.test_context_meter.ContextMeterTests)",
+        "test": "test_model_specific_override_takes_precedence_over_provider_metadata (test.test_context_meter.ContextMeterTests.test_model_specific_override_takes_precedence_over_provider_metadata)",
         "status": "passed"
       },
       {
-        "test": "test_reads_model_specific_context_limit (test.test_context_meter.ContextMeterTests)",
+        "test": "test_reads_model_specific_context_limit (test.test_context_meter.ContextMeterTests.test_reads_model_specific_context_limit)",
         "status": "passed"
       },
       {
-        "test": "test_thinking_context_status_known_for_default_model (test.test_context_meter.ContextMeterTests)",
+        "test": "test_thinking_context_status_known_for_default_model (test.test_context_meter.ContextMeterTests.test_thinking_context_status_known_for_default_model)",
         "status": "passed"
       },
       {
-        "test": "test_add_input_ignores_whitespace_and_caps_history (test.test_conversation_history.ConversationHistoryTests)",
+        "test": "test_add_input_ignores_whitespace_and_caps_history (test.test_conversation_history.ConversationHistoryTests.test_add_input_ignores_whitespace_and_caps_history)",
         "status": "passed"
       },
       {
-        "test": "test_clear_preserves_prompt_and_other_mode_history (test.test_conversation_history.ConversationHistoryTests)",
+        "test": "test_clear_preserves_prompt_and_other_mode_history (test.test_conversation_history.ConversationHistoryTests.test_clear_preserves_prompt_and_other_mode_history)",
         "status": "passed"
       },
       {
-        "test": "test_corrupt_history_file_recovers_to_empty (test.test_conversation_history.ConversationHistoryTests)",
+        "test": "test_corrupt_history_file_recovers_to_empty (test.test_conversation_history.ConversationHistoryTests.test_corrupt_history_file_recovers_to_empty)",
         "status": "passed"
       },
       {
-        "test": "test_history_file_is_json_and_has_expected_path (test.test_conversation_history.ConversationHistoryTests)",
+        "test": "test_history_file_is_json_and_has_expected_path (test.test_conversation_history.ConversationHistoryTests.test_history_file_is_json_and_has_expected_path)",
         "status": "passed"
       },
       {
-        "test": "test_load_returns_deep_copy (test.test_conversation_history.ConversationHistoryTests)",
+        "test": "test_load_returns_deep_copy (test.test_conversation_history.ConversationHistoryTests.test_load_returns_deep_copy)",
         "status": "passed"
       },
       {
-        "test": "test_metadata_persistence_and_mode_isolation (test.test_conversation_history.ConversationHistoryTests)",
+        "test": "test_metadata_persistence_and_mode_isolation (test.test_conversation_history.ConversationHistoryTests.test_metadata_persistence_and_mode_isolation)",
         "status": "passed"
       },
       {
-        "test": "test_mode_histories_are_separate_and_preserved (test.test_conversation_history.ConversationHistoryTests)",
+        "test": "test_mode_histories_are_separate_and_preserved (test.test_conversation_history.ConversationHistoryTests.test_mode_histories_are_separate_and_preserved)",
         "status": "passed"
       },
       {
-        "test": "test_prompt_history_shared_and_deduplicated (test.test_conversation_history.ConversationHistoryTests)",
+        "test": "test_prompt_history_shared_and_deduplicated (test.test_conversation_history.ConversationHistoryTests.test_prompt_history_shared_and_deduplicated)",
         "status": "passed"
       },
       {
-        "test": "test_all_domain_modules_import (test.test_engine_module_boundaries.EngineModuleBoundaryTests)",
+        "test": "test_all_domain_modules_import (test.test_engine_module_boundaries.EngineModuleBoundaryTests.test_all_domain_modules_import)",
         "status": "passed"
       },
       {
-        "test": "test_domain_source_is_not_left_in_runtime (test.test_engine_module_boundaries.EngineModuleBoundaryTests)",
+        "test": "test_domain_source_is_not_left_in_runtime (test.test_engine_module_boundaries.EngineModuleBoundaryTests.test_domain_source_is_not_left_in_runtime)",
         "status": "passed"
       },
       {
-        "test": "test_engine_runtime_remains_compatibility_surface (test.test_engine_module_boundaries.EngineModuleBoundaryTests)",
+        "test": "test_engine_runtime_remains_compatibility_surface (test.test_engine_module_boundaries.EngineModuleBoundaryTests.test_engine_runtime_remains_compatibility_surface)",
         "status": "passed"
       },
       {
-        "test": "test_runtime_installs_public_functions (test.test_engine_module_boundaries.EngineModuleBoundaryTests)",
+        "test": "test_runtime_installs_public_functions (test.test_engine_module_boundaries.EngineModuleBoundaryTests.test_runtime_installs_public_functions)",
         "status": "passed"
       },
       {
-        "test": "test_empty_diff_returns_cleanly (test.test_file_change_display.FileChangeDisplayTests)",
+        "test": "test_empty_diff_returns_cleanly (test.test_file_change_display.FileChangeDisplayTests.test_empty_diff_returns_cleanly)",
         "status": "passed"
       },
       {
-        "test": "test_load_settings_reads_from_cli_config_when_config_path_none (test.test_file_change_display.FileChangeDisplayTests)",
+        "test": "test_load_settings_reads_from_cli_config_when_config_path_none (test.test_file_change_display.FileChangeDisplayTests.test_load_settings_reads_from_cli_config_when_config_path_none)",
         "status": "passed"
       },
       {
-        "test": "test_load_settings_reads_from_sibling_cli_config_when_given_shai_config (test.test_file_change_display.FileChangeDisplayTests)",
+        "test": "test_load_settings_reads_from_sibling_cli_config_when_given_shai_config (test.test_file_change_display.FileChangeDisplayTests.test_load_settings_reads_from_sibling_cli_config_when_given_shai_config)",
         "status": "passed"
       },
       {
-        "test": "test_print_change_preview_enabled_and_disabled (test.test_file_change_display.FileChangeDisplayTests)",
+        "test": "test_print_change_preview_enabled_and_disabled (test.test_file_change_display.FileChangeDisplayTests.test_print_change_preview_enabled_and_disabled)",
         "status": "passed"
       },
       {
-        "test": "test_settings_are_loaded_from_config (test.test_file_change_display.FileChangeDisplayTests)",
+        "test": "test_settings_are_loaded_from_config (test.test_file_change_display.FileChangeDisplayTests.test_settings_are_loaded_from_config)",
         "status": "passed"
       },
       {
-        "test": "test_settings_fallback_on_corrupt_or_invalid_config (test.test_file_change_display.FileChangeDisplayTests)",
+        "test": "test_settings_fallback_on_corrupt_or_invalid_config (test.test_file_change_display.FileChangeDisplayTests.test_settings_fallback_on_corrupt_or_invalid_config)",
         "status": "passed"
       },
       {
-        "test": "test_settings_normalization_of_invalid_types (test.test_file_change_display.FileChangeDisplayTests)",
+        "test": "test_settings_normalization_of_invalid_types (test.test_file_change_display.FileChangeDisplayTests.test_settings_normalization_of_invalid_types)",
         "status": "passed"
       },
       {
-        "test": "test_small_diff_is_not_truncated (test.test_file_change_display.FileChangeDisplayTests)",
+        "test": "test_small_diff_is_not_truncated (test.test_file_change_display.FileChangeDisplayTests.test_small_diff_is_not_truncated)",
         "status": "passed"
       },
       {
-        "test": "test_truncates_large_diff_and_preserves_head_tail (test.test_file_change_display.FileChangeDisplayTests)",
+        "test": "test_truncates_large_diff_and_preserves_head_tail (test.test_file_change_display.FileChangeDisplayTests.test_truncates_large_diff_and_preserves_head_tail)",
         "status": "passed"
       },
       {
-        "test": "test_custom_handler_intercepts_confirm_action (test.test_interaction.InteractionHandlerTests)",
+        "test": "test_custom_handler_intercepts_confirm_action (test.test_interaction.InteractionHandlerTests.test_custom_handler_intercepts_confirm_action)",
         "status": "passed"
       },
       {
-        "test": "test_custom_handler_intercepts_git_choice (test.test_interaction.InteractionHandlerTests)",
+        "test": "test_custom_handler_intercepts_git_choice (test.test_interaction.InteractionHandlerTests.test_custom_handler_intercepts_git_choice)",
         "status": "passed"
       },
       {
-        "test": "test_custom_handler_intercepts_risky_approval (test.test_interaction.InteractionHandlerTests)",
+        "test": "test_custom_handler_intercepts_risky_approval (test.test_interaction.InteractionHandlerTests.test_custom_handler_intercepts_risky_approval)",
         "status": "passed"
       },
       {
-        "test": "test_set_invalid_handler_raises_type_error (test.test_interaction.InteractionHandlerTests)",
+        "test": "test_set_invalid_handler_raises_type_error (test.test_interaction.InteractionHandlerTests.test_set_invalid_handler_raises_type_error)",
         "status": "passed"
       },
       {
-        "test": "test_keeps_visible_text_and_drops_thinking_blocks (test.test_invalid_tool_recovery.ConversationRepairTests)",
+        "test": "test_keeps_visible_text_and_drops_thinking_blocks (test.test_invalid_tool_recovery.ConversationRepairTests.test_keeps_visible_text_and_drops_thinking_blocks)",
         "status": "passed"
       },
       {
-        "test": "test_outgoing_history_preserves_valid_tool_calls (test.test_invalid_tool_recovery.ConversationRepairTests)",
+        "test": "test_outgoing_history_preserves_valid_tool_calls (test.test_invalid_tool_recovery.ConversationRepairTests.test_outgoing_history_preserves_valid_tool_calls)",
         "status": "passed"
       },
       {
-        "test": "test_outgoing_history_sanitizes_cohere_thinking_even_without_recovery (test.test_invalid_tool_recovery.ConversationRepairTests)",
+        "test": "test_outgoing_history_sanitizes_cohere_thinking_even_without_recovery (test.test_invalid_tool_recovery.ConversationRepairTests.test_outgoing_history_sanitizes_cohere_thinking_even_without_recovery)",
         "status": "passed"
       },
       {
-        "test": "test_recovery_regenerates_with_repaired_history (test.test_invalid_tool_recovery.ConversationRepairTests)",
+        "test": "test_recovery_regenerates_with_repaired_history (test.test_invalid_tool_recovery.ConversationRepairTests.test_recovery_regenerates_with_repaired_history)",
         "status": "passed"
       },
       {
-        "test": "test_repairs_anthropic_tool_use_result_blocks (test.test_invalid_tool_recovery.ConversationRepairTests)",
+        "test": "test_repairs_anthropic_tool_use_result_blocks (test.test_invalid_tool_recovery.ConversationRepairTests.test_repairs_anthropic_tool_use_result_blocks)",
         "status": "passed"
       },
       {
-        "test": "test_repairs_cohere_thinking_block_with_empty_tool_calls (test.test_invalid_tool_recovery.ConversationRepairTests)",
+        "test": "test_repairs_cohere_thinking_block_with_empty_tool_calls (test.test_invalid_tool_recovery.ConversationRepairTests.test_repairs_cohere_thinking_block_with_empty_tool_calls)",
         "status": "passed"
       },
       {
-        "test": "test_repairs_openai_tool_exchange_and_preserves_request_and_result (test.test_invalid_tool_recovery.ConversationRepairTests)",
+        "test": "test_repairs_openai_tool_exchange_and_preserves_request_and_result (test.test_invalid_tool_recovery.ConversationRepairTests.test_repairs_openai_tool_exchange_and_preserves_request_and_result)",
         "status": "passed"
       },
       {
-        "test": "test_repeated_provider_rejection_stops_without_resending_same_history (test.test_invalid_tool_recovery.ConversationRepairTests)",
+        "test": "test_repeated_provider_rejection_stops_without_resending_same_history (test.test_invalid_tool_recovery.ConversationRepairTests.test_repeated_provider_rejection_stops_without_resending_same_history)",
         "status": "passed"
       },
       {
-        "test": "test_detects_nested_provider_error (test.test_invalid_tool_recovery.InvalidToolCallDetectionTests)",
+        "test": "test_detects_nested_provider_error (test.test_invalid_tool_recovery.InvalidToolCallDetectionTests.test_detects_nested_provider_error)",
         "status": "passed"
       },
       {
-        "test": "test_does_not_misclassify_rate_limit (test.test_invalid_tool_recovery.InvalidToolCallDetectionTests)",
+        "test": "test_does_not_misclassify_rate_limit (test.test_invalid_tool_recovery.InvalidToolCallDetectionTests.test_does_not_misclassify_rate_limit)",
         "status": "passed"
       },
       {
-        "test": "test_http_400_invalid_tool_error_is_classified (test.test_invalid_tool_recovery.InvalidToolCallDetectionTests)",
+        "test": "test_http_400_invalid_tool_error_is_classified (test.test_invalid_tool_recovery.InvalidToolCallDetectionTests.test_http_400_invalid_tool_error_is_classified)",
         "status": "passed"
       },
       {
-        "test": "test_http_400_is_not_retried_even_if_runtime_settings_include_it (test.test_invalid_tool_recovery.RetryPolicyTests)",
+        "test": "test_http_400_is_not_retried_even_if_runtime_settings_include_it (test.test_invalid_tool_recovery.RetryPolicyTests.test_http_400_is_not_retried_even_if_runtime_settings_include_it)",
         "status": "passed"
       },
       {
-        "test": "test_http_400_is_removed_from_configured_retry_statuses (test.test_invalid_tool_recovery.RetryPolicyTests)",
+        "test": "test_http_400_is_removed_from_configured_retry_statuses (test.test_invalid_tool_recovery.RetryPolicyTests.test_http_400_is_removed_from_configured_retry_statuses)",
         "status": "passed"
       },
       {
-        "test": "test_context_and_task_updates_do_not_interrupt_chat_output (test.test_live_status.LiveStatusTests)",
+        "test": "test_context_and_task_updates_do_not_interrupt_chat_output (test.test_live_status.LiveStatusTests.test_context_and_task_updates_do_not_interrupt_chat_output)",
         "status": "passed"
       },
       {
-        "test": "test_non_tty_does_not_emit_status_spam (test.test_live_status.LiveStatusTests)",
+        "test": "test_non_tty_does_not_emit_status_spam (test.test_live_status.LiveStatusTests.test_non_tty_does_not_emit_status_spam)",
         "status": "passed"
       },
       {
-        "test": "test_repeated_tool_calls_are_summarized_in_same_transient_line (test.test_live_status.LiveStatusTests)",
+        "test": "test_repeated_tool_calls_are_summarized_in_same_transient_line (test.test_live_status.LiveStatusTests.test_repeated_tool_calls_are_summarized_in_same_transient_line)",
         "status": "passed"
       },
       {
-        "test": "test_tool_batch_rewrites_one_transient_line (test.test_live_status.LiveStatusTests)",
+        "test": "test_tool_batch_rewrites_one_transient_line (test.test_live_status.LiveStatusTests.test_tool_batch_rewrites_one_transient_line)",
         "status": "passed"
       },
       {
-        "test": "test_default_log_location_is_under_shai_and_migrates_legacy_logs (test.test_logging_config.LoggingConfigTests)",
+        "test": "test_default_log_location_is_under_shai_and_migrates_legacy_logs (test.test_logging_config.LoggingConfigTests.test_default_log_location_is_under_shai_and_migrates_legacy_logs)",
         "status": "passed"
       },
       {
-        "test": "test_init_default_logging_reads_logging_config_asset (test.test_logging_config.LoggingConfigTests)",
+        "test": "test_init_default_logging_reads_logging_config_asset (test.test_logging_config.LoggingConfigTests.test_init_default_logging_reads_logging_config_asset)",
         "status": "passed"
       },
       {
-        "test": "test_legacy_logs_config_value_resolves_under_shai (test.test_logging_config.LoggingConfigTests)",
+        "test": "test_legacy_logs_config_value_resolves_under_shai (test.test_logging_config.LoggingConfigTests.test_legacy_logs_config_value_resolves_under_shai)",
         "status": "passed"
       },
       {
-        "test": "test_load_logging_config_caller_overrides_dedicated_asset (test.test_logging_config.LoggingConfigTests)",
+        "test": "test_load_logging_config_caller_overrides_dedicated_asset (test.test_logging_config.LoggingConfigTests.test_load_logging_config_caller_overrides_dedicated_asset)",
         "status": "passed"
       },
       {
-        "test": "test_newest_entries_are_at_top_and_per_run_files_retained (test.test_logging_config.LoggingConfigTests)",
+        "test": "test_newest_entries_are_at_top_and_per_run_files_retained (test.test_logging_config.LoggingConfigTests.test_newest_entries_are_at_top_and_per_run_files_retained)",
         "status": "passed"
       },
       {
-        "test": "test_retention_keeps_only_last_n_run_logs (test.test_logging_config.LoggingConfigTests)",
+        "test": "test_retention_keeps_only_last_n_run_logs (test.test_logging_config.LoggingConfigTests.test_retention_keeps_only_last_n_run_logs)",
         "status": "passed"
       },
       {
-        "test": "test_all_supported_roles_have_unconfigured_template_entries (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_all_supported_roles_have_unconfigured_template_entries (test.test_model_routing.ModelRoutingTests.test_all_supported_roles_have_unconfigured_template_entries)",
         "status": "passed"
       },
       {
-        "test": "test_candidate_deduplication_preserves_first_occurrence (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_candidate_deduplication_preserves_first_occurrence (test.test_model_routing.ModelRoutingTests.test_candidate_deduplication_preserves_first_occurrence)",
         "status": "passed"
       },
       {
-        "test": "test_candidate_validation_rejects_booleans_and_missing_keys (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_candidate_validation_rejects_booleans_and_missing_keys (test.test_model_routing.ModelRoutingTests.test_candidate_validation_rejects_booleans_and_missing_keys)",
         "status": "passed"
       },
       {
-        "test": "test_clear_availability_cache_forces_rediscovery (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_clear_availability_cache_forces_rediscovery (test.test_model_routing.ModelRoutingTests.test_clear_availability_cache_forces_rediscovery)",
         "status": "passed"
       },
       {
-        "test": "test_discovery_is_cached_per_project_and_provider (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_discovery_is_cached_per_project_and_provider (test.test_model_routing.ModelRoutingTests.test_discovery_is_cached_per_project_and_provider)",
         "status": "passed"
       },
       {
-        "test": "test_invalid_project_version_does_not_enable_routes (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_invalid_project_version_does_not_enable_routes (test.test_model_routing.ModelRoutingTests.test_invalid_project_version_does_not_enable_routes)",
         "status": "passed"
       },
       {
-        "test": "test_malformed_candidates_are_skipped_individually (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_malformed_candidates_are_skipped_individually (test.test_model_routing.ModelRoutingTests.test_malformed_candidates_are_skipped_individually)",
         "status": "passed"
       },
       {
-        "test": "test_priority_and_availability_choose_first_available_candidate (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_priority_and_availability_choose_first_available_candidate (test.test_model_routing.ModelRoutingTests.test_priority_and_availability_choose_first_available_candidate)",
         "status": "passed"
       },
       {
-        "test": "test_project_routes_override_template_by_role_only (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_project_routes_override_template_by_role_only (test.test_model_routing.ModelRoutingTests.test_project_routes_override_template_by_role_only)",
         "status": "passed"
       },
       {
-        "test": "test_project_routing_file_is_gitignored_and_template_is_tracked (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_project_routing_file_is_gitignored_and_template_is_tracked (test.test_model_routing.ModelRoutingTests.test_project_routing_file_is_gitignored_and_template_is_tracked)",
         "status": "passed"
       },
       {
-        "test": "test_unavailable_or_invalid_candidate_uses_default (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_unavailable_or_invalid_candidate_uses_default (test.test_model_routing.ModelRoutingTests.test_unavailable_or_invalid_candidate_uses_default)",
         "status": "passed"
       },
       {
-        "test": "test_unknown_role_uses_default (test.test_model_routing.ModelRoutingTests)",
+        "test": "test_unknown_role_uses_default (test.test_model_routing.ModelRoutingTests.test_unknown_role_uses_default)",
         "status": "passed"
       },
       {
-        "test": "test_command_aliases_preserve_arguments (test.test_modular_architecture.ModularArchitectureTests)",
+        "test": "test_command_aliases_preserve_arguments (test.test_modular_architecture.ModularArchitectureTests.test_command_aliases_preserve_arguments)",
         "status": "passed"
       },
       {
-        "test": "test_command_help_is_externalized (test.test_modular_architecture.ModularArchitectureTests)",
+        "test": "test_command_help_is_externalized (test.test_modular_architecture.ModularArchitectureTests.test_command_help_is_externalized)",
         "status": "passed"
       },
       {
-        "test": "test_legacy_entry_points_resolve_to_runtime_modules (test.test_modular_architecture.ModularArchitectureTests)",
+        "test": "test_legacy_entry_points_resolve_to_runtime_modules (test.test_modular_architecture.ModularArchitectureTests.test_legacy_entry_points_resolve_to_runtime_modules)",
         "status": "passed"
       },
       {
-        "test": "test_spinner_is_a_ui_component (test.test_modular_architecture.ModularArchitectureTests)",
+        "test": "test_spinner_is_a_ui_component (test.test_modular_architecture.ModularArchitectureTests.test_spinner_is_a_ui_component)",
         "status": "passed"
       },
       {
-        "test": "test_tool_dispatch_contains_split_tool_functions (test.test_modular_architecture.ModularArchitectureTests)",
+        "test": "test_tool_dispatch_contains_split_tool_functions (test.test_modular_architecture.ModularArchitectureTests.test_tool_dispatch_contains_split_tool_functions)",
         "status": "passed"
       },
       {
-        "test": "test_tool_facade_exports_split_implementations (test.test_modular_architecture.ModularArchitectureTests)",
+        "test": "test_tool_facade_exports_split_implementations (test.test_modular_architecture.ModularArchitectureTests.test_tool_facade_exports_split_implementations)",
         "status": "passed"
       },
       {
-        "test": "test_agent_registry_exposes_os_command (test.test_os_command.OSCommandTests)",
+        "test": "test_approval_preview_contains_complete_command (test.test_os_command.OSCommandTests.test_approval_preview_contains_complete_command)",
         "status": "passed"
       },
       {
-        "test": "test_approval_preview_contains_complete_command (test.test_os_command.OSCommandTests)",
+        "test": "test_configured_command_runs_with_argument_vector (test.test_os_command.OSCommandTests.test_configured_command_runs_with_argument_vector)",
         "status": "passed"
       },
       {
-        "test": "test_blacklist_cannot_be_overridden_by_whitelist (test.test_os_command.OSCommandTests)",
+        "test": "test_configured_commands_are_not_restricted_by_hardcoded_argument_rules (test.test_os_command.OSCommandTests.test_configured_commands_are_not_restricted_by_hardcoded_argument_rules)",
         "status": "passed"
       },
       {
-        "test": "test_command_line_parser_does_not_evaluate_shell_syntax (test.test_os_command.OSCommandTests)",
+        "test": "test_explicitly_blocked_command_cannot_be_whitelisted (test.test_os_command.OSCommandTests.test_explicitly_blocked_command_cannot_be_whitelisted)",
         "status": "passed"
       },
       {
-        "test": "test_config_cannot_raise_hard_timeout_ceiling (test.test_os_command.OSCommandTests)",
+        "test": "test_invalid_cwd_is_rejected (test.test_os_command.OSCommandTests.test_invalid_cwd_is_rejected)",
         "status": "passed"
       },
       {
-        "test": "test_configuration_can_enable_unrestricted_git_commands (test.test_os_command.OSCommandTests)",
+        "test": "test_parse_command_line (test.test_os_command.OSCommandTests.test_parse_command_line)",
         "status": "passed"
       },
       {
-        "test": "test_configuration_cannot_expand_python_modules (test.test_os_command.OSCommandTests)",
+        "test": "test_shell_syntax_is_passed_as_literal_arguments_not_interpreted (test.test_os_command.OSCommandTests.test_shell_syntax_is_passed_as_literal_arguments_not_interpreted)",
         "status": "passed"
       },
       {
-        "test": "test_cwd_traversal_is_rejected (test.test_os_command.OSCommandTests)",
+        "test": "test_timeout_is_bounded (test.test_os_command.OSCommandTests.test_timeout_is_bounded)",
         "status": "passed"
       },
       {
-        "test": "test_disabled_feature_rejects_execution (test.test_os_command.OSCommandTests)",
+        "test": "test_unconfigured_command_requests_whitelisting (test.test_os_command.OSCommandTests.test_unconfigured_command_requests_whitelisting)",
         "status": "passed"
       },
       {
-        "test": "test_exact_command_whitelist_bypasses_positive_argument_rules (test.test_os_command.OSCommandTests)",
+        "test": "test_find_references_edge_cases (test.test_priority_tools.PriorityToolTests.test_find_references_edge_cases)",
         "status": "passed"
       },
       {
-        "test": "test_git_diff_directory_pathspec_is_rejected (test.test_os_command.OSCommandTests)",
+        "test": "test_find_symbol_and_references (test.test_priority_tools.PriorityToolTests.test_find_symbol_and_references)",
         "status": "passed"
       },
       {
-        "test": "test_git_diff_disables_external_diff_and_textconv (test.test_os_command.OSCommandTests)",
+        "test": "test_find_symbol_edge_cases (test.test_priority_tools.PriorityToolTests.test_find_symbol_edge_cases)",
         "status": "passed"
       },
       {
-        "test": "test_git_diff_rejects_wildcard_pathspecs (test.test_os_command.OSCommandTests)",
+        "test": "test_get_file_outline_lists_functions_and_methods (test.test_priority_tools.PriorityToolTests.test_get_file_outline_lists_functions_and_methods)",
         "status": "passed"
       },
       {
-        "test": "test_git_diff_without_summary_or_safe_path_is_rejected (test.test_os_command.OSCommandTests)",
+        "test": "test_get_file_outline_syntax_error_and_empty_file (test.test_priority_tools.PriorityToolTests.test_get_file_outline_syntax_error_and_empty_file)",
         "status": "passed"
       },
       {
-        "test": "test_git_log_accepts_last_ten_commits (test.test_os_command.OSCommandTests)",
+        "test": "test_get_project_map_and_test_map (test.test_priority_tools.PriorityToolTests.test_get_project_map_and_test_map)",
         "status": "passed"
       },
       {
-        "test": "test_git_log_accepts_safe_pretty_format (test.test_os_command.OSCommandTests)",
+        "test": "test_inspect_test_failure_empty_output (test.test_priority_tools.PriorityToolTests.test_inspect_test_failure_empty_output)",
         "status": "passed"
       },
       {
-        "test": "test_git_log_accepts_short_and_fuller_formats (test.test_os_command.OSCommandTests)",
+        "test": "test_inspect_test_failure_extracts_assertion (test.test_priority_tools.PriorityToolTests.test_inspect_test_failure_extracts_assertion)",
         "status": "passed"
       },
       {
-        "test": "test_git_log_rejects_unbounded_or_unsafe_options (test.test_os_command.OSCommandTests)",
+        "test": "test_patch_failure_recommends_replace_lines (test.test_priority_tools.PriorityToolTests.test_patch_failure_recommends_replace_lines)",
         "status": "passed"
       },
       {
-        "test": "test_git_mutation_is_rejected (test.test_os_command.OSCommandTests)",
+        "test": "test_patch_mismatch_is_a_tool_error_and_stops_repeated_retry (test.test_priority_tools.PriorityToolTests.test_patch_mismatch_is_a_tool_error_and_stops_repeated_retry)",
         "status": "passed"
       },
       {
-        "test": "test_git_pathspec_symlink_to_secret_is_rejected (test.test_os_command.OSCommandTests)",
+        "test": "test_priority_tools_are_registered_and_have_schemas (test.test_priority_tools.PriorityToolTests.test_priority_tools_are_registered_and_have_schemas)",
         "status": "passed"
       },
       {
-        "test": "test_git_read_only_command_uses_argument_vector_and_bounded_runner (test.test_os_command.OSCommandTests)",
+        "test": "test_replace_lines_bounds_and_validations (test.test_priority_tools.PriorityToolTests.test_replace_lines_bounds_and_validations)",
         "status": "passed"
       },
       {
-        "test": "test_git_show_requires_summary_mode (test.test_os_command.OSCommandTests)",
+        "test": "test_replace_lines_uses_line_numbers_and_approval (test.test_priority_tools.PriorityToolTests.test_replace_lines_uses_line_numbers_and_approval)",
         "status": "passed"
       },
       {
-        "test": "test_path_traversal_is_rejected (test.test_os_command.OSCommandTests)",
+        "test": "test_update_task_plan_input_validation (test.test_priority_tools.PriorityToolTests.test_update_task_plan_input_validation)",
         "status": "passed"
       },
       {
-        "test": "test_python_script_execution_is_rejected (test.test_os_command.OSCommandTests)",
+        "test": "test_update_task_plan_validates_and_formats (test.test_priority_tools.PriorityToolTests.test_update_task_plan_validates_and_formats)",
         "status": "passed"
       },
       {
-        "test": "test_python_test_command_requires_approval (test.test_os_command.OSCommandTests)",
+        "test": "test_verify_changes_runs_compile_and_unittest (test.test_priority_tools.PriorityToolTests.test_verify_changes_runs_compile_and_unittest)",
         "status": "passed"
       },
       {
-        "test": "test_restricted_git_policy_is_configuration_driven (test.test_os_command.OSCommandTests)",
+        "test": "test_absolute_and_parent_paths_are_rejected (test.test_project_access_control.ProjectAccessControlTests.test_absolute_and_parent_paths_are_rejected)",
         "status": "passed"
       },
       {
-        "test": "test_subcommand_whitelist_bypasses_positive_argument_rules (test.test_os_command.OSCommandTests)",
+        "test": "test_agent_runtime_prompts_and_persists_on_explicit_block (test.test_project_access_control.ProjectAccessControlTests.test_agent_runtime_prompts_and_persists_on_explicit_block)",
         "status": "passed"
       },
       {
-        "test": "test_unittest_module_name_execution_is_rejected (test.test_os_command.OSCommandTests)",
+        "test": "test_agent_runtime_read_and_explicit_folder_access_are_gated (test.test_project_access_control.ProjectAccessControlTests.test_agent_runtime_read_and_explicit_folder_access_are_gated)",
         "status": "passed"
       },
       {
-        "test": "test_unknown_executable_is_rejected (test.test_os_command.OSCommandTests)",
+        "test": "test_agent_runtime_recursive_listing_prunes_denied_directories (test.test_project_access_control.ProjectAccessControlTests.test_agent_runtime_recursive_listing_prunes_denied_directories)",
         "status": "passed"
       },
       {
-        "test": "test_unrestricted_git_allows_unlisted_subcommands_and_options (test.test_os_command.OSCommandTests)",
+        "test": "test_all_grant_authorizes_every_supported_capability (test.test_project_access_control.ProjectAccessControlTests.test_all_grant_authorizes_every_supported_capability)",
         "status": "passed"
       },
       {
-        "test": "test_unrestricted_git_still_applies_forbidden_argument_patterns (test.test_os_command.OSCommandTests)",
+        "test": "test_compact_delete_bit_is_independent (test.test_project_access_control.ProjectAccessControlTests.test_compact_delete_bit_is_independent)",
         "status": "passed"
       },
       {
-        "test": "test_unrestricted_git_still_blocks_blacklisted_subcommands (test.test_os_command.OSCommandTests)",
+        "test": "test_compact_rwx_permissions_and_delete_bit (test.test_project_access_control.ProjectAccessControlTests.test_compact_rwx_permissions_and_delete_bit)",
         "status": "passed"
       },
       {
-        "test": "test_unrestricted_git_still_blocks_forbidden_options (test.test_os_command.OSCommandTests)",
+        "test": "test_default_policy_and_rule_deny (test.test_project_access_control.ProjectAccessControlTests.test_default_policy_and_rule_deny)",
         "status": "passed"
       },
       {
-        "test": "test_find_references_edge_cases (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_edit_and_truncate_are_independent_permissions (test.test_project_access_control.ProjectAccessControlTests.test_edit_and_truncate_are_independent_permissions)",
         "status": "passed"
       },
       {
-        "test": "test_find_symbol_and_references (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_exact_folder_grant_covers_descendants (test.test_project_access_control.ProjectAccessControlTests.test_exact_folder_grant_covers_descendants)",
         "status": "passed"
       },
       {
-        "test": "test_find_symbol_edge_cases (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_execute_permission_is_enforced_by_os_command (test.test_project_access_control.ProjectAccessControlTests.test_execute_permission_is_enforced_by_os_command)",
         "status": "passed"
       },
       {
-        "test": "test_get_file_outline_lists_functions_and_methods (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_existing_file_write_also_requires_read_for_safe_diff (test.test_project_access_control.ProjectAccessControlTests.test_existing_file_write_also_requires_read_for_safe_diff)",
         "status": "passed"
       },
       {
-        "test": "test_get_file_outline_syntax_error_and_empty_file (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_explicit_deny_overrides_broad_allow (test.test_project_access_control.ProjectAccessControlTests.test_explicit_deny_overrides_broad_allow)",
         "status": "passed"
       },
       {
-        "test": "test_get_project_map_and_test_map (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_generic_explicit_deny_wins_even_when_broader_allow_is_later (test.test_project_access_control.ProjectAccessControlTests.test_generic_explicit_deny_wins_even_when_broader_allow_is_later)",
         "status": "passed"
       },
       {
-        "test": "test_inspect_test_failure_empty_output (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_generic_policy_uses_dedicated_config_file (test.test_project_access_control.ProjectAccessControlTests.test_generic_policy_uses_dedicated_config_file)",
         "status": "passed"
       },
       {
-        "test": "test_inspect_test_failure_extracts_assertion (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_glob_rule_applies_to_directory_and_descendants (test.test_project_access_control.ProjectAccessControlTests.test_glob_rule_applies_to_directory_and_descendants)",
         "status": "passed"
       },
       {
-        "test": "test_patch_failure_recommends_replace_lines (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_grant_without_requested_capability_is_not_persisted (test.test_project_access_control.ProjectAccessControlTests.test_grant_without_requested_capability_is_not_persisted)",
         "status": "passed"
       },
       {
-        "test": "test_patch_mismatch_is_a_tool_error_and_stops_repeated_retry (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_interactive_deny_does_not_persist (test.test_project_access_control.ProjectAccessControlTests.test_interactive_deny_does_not_persist)",
         "status": "passed"
       },
       {
-        "test": "test_priority_tools_are_registered_and_have_schemas (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_interactive_grant_for_exact_file_and_requested_capability (test.test_project_access_control.ProjectAccessControlTests.test_interactive_grant_for_exact_file_and_requested_capability)",
         "status": "passed"
       },
       {
-        "test": "test_replace_lines_bounds_and_validations (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_interactive_level_two_parent_grant (test.test_project_access_control.ProjectAccessControlTests.test_interactive_level_two_parent_grant)",
         "status": "passed"
       },
       {
-        "test": "test_replace_lines_uses_line_numbers_and_approval (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_interactive_parent_grant_and_write_permissions (test.test_project_access_control.ProjectAccessControlTests.test_interactive_parent_grant_and_write_permissions)",
         "status": "passed"
       },
       {
-        "test": "test_update_task_plan_input_validation (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_invalid_config_falls_back_to_safe_defaults (test.test_project_access_control.ProjectAccessControlTests.test_invalid_config_falls_back_to_safe_defaults)",
         "status": "passed"
       },
       {
-        "test": "test_update_task_plan_validates_and_formats (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_level_two_parent_at_project_root_covers_project (test.test_project_access_control.ProjectAccessControlTests.test_level_two_parent_at_project_root_covers_project)",
         "status": "passed"
       },
       {
-        "test": "test_verify_changes_runs_compile_and_unittest (test.test_priority_tools.PriorityToolTests)",
+        "test": "test_listing_hides_denied_descendants (test.test_project_access_control.ProjectAccessControlTests.test_listing_hides_denied_descendants)",
         "status": "passed"
       },
       {
-        "test": "test_absolute_and_parent_paths_are_rejected (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_non_interactive_denial_never_prompts (test.test_project_access_control.ProjectAccessControlTests.test_non_interactive_denial_never_prompts)",
         "status": "passed"
       },
       {
-        "test": "test_agent_runtime_prompts_and_persists_on_explicit_block (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_os_command_requires_execute_for_pytest_target (test.test_project_access_control.ProjectAccessControlTests.test_os_command_requires_execute_for_pytest_target)",
         "status": "passed"
       },
       {
-        "test": "test_agent_runtime_read_and_explicit_folder_access_are_gated (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_permission_validation_and_diagnostic (test.test_project_access_control.ProjectAccessControlTests.test_permission_validation_and_diagnostic)",
         "status": "passed"
       },
       {
-        "test": "test_agent_runtime_recursive_listing_prunes_denied_directories (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_project_grants_are_isolated_per_project (test.test_project_access_control.ProjectAccessControlTests.test_project_grants_are_isolated_per_project)",
         "status": "passed"
       },
       {
-        "test": "test_all_grant_authorizes_every_supported_capability (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_read_denied (test.test_project_access_control.ProjectAccessControlTests.test_read_denied)",
         "status": "passed"
       },
       {
-        "test": "test_compact_delete_bit_is_independent (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_search_prunes_denied_directories (test.test_project_access_control.ProjectAccessControlTests.test_search_prunes_denied_directories)",
         "status": "passed"
       },
       {
-        "test": "test_compact_rwx_permissions_and_delete_bit (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_single_star_does_not_cross_directory_boundary (test.test_project_access_control.ProjectAccessControlTests.test_single_star_does_not_cross_directory_boundary)",
         "status": "passed"
       },
       {
-        "test": "test_default_policy_and_rule_deny (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_symlink_escape_is_rejected (test.test_project_access_control.ProjectAccessControlTests.test_symlink_escape_is_rejected)",
         "status": "passed"
       },
       {
-        "test": "test_edit_and_truncate_are_independent_permissions (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_test_runner_never_falls_through_to_stdin (test.test_project_access_control.ProjectAccessControlTests.test_test_runner_never_falls_through_to_stdin)",
         "status": "passed"
       },
       {
-        "test": "test_exact_folder_grant_covers_descendants (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_unknown_permission_rejected (test.test_project_access_control.ProjectAccessControlTests.test_unknown_permission_rejected)",
         "status": "passed"
       },
       {
-        "test": "test_execute_permission_is_enforced_by_os_command (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_kilo_free_only_returns_free_models (test.test_provider_selection.ProviderSelectionTests.test_kilo_free_only_returns_free_models)",
         "status": "passed"
       },
       {
-        "test": "test_existing_file_write_also_requires_read_for_safe_diff (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_kilo_hides_free_models_but_kilo_free_keeps_them (test.test_provider_selection.ProviderSelectionTests.test_kilo_hides_free_models_but_kilo_free_keeps_them)",
         "status": "passed"
       },
       {
-        "test": "test_explicit_deny_overrides_broad_allow (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_model_context_window_metadata_is_captured_and_saved (test.test_provider_selection.ProviderSelectionTests.test_model_context_window_metadata_is_captured_and_saved)",
         "status": "passed"
       },
       {
-        "test": "test_generic_explicit_deny_wins_even_when_broader_allow_is_later (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_ollama_is_keyless_and_reads_local_tags (test.test_provider_selection.ProviderSelectionTests.test_ollama_is_keyless_and_reads_local_tags)",
         "status": "passed"
       },
       {
-        "test": "test_generic_policy_uses_dedicated_config_file (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_provider_endpoints_and_auth_are_configurable (test.test_provider_selection.ProviderSelectionTests.test_provider_endpoints_and_auth_are_configurable)",
         "status": "passed"
       },
       {
-        "test": "test_glob_rule_applies_to_directory_and_descendants (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_provider_zero_reuses_saved_provider_and_model (test.test_provider_selection.ProviderSelectionTests.test_provider_zero_reuses_saved_provider_and_model)",
         "status": "passed"
       },
       {
-        "test": "test_grant_without_requested_capability_is_not_persisted (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_query_auth_url_is_configurable (test.test_provider_selection.ProviderSelectionTests.test_query_auth_url_is_configurable)",
         "status": "passed"
       },
       {
-        "test": "test_interactive_deny_does_not_persist (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_save_provider_preserves_other_configuration (test.test_provider_selection.ProviderSelectionTests.test_save_provider_preserves_other_configuration)",
         "status": "passed"
       },
       {
-        "test": "test_interactive_grant_for_exact_file_and_requested_capability (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_saved_model_context_override_is_preserved_and_preferred (test.test_provider_selection.ProviderSelectionTests.test_saved_model_context_override_is_preserved_and_preferred)",
         "status": "passed"
       },
       {
-        "test": "test_interactive_level_two_parent_grant (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_anthropic_does_not_expose_thinking_block (test.test_reasoning_handlers.ReasoningHandlerTests.test_anthropic_does_not_expose_thinking_block)",
         "status": "passed"
       },
       {
-        "test": "test_interactive_parent_grant_and_write_permissions (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_anthropic_explicit_summary_is_extracted (test.test_reasoning_handlers.ReasoningHandlerTests.test_anthropic_explicit_summary_is_extracted)",
         "status": "passed"
       },
       {
-        "test": "test_invalid_config_falls_back_to_safe_defaults (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_display_settings_reads_from_cli_config (test.test_reasoning_handlers.ReasoningHandlerTests.test_display_settings_reads_from_cli_config)",
         "status": "passed"
       },
       {
-        "test": "test_level_two_parent_at_project_root_covers_project (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_display_settings_respects_custom_cli_config (test.test_reasoning_handlers.ReasoningHandlerTests.test_display_settings_respects_custom_cli_config)",
         "status": "passed"
       },
       {
-        "test": "test_listing_hides_denied_descendants (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_display_uses_separate_thinking_summary_section (test.test_reasoning_handlers.ReasoningHandlerTests.test_display_uses_separate_thinking_summary_section)",
         "status": "passed"
       },
       {
-        "test": "test_non_interactive_denial_never_prompts (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_gemini_summary_field_is_extracted (test.test_reasoning_handlers.ReasoningHandlerTests.test_gemini_summary_field_is_extracted)",
         "status": "passed"
       },
       {
-        "test": "test_os_command_requires_execute_for_pytest_target (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_kilo_extracts_explicit_summary_block (test.test_reasoning_handlers.ReasoningHandlerTests.test_kilo_extracts_explicit_summary_block)",
         "status": "passed"
       },
       {
-        "test": "test_permission_validation_and_diagnostic (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_openrouter_does_not_expose_raw_reasoning (test.test_reasoning_handlers.ReasoningHandlerTests.test_openrouter_does_not_expose_raw_reasoning)",
         "status": "passed"
       },
       {
-        "test": "test_project_grants_are_isolated_per_project (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_provider_summary_is_written_to_debug_log_but_raw_reasoning_is_not (test.test_reasoning_handlers.ReasoningHandlerTests.test_provider_summary_is_written_to_debug_log_but_raw_reasoning_is_not)",
         "status": "passed"
       },
       {
-        "test": "test_read_denied (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_unknown_provider_is_safe (test.test_reasoning_handlers.ReasoningHandlerTests.test_unknown_provider_is_safe)",
         "status": "passed"
       },
       {
-        "test": "test_search_prunes_denied_directories (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_ambiguous_or_argument_requiring_requests_are_not_guessed (test.test_shai_command.ShaiCommandTests.test_ambiguous_or_argument_requiring_requests_are_not_guessed)",
         "status": "passed"
       },
       {
-        "test": "test_single_star_does_not_cross_directory_boundary (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_chat_status_is_mode_specific (test.test_shai_command.ShaiCommandTests.test_chat_status_is_mode_specific)",
         "status": "passed"
       },
       {
-        "test": "test_symlink_escape_is_rejected (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_clear_agent_commands (test.test_shai_command.ShaiCommandTests.test_clear_agent_commands)",
         "status": "passed"
       },
       {
-        "test": "test_test_runner_never_falls_through_to_stdin (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_commands_are_restricted_by_mode (test.test_shai_command.ShaiCommandTests.test_commands_are_restricted_by_mode)",
         "status": "passed"
       },
       {
-        "test": "test_unknown_permission_rejected (test.test_project_access_control.ProjectAccessControlTests)",
+        "test": "test_exec_is_canonical_and_os_command_is_legacy_alias (test.test_shai_command.ShaiCommandTests.test_exec_is_canonical_and_os_command_is_legacy_alias)",
         "status": "passed"
       },
       {
-        "test": "test_kilo_free_only_returns_free_models (test.test_provider_selection.ProviderSelectionTests)",
+        "test": "test_malformed_command_registry_returns_none (test.test_shai_command.ShaiCommandTests.test_malformed_command_registry_returns_none)",
         "status": "passed"
       },
       {
-        "test": "test_kilo_hides_free_models_but_kilo_free_keeps_them (test.test_provider_selection.ProviderSelectionTests)",
+        "test": "test_negated_and_meta_requests_do_not_trigger (test.test_shai_command.ShaiCommandTests.test_negated_and_meta_requests_do_not_trigger)",
         "status": "passed"
       },
       {
-        "test": "test_model_context_window_metadata_is_captured_and_saved (test.test_provider_selection.ProviderSelectionTests)",
+        "test": "test_non_string_and_empty_inputs (test.test_shai_command.ShaiCommandTests.test_non_string_and_empty_inputs)",
         "status": "passed"
       },
       {
-        "test": "test_ollama_is_keyless_and_reads_local_tags (test.test_provider_selection.ProviderSelectionTests)",
+        "test": "test_polite_prefixes_and_suffixes (test.test_shai_command.ShaiCommandTests.test_polite_prefixes_and_suffixes)",
         "status": "passed"
       },
       {
-        "test": "test_provider_endpoints_and_auth_are_configurable (test.test_provider_selection.ProviderSelectionTests)",
+        "test": "test_registry_is_loaded_from_assets_json (test.test_shai_command.ShaiCommandTests.test_registry_is_loaded_from_assets_json)",
         "status": "passed"
       },
       {
-        "test": "test_provider_zero_reuses_saved_provider_and_model (test.test_provider_selection.ProviderSelectionTests)",
+        "test": "test_shai_command_can_be_disabled_in_command_config (test.test_shai_command.ShaiCommandTests.test_shai_command_can_be_disabled_in_command_config)",
         "status": "passed"
       },
       {
-        "test": "test_query_auth_url_is_configurable (test.test_provider_selection.ProviderSelectionTests)",
+        "test": "test_shai_command_can_be_disabled_in_config (test.test_shai_command.ShaiCommandTests.test_shai_command_can_be_disabled_in_config)",
         "status": "passed"
       },
       {
-        "test": "test_save_provider_preserves_other_configuration (test.test_provider_selection.ProviderSelectionTests)",
+        "test": "test_shai_command_resolves_sibling_command_config_when_given_shai_config (test.test_shai_command.ShaiCommandTests.test_shai_command_resolves_sibling_command_config_when_given_shai_config)",
         "status": "passed"
       },
       {
-        "test": "test_saved_model_context_override_is_preserved_and_preferred (test.test_provider_selection.ProviderSelectionTests)",
+        "test": "test_slash_aliases_are_registry_backed (test.test_shai_command.ShaiCommandTests.test_slash_aliases_are_registry_backed)",
         "status": "passed"
       },
       {
-        "test": "test_anthropic_does_not_expose_thinking_block (test.test_reasoning_handlers.ReasoningHandlerTests)",
+        "test": "test_slash_commands_are_not_reinterpreted (test.test_shai_command.ShaiCommandTests.test_slash_commands_are_not_reinterpreted)",
         "status": "passed"
       },
       {
-        "test": "test_anthropic_explicit_summary_is_extracted (test.test_reasoning_handlers.ReasoningHandlerTests)",
+        "test": "test_agent_and_chat_declarations_come_from_registry (test.test_tool_registry.ToolRegistryTests.test_agent_and_chat_declarations_come_from_registry)",
         "status": "passed"
       },
       {
-        "test": "test_display_settings_reads_from_cli_config (test.test_reasoning_handlers.ReasoningHandlerTests)",
+        "test": "test_each_schema_has_function_parameters (test.test_tool_registry.ToolRegistryTests.test_each_schema_has_function_parameters)",
         "status": "passed"
       },
       {
-        "test": "test_display_settings_respects_custom_cli_config (test.test_reasoning_handlers.ReasoningHandlerTests)",
+        "test": "test_load_tool_functions_order_and_chat_filtering (test.test_tool_registry.ToolRegistryTests.test_load_tool_functions_order_and_chat_filtering)",
         "status": "passed"
       },
       {
-        "test": "test_display_uses_separate_thinking_summary_section (test.test_reasoning_handlers.ReasoningHandlerTests)",
+        "test": "test_load_tool_registry_missing_or_duplicate_name_raises (test.test_tool_registry.ToolRegistryTests.test_load_tool_registry_missing_or_duplicate_name_raises)",
         "status": "passed"
       },
       {
-        "test": "test_gemini_summary_field_is_extracted (test.test_reasoning_handlers.ReasoningHandlerTests)",
+        "test": "test_load_tool_registry_missing_tools_array_raises (test.test_tool_registry.ToolRegistryTests.test_load_tool_registry_missing_tools_array_raises)",
         "status": "passed"
       },
       {
-        "test": "test_kilo_extracts_explicit_summary_block (test.test_reasoning_handlers.ReasoningHandlerTests)",
+        "test": "test_load_tool_registry_non_dict_entry_raises (test.test_tool_registry.ToolRegistryTests.test_load_tool_registry_non_dict_entry_raises)",
         "status": "passed"
       },
       {
-        "test": "test_openrouter_does_not_expose_raw_reasoning (test.test_reasoning_handlers.ReasoningHandlerTests)",
+        "test": "test_registry_has_unique_named_tools (test.test_tool_registry.ToolRegistryTests.test_registry_has_unique_named_tools)",
         "status": "passed"
       },
       {
-        "test": "test_provider_summary_is_written_to_debug_log_but_raw_reasoning_is_not (test.test_reasoning_handlers.ReasoningHandlerTests)",
+        "test": "test_get_file_outline_no_duplicate_methods_and_supports_async (test.test_tools_module.SharedToolsModuleTests.test_get_file_outline_no_duplicate_methods_and_supports_async)",
         "status": "passed"
       },
       {
-        "test": "test_unknown_provider_is_safe (test.test_reasoning_handlers.ReasoningHandlerTests)",
+        "test": "test_list_files_empty_and_populated_directory (test.test_tools_module.SharedToolsModuleTests.test_list_files_empty_and_populated_directory)",
         "status": "passed"
       },
       {
-        "test": "test_ambiguous_or_argument_requiring_requests_are_not_guessed (test.test_shai_command.ShaiCommandTests)",
+        "test": "test_read_file_bounds_and_validations (test.test_tools_module.SharedToolsModuleTests.test_read_file_bounds_and_validations)",
         "status": "passed"
       },
       {
-        "test": "test_chat_status_is_mode_specific (test.test_shai_command.ShaiCommandTests)",
+        "test": "test_read_only_dispatch_and_schemas_are_shared (test.test_tools_module.SharedToolsModuleTests.test_read_only_dispatch_and_schemas_are_shared)",
         "status": "passed"
       },
       {
-        "test": "test_clear_agent_commands (test.test_shai_command.ShaiCommandTests)",
+        "test": "test_root_configuration_and_safe_path (test.test_tools_module.SharedToolsModuleTests.test_root_configuration_and_safe_path)",
         "status": "passed"
       },
       {
-        "test": "test_commands_are_restricted_by_mode (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_exec_is_canonical_and_os_command_is_legacy_alias (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_malformed_command_registry_returns_none (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_negated_and_meta_requests_do_not_trigger (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_non_string_and_empty_inputs (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_polite_prefixes_and_suffixes (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_registry_is_loaded_from_assets_json (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_shai_command_can_be_disabled_in_command_config (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_shai_command_can_be_disabled_in_config (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_shai_command_resolves_sibling_command_config_when_given_shai_config (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_slash_aliases_are_registry_backed (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_slash_commands_are_not_reinterpreted (test.test_shai_command.ShaiCommandTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_agent_and_chat_declarations_come_from_registry (test.test_tool_registry.ToolRegistryTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_each_schema_has_function_parameters (test.test_tool_registry.ToolRegistryTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_load_tool_functions_order_and_chat_filtering (test.test_tool_registry.ToolRegistryTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_load_tool_registry_missing_or_duplicate_name_raises (test.test_tool_registry.ToolRegistryTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_load_tool_registry_missing_tools_array_raises (test.test_tool_registry.ToolRegistryTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_load_tool_registry_non_dict_entry_raises (test.test_tool_registry.ToolRegistryTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_registry_has_unique_named_tools (test.test_tool_registry.ToolRegistryTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_get_file_outline_no_duplicate_methods_and_supports_async (test.test_tools_module.SharedToolsModuleTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_list_files_empty_and_populated_directory (test.test_tools_module.SharedToolsModuleTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_read_file_bounds_and_validations (test.test_tools_module.SharedToolsModuleTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_read_only_dispatch_and_schemas_are_shared (test.test_tools_module.SharedToolsModuleTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_root_configuration_and_safe_path (test.test_tools_module.SharedToolsModuleTests)",
-        "status": "passed"
-      },
-      {
-        "test": "test_search_files_single_and_recursive (test.test_tools_module.SharedToolsModuleTests)",
+        "test": "test_search_files_single_and_recursive (test.test_tools_module.SharedToolsModuleTests.test_search_files_single_and_recursive)",
         "status": "passed"
       }
     ]
   },
   "pytest": {
-    "available": false,
+    "available": true,
     "success": true,
-    "returncode": null
+    "returncode": 0,
+    "junit_xml": "test/test_report_pytest.xml"
   },
   "compile": {
     "success": true,

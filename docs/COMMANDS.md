@@ -70,10 +70,11 @@ Examples:
 /exec python3 -m pytest -q
 ```
 
-Only approved Git inspection subcommands and Python verification modules are
-supported. Python test execution requires approval by default. Pipes,
-redirections, shell expansion, arbitrary scripts, network commands, privileged
-commands, and Git mutations are rejected. See [os_command](OS_COMMAND.md).
+The executable allowlist is platform-aware. Destructive operations such as
+filesystem deletion and selected Git mutations are blocked by default. When a
+blocked invocation is requested, Shai offers to allow that exact invocation
+once, save that exact invocation permanently, or deny it. Pipes, redirections,
+and shell expansion are not interpreted. See [os_command](OS_COMMAND.md).
 
 ---
 
