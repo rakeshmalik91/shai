@@ -23,6 +23,7 @@ import math
 import tty
 import _thread
 
+from modules.empty_response_retry import request_with_empty_response_retries
 from modules.ui.spinner import Spinner
 from modules.ui.chat_runtime import extract_anthropic_response, response_text
 from modules.commands.registry import normalize_command
@@ -244,6 +245,8 @@ DEFAULT_RETRY_SETTINGS = {
     "retry_network_errors": True,
     "retry_http_statuses": [408, 425, 429, 500, 502, 503, 504],
     "retry_invalid_json": True,
+    "empty_response_retry_enabled": True,
+    "empty_response_max_retries": 2,
     "invalid_tool_selection_enabled": True,
     "invalid_tool_selection_max_attempts": 3,
     "invalid_tool_call_recovery": {

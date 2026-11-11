@@ -61,7 +61,9 @@
       "preserve_user_request": true,
       "stop_on_repeated_failure": false,
       "max_tool_result_chars": 12000
-    }
+    },
+    "empty_response_retry_enabled": true,
+    "empty_response_max_retries": 2
   },
   "test_execution": {
     "timeout_seconds": 120,

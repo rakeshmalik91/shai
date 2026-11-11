@@ -228,3 +228,29 @@ endpoint configuration, or context-window overrides.
 Legacy `commit_message.provider` and `commit_message.model` fields are ignored
 for model selection; the existing enable/prompt/pattern settings remain
 separate.
+
+
+### Empty model response retries
+
+The `retry` object in `assets/shai_config.json` also controls successful API
+responses that contain neither assistant text nor tool calls. This applies to
+all registered providers, including Kilo and Kilo Free.
+
+```json
+"retry": {
+  "empty_response_retry_enabled": true,
+  "empty_response_max_retries": 2
+}
+```
+
+- `empty_response_retry_enabled`: enables or disables retries for empty model
+  responses.
+- `empty_response_max_retries`: number of additional model requests after the
+  initial empty response. `0` disables additional attempts; values are capped
+  at `5`.
+
+Each retry adds a temporary recovery instruction to a copy of the request
+history. It does not permanently modify saved conversation history. A valid
+text response or tool call ends the retry sequence immediately. Truncated
+responses are handled by the existing truncation safeguards, not as empty
+responses.

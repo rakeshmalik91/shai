@@ -76,6 +76,31 @@
       ],
       "supports_tools": true,
       "supports_reasoning": true
+    },
+    "kilo-free::cohere/north-mini-code:free": {
+      "context_window": 256000,
+      "max_output_tokens": 8192,
+      "supported_input_types": [
+        "text"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true
+    },
+    "gemini::gemini-3.5-flash": {
+      "context_window": 1048576,
+      "max_output_tokens": 8192,
+      "supported_input_types": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true
     }
   },
   "overrides": {

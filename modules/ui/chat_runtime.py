@@ -20,6 +20,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from modules.empty_response_retry import request_with_empty_response_retries
 from modules.terminal_style import colorize
 from modules.commands.shai_command import resolve_shai_command
 from modules.commands.registry import normalize_command
@@ -348,6 +349,19 @@ def history_for_new_provider(history):
     return cleaned
 
 
+
+def _request_with_empty_response_retries(history, provider, model):
+    retry_settings = load_config().get("retry", {})
+    if not isinstance(retry_settings, dict):
+        retry_settings = {}
+    return request_with_empty_response_retries(
+        lambda request_history: api_request(request_history, provider, model),
+        history,
+        get_provider_config(provider)["format"],
+        retry_settings,
+        LOGGER,
+    )
+
 def main():
     init_default_logging(load_config())
     LOGGER.info("Starting Shai chat api_timeout=%ss", API_TIMEOUT_SECONDS)
@@ -489,7 +503,7 @@ def main():
         LOGGER.info("Chat turn started provider=%s model=%s user_chars=%d history_messages=%d",
                     provider, model, len(user_text), len(history))
         try:
-            response = api_request(history, provider, model)
+            response = _request_with_empty_response_retries(history, provider, model)
             log_and_display_usage(
                 LOGGER, response, get_provider_config(provider)["format"],
                 estimated_prompt_tokens, context_limit
@@ -574,7 +588,7 @@ def main():
             spinner = Spinner("Shai is thinking | " + context_status)
             spinner.start()
             try:
-                response = api_request(history, provider, model)
+                response = _request_with_empty_response_retries(history, provider, model)
                 log_and_display_usage(
                     LOGGER, response, get_provider_config(provider)["format"],
                     estimated_prompt_tokens, context_limit
