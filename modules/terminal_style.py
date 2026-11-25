@@ -51,6 +51,8 @@ def supports_color(stream=None):
     if os.environ.get("TERM", "").lower() == "dumb":
         return False
     try:
+        if getattr(stream, "supports_ansi_colors", False):
+            return True
         if bool(stream.isatty()):
             _enable_windows_ansi()
             return True

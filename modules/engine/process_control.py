@@ -107,6 +107,28 @@ def _terminate_process_tree(process, process_group):
         process.kill()
         process.wait()
 
+def _no_window_kwargs():
+    """Return Popen kwargs to prevent flashing a console window on Windows."""
+    if os.name == "nt" and hasattr(subprocess, "CREATE_NO_WINDOW"):
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
+_EXTERNAL_CANCEL_EVENT = None
+
+
+def set_external_cancel_event(event):
+    """Register an external threading.Event (e.g. GUI Stop button) for cancellation."""
+    global _EXTERNAL_CANCEL_EVENT
+    _EXTERNAL_CANCEL_EVENT = event
+
+
+def _is_cancelled(monitor):
+    return monitor.cancelled.is_set() or (
+        _EXTERNAL_CANCEL_EVENT is not None and _EXTERNAL_CANCEL_EVENT.is_set()
+    )
+
+
 def run_bounded_interruptible_command(
     command, cwd, timeout, output_settings, env=None
 ):
@@ -124,6 +146,7 @@ def run_bounded_interruptible_command(
         popen_options["env"] = env
     if process_group:
         popen_options["start_new_session"] = True
+    popen_options.update(_no_window_kwargs())
 
     process = subprocess.Popen(command, **popen_options)
     stdout_capture = BoundedOutputCapture(
@@ -172,7 +195,7 @@ def run_bounded_interruptible_command(
     try:
         with CtrlDMonitor() as monitor:
             while process.poll() is None:
-                if monitor.cancelled.is_set():
+                if _is_cancelled(monitor):
                     interrupted = True
                     _terminate_process_tree(process, process_group)
                     break
@@ -325,7 +348,7 @@ def run_interruptible_call(function, *args):
         worker.start()
         while worker.is_alive():
             worker.join(timeout=0.1)
-            if monitor.cancelled.is_set():
+            if _is_cancelled(monitor):
                 raise IterationInterrupted()
 
     if "error" in result:
@@ -336,13 +359,13 @@ def run_interruptible_command(command, cwd, timeout):
     """Run a command with a timeout and terminate it on Ctrl+D."""
     process = subprocess.Popen(
         command, cwd=str(cwd), stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, text=True
+        stderr=subprocess.PIPE, text=True, **_no_window_kwargs()
     )
     started = time.monotonic()
     try:
         with CtrlDMonitor() as monitor:
             while True:
-                if monitor.cancelled.is_set():
+                if _is_cancelled(monitor):
                     if process.poll() is None:
                         process.kill()
                     process.communicate()

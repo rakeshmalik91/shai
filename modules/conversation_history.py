@@ -98,6 +98,11 @@ class ConversationHistory:
         self._refresh()
         return dict(self._data["conversation_meta"].get(self.mode, {}))
 
+    def input_history(self):
+        """Return persisted prompt input history entries."""
+        self._refresh()
+        return list(self._data["input_history"])
+
     def save(self, messages, provider=None, model=None):
         """Persist the full provider message history for this mode."""
         if not isinstance(messages, list):

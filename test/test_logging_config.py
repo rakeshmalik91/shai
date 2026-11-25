@@ -83,6 +83,23 @@ class LoggingConfigTests(unittest.TestCase):
         self.assertEqual(settings["log_level"], logging.DEBUG)
         self.assertEqual(settings["retain_files"], 10)
 
+    def test_prepend_handler_recreates_deleted_log_file(self):
+        import pathlib
+
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = pathlib.Path(tmp) / "logs" / "shai.log"
+            handler = logging_config.PrependFileHandler(log_path, newest_first=True)
+            handler.setFormatter(logging.Formatter("%(message)s"))
+            try:
+                log_path.unlink()
+                log_path.parent.rmdir()
+                record = logging.LogRecord("t", logging.INFO, __file__, 1, "recreated", (), None)
+                handler.emit(record)
+                self.assertTrue(log_path.is_file())
+                self.assertEqual(log_path.read_text(encoding="utf-8").strip(), "recreated")
+            finally:
+                handler.close()
+
 
 if __name__ == "__main__":
     unittest.main()

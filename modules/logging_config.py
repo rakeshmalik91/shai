@@ -42,7 +42,11 @@ class PrependFileHandler(logging.Handler):
         try:
             message = self.format(record) + "\n"
             with self._lock:
+                pathlib.Path(self.baseFilename).parent.mkdir(parents=True, exist_ok=True)
                 if self.newest_first:
+                    if not os.path.exists(self.baseFilename):
+                        with open(self.baseFilename, "a", encoding=self.encoding):
+                            pass
                     with open(self.baseFilename, "r+", encoding=self.encoding) as handle:
                         previous = handle.read()
                         handle.seek(0)

@@ -76,6 +76,14 @@ Start chat mode (no project tools):
 python3 chat.py
 ```
 
+Start the desktop GUI (supports Ask, Read-Only, and Agent modes):
+
+```sh
+python3 gui.py
+# Or on Windows without a console window (double-click gui.pyw or run):
+pythonw gui.pyw
+```
+
 Choose a provider/model when prompted. Shai remembers the last selection. During requests, it shows an estimated context size and, when available, the model context percentage; after a response it shows provider-reported token usage. Use `/help` inside either mode for available commands; `/model` switches provider/model and `/exit` quits.
 
 ## Commands (Agent Mode)
@@ -122,6 +130,7 @@ automatically when installed.
 
 ## Documentation
 
+- [Desktop GUI guide](docs/GUI.md)
 - [Commands reference](docs/COMMANDS.md)
 - [Existing tools](docs/TOOLS.md)
 - [Project path access control](docs/PROJECT_PATH_ACCESS_CONTROL.md)

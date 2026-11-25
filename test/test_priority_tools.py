@@ -15,10 +15,15 @@ class PriorityToolTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.root = pathlib.Path(self.temp_dir.name)
         self.original_root = agent.ROOT
+        self.original_task_file = agent.TASK_FILE
+        self.original_task_plan = list(agent.TASK_PLAN)
         agent.ROOT = self.root
+        agent.TASK_FILE = self.root / ".shai" / "task.json"
 
     def tearDown(self):
         agent.ROOT = self.original_root
+        agent.TASK_FILE = self.original_task_file
+        agent.TASK_PLAN = self.original_task_plan
         self.temp_dir.cleanup()
 
     def write(self, name, content):

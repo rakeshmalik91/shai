@@ -69,6 +69,15 @@ def load_routing_config(project_root):
                             LOGGER.warning("Ignoring invalid model route list for role=%s", role)
     template["default"] = default
     template["models"] = models
+    stt = template.get("speech_to_text")
+    stt = {k: list(v) for k, v in stt.items() if isinstance(v, list)} if isinstance(stt, dict) else {}
+    if project and project.get("version") == SCHEMA_VERSION:
+        project_stt = project.get("speech_to_text")
+        if isinstance(project_stt, dict):
+            for provider, model_list in project_stt.items():
+                if isinstance(model_list, list):
+                    stt[provider] = [str(m).strip() for m in model_list if isinstance(m, str) and m.strip()]
+    template["speech_to_text"] = stt
     return template
 
 

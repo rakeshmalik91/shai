@@ -1,0 +1,15 @@
+{
+  "approved_subcommands": {
+    "git": [
+      [
+        "add"
+      ],
+      [
+        "commit"
+      ],
+      [
+        "config"
+      ]
+    ]
+  }
+}
