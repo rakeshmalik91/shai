@@ -2,7 +2,7 @@
   "version": 1,
   "default": {
     "provider": "kilo-free",
-    "model": "nvidia/nemotron-3.5-lightning:free"
+    "model": "nvidia/nemotron-3-ultra-550b-a55b:free"
   },
   "models": {
     "orchestrator": [],

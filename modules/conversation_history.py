@@ -199,8 +199,11 @@ class ConversationHistory:
 
 def _fallback_input(prompt, history):
     """Small readline fallback for terminals where Python lacks readline."""
-    import termios
-    import tty
+    try:
+        import termios
+        import tty
+    except ImportError:
+        return input(prompt)
 
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         return input(prompt)

@@ -1,5 +1,6 @@
 import tempfile
 import os
+import shutil
 import subprocess
 import sys
 import unittest
@@ -8,25 +9,40 @@ from pathlib import Path
 
 from modules.tools.os_command import execute_os_command, parse_os_command_line
 
+_REAL_WHICH = shutil.which
+
+
+def _test_which(name):
+    found = _REAL_WHICH(name)
+    if found:
+        return found
+    if name in ("grep", "rm", "true"):
+        return "/usr/bin/{}".format(name)
+    return None
+
 
 class OSCommandTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
+        self.platform_key = "windows" if os.name == "nt" else "unix"
+        self.which_patch = patch("modules.tools.os_command.shutil.which", side_effect=_test_which)
+        self.which_patch.start()
+        self.addCleanup(self.which_patch.stop)
         self.settings = {
             "enabled": True, "default_timeout_seconds": 30,
             "max_timeout_seconds": 60, "requires_approval": False,
             "allowed_commands": ["python", "pytest", "grep", "sed", "awk", "git"],
             "unrestricted_commands": {"common": [], "unix": [], "windows": []},
-            "blocked_commands": {"common": [], "unix": ["sudo", "su", "rm", "rmdir"], "windows": []},
+            "blocked_commands": {"common": ["sudo", "su", "rm", "rmdir"], "unix": [], "windows": []},
             "blocked_command_rules": {
-                "common": {},
-                "unix": {"git": ["reset", "push", "clean", "checkout --", "restore"]},
+                "common": {"git": ["reset", "push", "clean", "checkout --", "restore"]},
+                "unix": {},
                 "windows": {},
             },
             "blocked_command_exceptions": {
-                "common": {},
-                "unix": {"sudo": ["--help", "--version"], "su": ["--help", "--version"]},
+                "common": {"sudo": ["--help", "--version"], "su": ["--help", "--version"]},
+                "unix": {},
                 "windows": {},
             },
         }
@@ -69,7 +85,7 @@ class OSCommandTests(unittest.TestCase):
         )
 
     def test_unrestricted_command_skips_routine_approval(self):
-        self.settings["unrestricted_commands"] = {"common": [], "unix": ["grep"], "windows": []}
+        self.settings["unrestricted_commands"] = {"common": ["grep"], "unix": [], "windows": []}
         self.settings["requires_approval"] = True
         def reject(_preview):
             raise AssertionError("Unrestricted command must not prompt for routine approval")
@@ -92,7 +108,7 @@ class OSCommandTests(unittest.TestCase):
     def test_configured_readonly_git_subcommands_skip_approval(self):
         self.settings["requires_approval"] = True
         self.settings["unrestricted_subcommands"] = {
-            "common": {}, "unix": {"git": ["status", "diff", "log", "branch --list"]},
+            "common": {"git": ["status", "diff", "log", "branch --list"]}, "unix": {},
             "windows": {},
         }
         for arguments in (["status"], ["diff", "--stat"], ["log", "--oneline", "-5"],
@@ -108,7 +124,7 @@ class OSCommandTests(unittest.TestCase):
     def test_unlisted_git_subcommand_still_requires_approval(self):
         self.settings["requires_approval"] = True
         self.settings["unrestricted_subcommands"] = {
-            "common": {}, "unix": {"git": ["status", "diff", "log"]},
+            "common": {"git": ["status", "diff", "log"]}, "unix": {},
             "windows": {},
         }
         result = execute_os_command(
@@ -122,7 +138,7 @@ class OSCommandTests(unittest.TestCase):
     def test_readonly_git_rule_does_not_bypass_blocked_rule(self):
         self.settings["requires_approval"] = True
         self.settings["unrestricted_subcommands"] = {
-            "common": {}, "unix": {"git": ["status", "diff", "log"]},
+            "common": {"git": ["status", "diff", "log"]}, "unix": {},
             "windows": {},
         }
         result = self.execute("git", ["push", "origin", "main"])
@@ -132,7 +148,7 @@ class OSCommandTests(unittest.TestCase):
     def test_git_read_rule_with_output_or_external_diff_option_requires_approval(self):
         self.settings["requires_approval"] = True
         self.settings["unrestricted_subcommands"] = {
-            "common": {}, "unix": {"git": ["diff", "log", "show"]},
+            "common": {"git": ["diff", "log", "show"]}, "unix": {},
             "windows": {},
         }
         for arguments in (["diff", "--output=patch.txt"], ["diff", "--ext-diff"],
@@ -145,13 +161,13 @@ class OSCommandTests(unittest.TestCase):
                 self.assertEqual(result["status"], "rejected")
 
     def test_unrestricted_command_does_not_bypass_blocked_rule(self):
-        self.settings["unrestricted_commands"] = {"common": [], "unix": ["git"], "windows": []}
+        self.settings["unrestricted_commands"] = {"common": ["git"], "unix": [], "windows": []}
         result = self.execute("git", ["push", "origin", "main"])
         self.assertEqual(result["status"], "blocked_confirmation_required")
 
     def test_blocked_rules_are_configured_as_strings(self):
         self.assertEqual(
-            self.settings["blocked_command_rules"]["unix"]["git"],
+            self.settings["blocked_command_rules"]["common"]["git"],
             ["reset", "push", "clean", "checkout --", "restore"]
         )
 
@@ -180,12 +196,12 @@ class OSCommandTests(unittest.TestCase):
                     "blocked_command_rule_exceptions": {},
                 },
                 "windows": {
-                    "allowed_commands": [],
-                    "unrestricted_commands": [],
+                    "allowed_commands": ["grep"],
+                    "unrestricted_commands": ["grep"],
                     "unrestricted_subcommands": {},
-                    "blocked_commands": [],
+                    "blocked_commands": ["rm"],
                     "blocked_command_exceptions": {},
-                    "blocked_command_rules": {},
+                    "blocked_command_rules": {"git": ["push"]},
                     "blocked_command_rule_exceptions": {},
                 },
             },
@@ -240,10 +256,11 @@ class OSCommandTests(unittest.TestCase):
         command = self.calls[0][0]
         self.assertEqual(command[1:], ["status"])
         git_config = self.calls[0][4]["GIT_CONFIG_GLOBAL"]
-        self.assertTrue(git_config.startswith("/tmp/shai-git-safe-"))
+        self.assertTrue(Path(git_config).name.startswith("shai-git-safe-"))
         self.assertFalse(Path(git_config).exists())
         self.assertIn('[safe]', self.calls[0][5])
-        self.assertIn('directory = "{}"'.format(self.root), self.calls[0][5])
+        expected_dir = str(self.root).replace("\\", "\\\\").replace('"', '\\"')
+        self.assertIn('directory = "{}"'.format(expected_dir), self.calls[0][5])
 
     def test_git_status_accepts_project_scoped_protected_safe_directory(self):
         repository = self.root
@@ -299,8 +316,7 @@ class OSCommandTests(unittest.TestCase):
                 "rm", ["temporary.txt"], root=self.root, settings=self.settings,
                 confirm=lambda preview: True, runner=self.runner, allow_blocked_once=True)
         self.assertEqual(result["status"], "completed")
-        platform_key = "windows" if __import__("os").name == "nt" else "unix"
-        self.assertIn("rm", self.settings["blocked_commands"][platform_key])
+        self.assertIn("rm", self.settings["blocked_commands"]["common"])
 
     def test_shell_syntax_is_passed_as_literal_arguments_not_interpreted(self):
         self.execute("grep", ["x", "file", "|", "cat"])

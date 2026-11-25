@@ -4,11 +4,21 @@ import select
 import signal
 import subprocess
 import sys
-import termios
 import threading
 import time
-import tty
 import _thread
+
+try:
+    import termios
+    import tty
+except ImportError:
+    termios = None
+    tty = None
+
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
 
 class BoundedOutputCapture:
     """Capture small output completely; for large output retain head and tail."""
@@ -230,19 +240,31 @@ class CtrlDMonitor:
         self.enabled = False
 
     def __enter__(self):
-        try:
-            if not sys.stdin.isatty():
-                return self
-            self.fd = sys.stdin.fileno()
-            self.original_settings = termios.tcgetattr(self.fd)
-            tty.setraw(self.fd)
-            self.enabled = True
-            self.thread = threading.Thread(
-                target=self._watch, name="shai-ctrl-d", daemon=True
-            )
-            self.thread.start()
-        except (AttributeError, OSError, termios.error):
-            self._restore()
+        if termios is not None and tty is not None:
+            try:
+                if not sys.stdin.isatty():
+                    return self
+                self.fd = sys.stdin.fileno()
+                self.original_settings = termios.tcgetattr(self.fd)
+                tty.setraw(self.fd)
+                self.enabled = True
+                self.thread = threading.Thread(
+                    target=self._watch, name="shai-ctrl-d", daemon=True
+                )
+                self.thread.start()
+            except (AttributeError, OSError, termios.error):
+                self._restore()
+        elif msvcrt is not None:
+            try:
+                if not sys.stdin.isatty():
+                    return self
+                self.enabled = True
+                self.thread = threading.Thread(
+                    target=self._watch_windows, name="shai-ctrl-d", daemon=True
+                )
+                self.thread.start()
+            except (AttributeError, OSError):
+                self.enabled = False
         return self
 
     def _watch(self):
@@ -258,8 +280,21 @@ class CtrlDMonitor:
             except (OSError, ValueError):
                 return
 
+    def _watch_windows(self):
+        while not self.stop_event.is_set():
+            try:
+                if msvcrt.kbhit():
+                    value = msvcrt.getch()
+                    if value in (b"\x04", b"\x03"):
+                        self.cancelled.set()
+                        return
+                else:
+                    time.sleep(0.05)
+            except OSError:
+                return
+
     def _restore(self):
-        if self.enabled and self.original_settings is not None:
+        if termios is not None and self.enabled and self.original_settings is not None:
             try:
                 termios.tcsetattr(
                     self.fd, termios.TCSADRAIN, self.original_settings

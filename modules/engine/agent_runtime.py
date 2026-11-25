@@ -14,13 +14,10 @@ import socket
 import difflib
 import datetime
 import urllib.parse
-import select
-import termios
 import threading
 import time
 import random
 import math
-import tty
 import _thread
 
 from modules.empty_response_retry import request_with_empty_response_retries

@@ -51,7 +51,7 @@ def _validate_tokens(args):
 
 
 def _minimal_environment():
-    return {
+    env = {
         "PATH": os.environ.get("PATH", os.defpath),
         "PYTHONNOUSERSITE": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
@@ -64,6 +64,11 @@ def _minimal_environment():
         "PAGER": "cat",
         "LC_ALL": "C",
     }
+    if os.name == "nt":
+        for key in ("SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP"):
+            if key in os.environ:
+                env[key] = os.environ[key]
+    return env
 
 
 def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
@@ -342,7 +347,7 @@ def execute_os_command(executable, args, cwd=".", timeout_seconds=None, *,
             descriptor, temporary_git_config = tempfile.mkstemp(
                 prefix="shai-git-safe-", suffix=".config"
             )
-            escaped_root = str(project_root).replace("\\\\", "\\\\\\\\").replace('"', '\\"')
+            escaped_root = str(project_root).replace("\\", "\\\\").replace('"', '\\"')
             with os.fdopen(descriptor, "w", encoding="utf-8") as config_handle:
                 config_handle.write('[safe]\n\tdirectory = "{}"\n'.format(escaped_root))
             command_environment["GIT_CONFIG_GLOBAL"] = temporary_git_config
@@ -386,6 +391,11 @@ def parse_os_command_line(value):
         parts = shlex.split(value, posix=(os.name != "nt"))
     except ValueError as error:
         raise OSCommandRejected("Could not parse command arguments: {}".format(error))
+    if os.name == "nt":
+        parts = [
+            part[1:-1] if len(part) >= 2 and part[0] == part[-1] and part[0] in ('"', "'") else part
+            for part in parts
+        ]
     if not parts:
         raise OSCommandRejected("Usage: /exec <command> [arguments...]")
     return parts[0], parts[1:]
