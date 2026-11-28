@@ -1284,6 +1284,533 @@ class FileExplorer(tk.Frame):
         self.destroy()
 
 
+class WorktreeSidebarPanel(tk.Frame):
+    """Git worktree panel embedded in the main window (right sidebar)."""
+
+    def __init__(self, parent, engine_ref):
+        super().__init__(parent, bg=THEME["bg"])
+        self.engine = engine_ref
+
+        # Main container
+        main = tk.Frame(self, bg=THEME["bg"], padx=8, pady=8)
+        main.pack(fill="both", expand=True)
+
+        # Toolbar
+        toolbar = tk.Frame(main, bg=THEME["surface"])
+        toolbar.pack(fill="x", pady=(0, 8))
+
+        refresh_btn = tk.Button(
+            toolbar,
+            cursor="hand2",
+            text="\u27f3 Refresh",
+            command=self._refresh_all,
+            bg=THEME["surface_alt"],
+            fg=THEME["accent"],
+            activebackground=THEME["surface_alt"],
+            activeforeground=THEME["fg"],
+            relief="flat",
+            padx=14,
+            pady=6,
+            font=("Segoe UI", 9, "bold"),
+        )
+        refresh_btn.pack(side="left")
+
+        # Path label
+        try:
+            from modules.tools.filesystem import common
+            root_path = str(common.ROOT)
+        except Exception:
+            root_path = str(Path(".").resolve())
+
+        self.path_label = tk.Label(
+            toolbar,
+            text=root_path,
+            bg=THEME["surface"],
+            fg=THEME["muted"],
+            font=("Segoe UI", 9),
+        )
+        self.path_label.pack(side="left", padx=(10, 0))
+
+        # Three sections container - use grid for equal height distribution
+        sections_frame = tk.Frame(main, bg=THEME["bg"])
+        sections_frame.pack(fill="both", expand=True)
+        sections_frame.grid_rowconfigure(0, weight=1)
+        sections_frame.grid_rowconfigure(1, weight=1)
+        sections_frame.grid_rowconfigure(2, weight=1)
+        sections_frame.grid_columnconfigure(0, weight=1)
+
+        # Section 1: Latest Commits
+        self.commits_frame = self._create_section(
+            sections_frame, "Latest Commits", "\U0001f4dc"
+        )
+        self.commits_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 4))
+
+        # Section 2: Staged Files
+        self.staged_frame = self._create_section(
+            sections_frame, "Staged Files", "\u2705"
+        )
+        self.staged_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 4))
+
+        # Section 3: Unstaged Files
+        self.unstaged_frame = self._create_section(
+            sections_frame, "Unstaged Files", "\U0001f4dd"
+        )
+        self.unstaged_frame.grid(row=2, column=0, sticky="nsew")
+
+        # Store tree references
+        self.commits_tree = self.commits_frame.tree
+        self.staged_tree = self.staged_frame.tree
+        self.unstaged_tree = self.unstaged_frame.tree
+
+        # Initial load
+        self._refresh_all()
+
+    def _create_section(self, parent, title, icon):
+        """Create a section with a treeview."""
+        frame = tk.Frame(parent, bg=THEME["bg"])
+        frame.title = title
+
+        # Header
+        header = tk.Frame(frame, bg=THEME["surface"])
+        header.pack(fill="x", pady=(0, 4))
+
+        tk.Label(
+            header,
+            text=f"{icon}  {title}",
+            bg=THEME["surface"],
+            fg=THEME["fg"],
+            font=("Segoe UI", 9, "bold"),
+        ).pack(side="left", padx=8, pady=4)
+
+        # Treeview
+        tree_frame = tk.Frame(frame, bg=THEME["surface"])
+        tree_frame.pack(fill="both", expand=True)
+
+        style = ttk.Style()
+        style.configure(
+            "Worktree.Treeview",
+            background=THEME["surface"],
+            foreground=THEME["fg"],
+            fieldbackground=THEME["surface"],
+            borderwidth=0,
+            font=("Consolas", 9),
+        )
+        style.map(
+            "Worktree.Treeview",
+            background=[("selected", THEME["accent"])],
+            foreground=[("selected", "#11111b")],
+        )
+        style.configure(
+            "Worktree.Treeview.Heading",
+            background=THEME["bg"],
+            foreground=THEME["fg"],
+            relief="flat",
+            font=("Segoe UI", 9, "bold"),
+        )
+
+        tree = ttk.Treeview(
+            tree_frame,
+            style="Worktree.Treeview",
+            show="tree",
+            selectmode="browse",
+        )
+        tree.pack(side="left", fill="both", expand=True)
+# Set minimum width for tree column (#0) to prevent text cropping
+        tree.column("#0", width=300, minwidth=200, stretch=False)
+        scrollbar = ttk.Scrollbar(
+            tree_frame,
+            orient="vertical",
+            style="ShAI.Vertical.TScrollbar",
+            command=tree.yview,
+        )
+        scrollbar.pack(side="right", fill="y")
+        tree.configure(yscrollcommand=scrollbar.set)
+
+        frame.tree = tree
+        return frame
+
+    def _refresh_all(self):
+        """Refresh all three sections in background threads."""
+        self._refresh_commits()
+        self._refresh_status()
+
+    def _refresh_commits(self):
+        """Fetch latest commits in background."""
+        def worker():
+            try:
+                from modules.tools.git import _no_window_kwargs
+                result = subprocess.run(
+                    ["git", "log", "--oneline", "-20"],
+                    cwd=engine.ROOT,
+                    capture_output=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=10,
+                    **_no_window_kwargs(),
+                )
+                output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+                self.after(0, lambda: self._update_commits_tree(output))
+            except Exception as e:
+                self.after(0, lambda: self._update_commits_tree(f"Error: {e}"))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_commits_tree(self, output):
+        """Update commits tree with fetched data."""
+        self.commits_tree.delete(*self.commits_tree.get_children())
+        if not output or output.startswith("Error"):
+            self.commits_tree.insert("", "end", text=output or "(no commits)")
+            return
+        for line in output.splitlines():
+            if line.strip():
+                self.commits_tree.insert("", "end", text=line.strip())
+
+    def _refresh_status(self):
+        """Fetch git status (staged/unstaged) in background."""
+        def worker():
+            try:
+                from modules.tools.git import _no_window_kwargs
+                result = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    cwd=engine.ROOT,
+                    capture_output=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=10,
+                    **_no_window_kwargs(),
+                )
+                output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+                self.after(0, lambda: self._update_status_trees(output))
+            except Exception as e:
+                self.after(0, lambda: self._update_status_trees(f"Error: {e}"))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_status_trees(self, output):
+        """Update staged and unstaged trees with fetched data."""
+        self.staged_tree.delete(*self.staged_tree.get_children())
+        self.unstaged_tree.delete(*self.unstaged_tree.get_children())
+
+        if not output or output.startswith("Error"):
+            msg = output or "(clean)"
+            self.staged_tree.insert("", "end", text=msg)
+            self.unstaged_tree.insert("", "end", text="")
+            return
+
+        staged_files = []
+        unstaged_files = []
+
+        for line in output.splitlines():
+            if len(line) < 3:
+                continue
+            status = line[:2]
+            filepath = line[3:].strip()
+            # First char = staged, second char = unstaged
+            if status[0] != " " and status[0] != "?":
+                staged_files.append(f"{status[0]}  {filepath}")
+            if status[1] != " ":
+                unstaged_files.append(f"{status[1]}  {filepath}")
+
+        if not staged_files:
+            self.staged_tree.insert("", "end", text="(none)")
+        else:
+            for f in staged_files:
+                self.staged_tree.insert("", "end", text=f)
+
+        if not unstaged_files:
+            self.unstaged_tree.insert("", "end", text="(none)")
+        else:
+            for f in unstaged_files:
+                self.unstaged_tree.insert("", "end", text=f)
+
+    def refresh(self):
+        """Public method to trigger refresh from outside."""
+        self._refresh_all()
+
+
+class WorktreePanel(tk.Toplevel):
+    """Git worktree panel showing commits, staged, and unstaged files in a separate window."""
+
+    def __init__(self, parent, engine_ref):
+        super().__init__(parent)
+        self.engine = engine_ref
+        self.title("ShAI Worktree")
+        self.geometry("400x600")
+        self.minsize(350, 400)
+
+        # Match theme
+        self.configure(bg=THEME["bg"])
+
+        # Position to the left of main window
+        self._position_left_of_parent(parent)
+
+        # Make it stay on top but not modal
+        self.transient(parent)
+        self.attributes("-topmost", True)
+        self.after(100, lambda: self.attributes("-topmost", False))
+
+        # Handle close
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # Build UI
+        self._build_ui()
+
+        # Initial load
+        self._refresh_all()
+
+    def _position_left_of_parent(self, parent):
+        """Position this window to the left of the parent window."""
+        try:
+            parent.update_idletasks()
+            px = parent.winfo_rootx()
+            py = parent.winfo_rooty()
+            ph = parent.winfo_height()
+            self.update_idletasks()
+            w = self.winfo_width()
+            h = self.winfo_height()
+            # Place to the left, vertically centered
+            x = max(0, px - w - 10)
+            y = py + (ph - h) // 2
+            self.geometry(f"{w}x{h}+{x}+{y}")
+        except Exception:
+            pass
+
+    def _build_ui(self):
+        """Build the three-panel UI."""
+        # Main container
+        main = tk.Frame(self, bg=THEME["bg"], padx=8, pady=8)
+        main.pack(fill="both", expand=True)
+
+        # Toolbar
+        toolbar = tk.Frame(main, bg=THEME["surface"])
+        toolbar.pack(fill="x", pady=(0, 8))
+
+        refresh_btn = tk.Button(
+            toolbar,
+            cursor="hand2",
+            text="\u27f3 Refresh",
+            command=self._refresh_all,
+            bg=THEME["surface_alt"],
+            fg=THEME["accent"],
+            activebackground=THEME["surface_alt"],
+            activeforeground=THEME["fg"],
+            relief="flat",
+            padx=14,
+            pady=6,
+            font=("Segoe UI", 9, "bold"),
+        )
+        refresh_btn.pack(side="left")
+
+        # Path label
+        try:
+            from modules.tools.filesystem import common
+            root_path = str(common.ROOT)
+        except Exception:
+            root_path = str(Path(".").resolve())
+
+        self.path_label = tk.Label(
+            toolbar,
+            text=root_path,
+            bg=THEME["surface"],
+            fg=THEME["muted"],
+            font=("Segoe UI", 9),
+        )
+        self.path_label.pack(side="left", padx=(10, 0))
+
+        # Three sections container
+        sections_frame = tk.Frame(main, bg=THEME["bg"])
+        sections_frame.pack(fill="both", expand=True)
+
+        # Section 1: Latest Commits
+        self.commits_frame = self._create_section(
+            sections_frame, "Latest Commits", "\U0001f4dc"
+        )
+        self.commits_frame.pack(fill="both", expand=True, pady=(0, 8))
+
+        # Section 2: Staged Files
+        self.staged_frame = self._create_section(
+            sections_frame, "Staged Files", "\u2705"
+        )
+        self.staged_frame.pack(fill="both", expand=True, pady=(0, 8))
+
+        # Section 3: Unstaged Files
+        self.unstaged_frame = self._create_section(
+            sections_frame, "Unstaged Files", "\U0001f4dd"
+        )
+        self.unstaged_frame.pack(fill="both", expand=True)
+
+        # Store tree references
+        self.commits_tree = self.commits_frame.tree
+        self.staged_tree = self.staged_frame.tree
+        self.unstaged_tree = self.unstaged_frame.tree
+
+    def _create_section(self, parent, title, icon):
+        """Create a section with a treeview."""
+        frame = tk.Frame(parent, bg=THEME["bg"])
+        frame.title = title
+
+        # Header
+        header = tk.Frame(frame, bg=THEME["surface"])
+        header.pack(fill="x", pady=(0, 4))
+
+        tk.Label(
+            header,
+            text=f"{icon}  {title}",
+            bg=THEME["surface"],
+            fg=THEME["fg"],
+            font=("Segoe UI", 9, "bold"),
+        ).pack(side="left", padx=8, pady=4)
+
+        # Treeview
+        tree_frame = tk.Frame(frame, bg=THEME["surface"])
+        tree_frame.pack(fill="both", expand=True)
+
+        style = ttk.Style()
+        style.configure(
+            "Worktree.Treeview",
+            background=THEME["surface"],
+            foreground=THEME["fg"],
+            fieldbackground=THEME["surface"],
+            borderwidth=0,
+            font=("Consolas", 9),
+        )
+        style.map(
+            "Worktree.Treeview",
+            background=[("selected", THEME["accent"])],
+            foreground=[("selected", "#11111b")],
+        )
+        style.configure(
+            "Worktree.Treeview.Heading",
+            background=THEME["bg"],
+            foreground=THEME["fg"],
+            relief="flat",
+            font=("Segoe UI", 9, "bold"),
+        )
+
+        tree = ttk.Treeview(
+            tree_frame,
+            style="Worktree.Treeview",
+            show="tree",
+            selectmode="browse",
+        )
+        tree.pack(side="left", fill="both", expand=True)
+# Set minimum width for tree column (#0) to prevent text cropping
+        tree.column("#0", width=300, minwidth=200, stretch=False)
+        scrollbar = ttk.Scrollbar(
+            tree_frame,
+            orient="vertical",
+            style="ShAI.Vertical.TScrollbar",
+            command=tree.yview,
+        )
+        scrollbar.pack(side="right", fill="y")
+        tree.configure(yscrollcommand=scrollbar.set)
+
+        frame.tree = tree
+        return frame
+
+    def _refresh_all(self):
+        """Refresh all three sections in background threads."""
+        self._refresh_commits()
+        self._refresh_status()
+
+    def _refresh_commits(self):
+        """Fetch latest commits in background."""
+        def worker():
+            try:
+                from modules.tools.git import _no_window_kwargs
+                result = subprocess.run(
+                    ["git", "log", "--oneline", "-20"],
+                    cwd=engine.ROOT,
+                    capture_output=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=10,
+                    **_no_window_kwargs(),
+                )
+                output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+                self.after(0, lambda: self._update_commits_tree(output))
+            except Exception as e:
+                self.after(0, lambda: self._update_commits_tree(f"Error: {e}"))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_commits_tree(self, output):
+        """Update commits tree with fetched data."""
+        self.commits_tree.delete(*self.commits_tree.get_children())
+        if not output or output.startswith("Error"):
+            self.commits_tree.insert("", "end", text=output or "(no commits)")
+            return
+        for line in output.splitlines():
+            if line.strip():
+                self.commits_tree.insert("", "end", text=line.strip())
+
+    def _refresh_status(self):
+        """Fetch git status (staged/unstaged) in background."""
+        def worker():
+            try:
+                from modules.tools.git import _no_window_kwargs
+                result = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    cwd=engine.ROOT,
+                    capture_output=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=10,
+                    **_no_window_kwargs(),
+                )
+                output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+                self.after(0, lambda: self._update_status_trees(output))
+            except Exception as e:
+                self.after(0, lambda: self._update_status_trees(f"Error: {e}"))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_status_trees(self, output):
+        """Update staged and unstaged trees with fetched data."""
+        self.staged_tree.delete(*self.staged_tree.get_children())
+        self.unstaged_tree.delete(*self.unstaged_tree.get_children())
+
+        if not output or output.startswith("Error"):
+            msg = output or "(clean)"
+            self.staged_tree.insert("", "end", text=msg)
+            self.unstaged_tree.insert("", "end", text="")
+            return
+
+        staged_files = []
+        unstaged_files = []
+
+        for line in output.splitlines():
+            if len(line) < 3:
+                continue
+            status = line[:2]
+            filepath = line[3:].strip()
+            # First char = staged, second char = unstaged
+            if status[0] != " " and status[0] != "?":
+                staged_files.append(f"{status[0]}  {filepath}")
+            if status[1] != " ":
+                unstaged_files.append(f"{status[1]}  {filepath}")
+
+        if not staged_files:
+            self.staged_tree.insert("", "end", text="(none)")
+        else:
+            for f in staged_files:
+                self.staged_tree.insert("", "end", text=f)
+
+        if not unstaged_files:
+            self.unstaged_tree.insert("", "end", text="(none)")
+        else:
+            for f in unstaged_files:
+                self.unstaged_tree.insert("", "end", text=f)
+
+    def _on_close(self):
+        """Handle window close."""
+        self.destroy()
+
+    def refresh(self):
+        """Public method to trigger refresh from outside."""
+        self._refresh_all()
+
+
 def center_window(
     window: tk.Misc,
     parent: tk.Misc | None = None,
@@ -1817,6 +2344,7 @@ class ShaiGuiApp:
             self.history_store.save(self.history, provider=engine.PROVIDER, model=engine.MODEL)
 
         self._build_ui()
+        self._restore_sidebar_state()
         self._sync_input_history()
         self._refresh_header()
         self._append_output(
@@ -2031,31 +2559,50 @@ class ShaiGuiApp:
         self.project_btn.pack(side="right", padx=(0, 6))
         self._project_tooltip = ToolTip(self.project_btn, "Select working project folder (/project <path>)")
 
-        # File Explorer toggle button
-        self.file_explorer_btn = tk.Button(
-            top,
-            cursor="hand2",
-            text="📁 Files",
-            command=self._toggle_file_explorer,
-            bg=THEME["button_bg"],
-            fg=THEME["fg"],
-            activebackground=THEME["button_active"],
-            activeforeground=THEME["fg"],
-            relief="flat",
-            padx=8,
-            pady=3,
-            font=("Segoe UI", 9),
-        )
-        self.file_explorer_btn.pack(side="right", padx=(0, 6))
-        ToolTip(self.file_explorer_btn, "Toggle file explorer panel (Ctrl+E)")
-
         # Quick action bar
         actions = tk.Frame(self.root, bg=THEME["bg"], padx=10, pady=4)
         actions.pack(fill="x")
         self._action_buttons: list[tk.Button] = []
+
+        # File Explorer toggle button (moved to actions bar, before worktree)
+        self.file_explorer_btn = tk.Button(
+            actions,
+            cursor="hand2",
+            text="📁 Files",
+            command=self._toggle_file_explorer,
+            bg=THEME["surface_alt"],
+            fg=THEME["accent"],
+            activebackground=THEME["button_active"],
+            activeforeground=THEME["fg"],
+            relief="flat",
+            padx=8,
+            pady=2,
+            font=("Segoe UI", 8, "bold"),
+        )
+        self.file_explorer_btn.pack(side="left", padx=(0, 5))
+        ToolTip(self.file_explorer_btn, "Toggle file explorer panel (Ctrl+E)")
+        self._action_buttons.append(self.file_explorer_btn)
+
+        # Worktree button - toggles left sidebar panel
+        self.worktree_btn = tk.Button(
+            actions,
+            cursor="hand2",
+            text="🌳 Worktree",
+            command=self._toggle_worktree_panel,
+            bg=THEME["surface_alt"],
+            fg=THEME["accent"],
+            activebackground=THEME["button_active"],
+            activeforeground=THEME["fg"],
+            relief="flat",
+            padx=8,
+            pady=2,
+            font=("Segoe UI", 8, "bold"),
+        )
+        self.worktree_btn.pack(side="left", padx=(0, 5))
+        ToolTip(self.worktree_btn, "Open Git worktree panel (commits, staged, unstaged)")
+        self._action_buttons.append(self.worktree_btn)
+
         for label, cmd, tip in (
-            ("Status", "/status", "Show Git status (/status)"),
-            ("Diff", "/diff", "Show Git diff (/diff)"),
             ("Commit", "/commit", "Stage and commit changes (/commit)"),
             ("Push", "/push", "Push commits to remote (/push)"),
         ):
@@ -2117,11 +2664,13 @@ class ShaiGuiApp:
         self.main_container = tk.Frame(self.root, bg=THEME["bg"])
         self.main_container.pack(fill="both", expand=True)
 
-        # Left sidebar (File Explorer) - initially hidden
-        self.sidebar_frame = tk.Frame(self.main_container, bg=THEME["surface"], width=280)
+        # Left sidebar (File Explorer / Worktree Panel) - initially hidden
+        # Use 320 width to accommodate both panels
+        self.sidebar_frame = tk.Frame(self.main_container, bg=THEME["surface"], width=320)
         self.sidebar_frame.pack(side="left", fill="y")
         self.sidebar_frame.pack_propagate(False)  # Maintain width
         self._sidebar_visible = False
+        self._sidebar_mode = None  # "files" or "worktree"
         self.sidebar_frame.pack_forget()  # Hide initially
 
         # Right main content area
@@ -3689,6 +4238,9 @@ class ShaiGuiApp:
                         payload()
                     except Exception:
                         LOGGER.exception("Error in queued call")
+                elif kind == "refresh_worktree":
+                    if hasattr(self, '_worktree_panel') and self._worktree_panel and self._worktree_panel.winfo_exists():
+                        self._worktree_panel.refresh()
                 elif kind == "done":
                     self._collapse_active_tool_batch()
                     self._has_progress = False
@@ -3791,12 +4343,13 @@ class ShaiGuiApp:
             self._switch_project(chosen)
 
     def _toggle_file_explorer(self):
-        """Toggle the file explorer panel."""
-        sidebar_width = 280
-        if self._sidebar_visible:
+        """Toggle the file explorer panel (left sidebar)."""
+        sidebar_width = 320
+        if self._sidebar_visible and self._sidebar_mode == "files":
             # Hide sidebar - shrink from left, keep right edge fixed
             self.sidebar_frame.pack_forget()
             self._sidebar_visible = False
+            self._sidebar_mode = None
             self.file_explorer_btn.config(text="📁 Files")
             try:
                 geo = self.root.geometry()
@@ -3810,14 +4363,117 @@ class ShaiGuiApp:
             except Exception:
                 pass
         else:
-            # Show sidebar - expand to left, keep right edge fixed
-            self.sidebar_frame.pack(side="left", fill="y", before=self.content_frame)
-            self._sidebar_visible = True
-            self.file_explorer_btn.config(text="📁 Files ✓")
-            # Create FileExplorer if not exists
-            if not hasattr(self, "_file_explorer") or self._file_explorer is None:
+            # If worktree panel is open, switch to files (no geometry change needed)
+            if self._sidebar_visible and self._sidebar_mode == "worktree":
+                # Just swap content, sidebar stays packed
+                self._hide_worktree_panel()
+                self._sidebar_mode = "files"
+                self.file_explorer_btn.config(text="📁 Files ✓")
+                self.worktree_btn.config(text="🌳 Worktree")
+                # Clear any existing widgets in sidebar
+                for widget in self.sidebar_frame.winfo_children():
+                    widget.destroy()
+                # Create FileExplorer
                 self._file_explorer = FileExplorer(self.sidebar_frame, self)
                 self._file_explorer.pack(fill="both", expand=True)
+            else:
+                # Show sidebar for first time - expand to left, keep right edge fixed
+                try:
+                    geo = self.root.geometry()
+                    import re
+                    match = re.match(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", geo)
+                    if match:
+                        w, h, x, y = map(int, match.groups())
+                        new_w = w + sidebar_width
+                        new_x = x - sidebar_width  # Move left edge to keep right edge fixed
+                        self.root.geometry(f"{new_w}x{h}+{new_x}+{y}")
+                except Exception:
+                    pass
+                self.sidebar_frame.pack(side="left", fill="y", before=self.content_frame)
+                self._sidebar_visible = True
+                self._sidebar_mode = "files"
+                self.file_explorer_btn.config(text="📁 Files ✓")
+                self.worktree_btn.config(text="🌳 Worktree")
+                # Clear any existing widgets in sidebar
+                for widget in self.sidebar_frame.winfo_children():
+                    widget.destroy()
+                # Create FileExplorer
+                self._file_explorer = FileExplorer(self.sidebar_frame, self)
+                self._file_explorer.pack(fill="both", expand=True)
+
+    def _hide_worktree_panel(self):
+        """Hide the worktree panel and clean up."""
+        self._worktree_sidebar = None
+        self.worktree_btn.config(text="🌳 Worktree")
+
+    def _toggle_worktree_panel(self):
+        """Toggle the worktree panel (left sidebar, mutually exclusive with file explorer)."""
+        sidebar_width = 320
+        if self._sidebar_visible and self._sidebar_mode == "worktree":
+            # Hide sidebar
+            self.sidebar_frame.pack_forget()
+            self._sidebar_visible = False
+            self._sidebar_mode = None
+            self._hide_worktree_panel()
+            try:
+                geo = self.root.geometry()
+                import re
+                match = re.match(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", geo)
+                if match:
+                    w, h, x, y = map(int, match.groups())
+                    new_w = max(420, w - sidebar_width)
+                    new_x = x + sidebar_width  # Move right edge to stay fixed
+                    self.root.geometry(f"{new_w}x{h}+{new_x}+{y}")
+            except Exception:
+                pass
+        else:
+            # If file explorer is open, switch to worktree (no geometry change needed)
+            if self._sidebar_visible and self._sidebar_mode == "files":
+                # Just swap content, sidebar stays packed
+                for widget in self.sidebar_frame.winfo_children():
+                    widget.destroy()
+                if hasattr(self, "_file_explorer") and self._file_explorer:
+                    self._file_explorer.pack_forget()
+                self._sidebar_mode = "worktree"
+                self.worktree_btn.config(text="🌳 Worktree ✓")
+                self.file_explorer_btn.config(text="📁 Files")
+                # Create WorktreeSidebarPanel
+                self._worktree_sidebar = WorktreeSidebarPanel(self.sidebar_frame, self)
+                self._worktree_sidebar.pack(fill="both", expand=True)
+            else:
+                # Show sidebar for first time - expand to left, keep right edge fixed
+                try:
+                    geo = self.root.geometry()
+                    import re
+                    match = re.match(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", geo)
+                    if match:
+                        w, h, x, y = map(int, match.groups())
+                        new_w = w + sidebar_width
+                        new_x = x - sidebar_width  # Move left edge to keep right edge fixed
+                        self.root.geometry(f"{new_w}x{h}+{new_x}+{y}")
+                except Exception:
+                    pass
+                self.sidebar_frame.pack(side="left", fill="y", before=self.content_frame)
+                self._sidebar_visible = True
+                self._sidebar_mode = "worktree"
+                self.worktree_btn.config(text="🌳 Worktree ✓")
+                self.file_explorer_btn.config(text="📁 Files")
+                # Clear any existing widgets in sidebar
+                for widget in self.sidebar_frame.winfo_children():
+                    widget.destroy()
+                # Create WorktreeSidebarPanel
+                self._worktree_sidebar = WorktreeSidebarPanel(self.sidebar_frame, self)
+                self._worktree_sidebar.pack(fill="both", expand=True)
+
+    def _open_worktree_panel(self):
+        """Open the Git worktree panel in a separate window."""
+        if not hasattr(self, "_worktree_panel") or self._worktree_panel is None:
+            self._worktree_panel = WorktreePanel(self.root, engine)
+        else:
+            # If already exists, bring to front and refresh
+            self._worktree_panel.deiconify()
+            self._worktree_panel.lift()
+            self._worktree_panel.refresh()
             try:
                 geo = self.root.geometry()
                 import re
@@ -4217,15 +4873,18 @@ class ShaiGuiApp:
                 return
             if user_text == "/commit-push":
                 self._event_queue.put(("output", "\n" + engine.git_commit_push() + "\n", "system"))
+                self._event_queue.put(("refresh_worktree", None, None))
                 return
             if user_text == "/push":
                 self._event_queue.put(("output", "\n" + engine.git_push() + "\n", "system"))
+                self._event_queue.put(("refresh_worktree", None, None))
                 return
             if user_text.startswith("/commit"):
                 message_only = "--message-only" in user_text.split()
                 self._event_queue.put(
                     ("output", "\n" + engine.git_commit(message_only=message_only) + "\n", "system")
                 )
+                self._event_queue.put(("refresh_worktree", None, None))
                 return
             if user_text.startswith(("/exec ", "/os-command ")) or user_text in ("/exec", "/os-command"):
                 if self._mode != "agent":
@@ -4418,6 +5077,8 @@ class ShaiGuiApp:
         self._disable_listening = saved.get("disable_listening") is True
         saved_settings_geo = saved.get("settings_geometry")
         self._settings_geometry = saved_settings_geo if isinstance(saved_settings_geo, dict) else None
+        self._sidebar_visible = saved.get("sidebar_visible", True) is not False
+        self._sidebar_mode = saved.get("sidebar_mode", "worktree")
         self._apply_always_on_top()
         if self._start_minimized:
             try:
@@ -4432,6 +5093,14 @@ class ShaiGuiApp:
                 self.root.withdraw()
             except tk.TclError:
                 pass
+
+    def _restore_sidebar_state(self):
+        """Restore sidebar visibility and mode after UI is built."""
+        if self._sidebar_visible:
+            if self._sidebar_mode == "files":
+                self._toggle_file_explorer()
+            elif self._sidebar_mode == "worktree":
+                self._toggle_worktree_sidebar()
 
     def _save_current_gui_state(self, window_open: bool | None = None):
         try:
@@ -4474,6 +5143,8 @@ class ShaiGuiApp:
                 "sound_cue_error": self._sound_cue_error,
                 "disable_listening": self._disable_listening,
                 "settings_geometry": self._settings_geometry,
+                "sidebar_visible": self._sidebar_visible,
+                "sidebar_mode": self._sidebar_mode,
             })
             if hasattr(self, "history_store") and hasattr(self, "history"):
                 self.history_store.save(
