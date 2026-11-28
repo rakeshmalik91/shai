@@ -3272,7 +3272,8 @@ class ShaiGuiApp:
             self._send_tooltip.set_text("Send message (Enter; Shift+Enter for newline)")
         self.mode_combo.config(state="disabled" if busy else "readonly")
         self.project_btn.config(state=state)
-        self.settings_btn.config(state=state)
+        # Allow opening settings even while busy
+        self.settings_btn.config(state="normal")
         self.provider_combo.config(state="disabled" if busy else "readonly")
         self.model_combo.config(state="disabled" if busy else "readonly")
         for btn in self._action_buttons:
