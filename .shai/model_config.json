@@ -119,14 +119,18 @@
       "supports_structured_output": true,
       "supports_reasoning": true
     },
-    "ollama::deepseek-coder-v2:latest": {},
-    "ollama::gemma4:12b": {},
-    "ollama::qwen3.5:4b": {},
-    "ollama::qwen3:latest": {}
-  },
-  "overrides": {
+    "ollama::deepseek-coder-v2:latest": {
+      "context_window": 16384
+    },
+    "ollama::gemma4:12b": {
+      "context_window": 8192
+    },
     "ollama::qwen3.5:4b": {
-      "context_window": 1000000
+      "context_window": 32768
+    },
+    "ollama::qwen3:latest": {
+      "context_window": 32768
     }
-  }
+  },
+  "overrides": {}
 }
