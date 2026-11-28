@@ -3794,25 +3794,23 @@ class ShaiGuiApp:
         """Toggle the file explorer panel."""
         sidebar_width = 280
         if self._sidebar_visible:
-            # Hide sidebar - shrink window from left
+            # Hide sidebar - shrink from left, keep right edge fixed
             self.sidebar_frame.pack_forget()
             self._sidebar_visible = False
             self.file_explorer_btn.config(text="📁 Files")
-            # Resize window: reduce width, move right
             try:
                 geo = self.root.geometry()
-                # Parse geometry: "WxH+X+Y"
                 import re
                 match = re.match(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", geo)
                 if match:
                     w, h, x, y = map(int, match.groups())
                     new_w = max(420, w - sidebar_width)
-                    new_x = x + sidebar_width
+                    new_x = x + sidebar_width  # Move right edge to stay fixed
                     self.root.geometry(f"{new_w}x{h}+{new_x}+{y}")
             except Exception:
                 pass
         else:
-            # Show sidebar - extend window to left
+            # Show sidebar - expand to left, keep right edge fixed
             self.sidebar_frame.pack(side="left", fill="y", before=self.content_frame)
             self._sidebar_visible = True
             self.file_explorer_btn.config(text="📁 Files ✓")
@@ -3820,7 +3818,6 @@ class ShaiGuiApp:
             if not hasattr(self, "_file_explorer") or self._file_explorer is None:
                 self._file_explorer = FileExplorer(self.sidebar_frame, self)
                 self._file_explorer.pack(fill="both", expand=True)
-            # Resize window: increase width, move left
             try:
                 geo = self.root.geometry()
                 import re
@@ -3828,7 +3825,7 @@ class ShaiGuiApp:
                 if match:
                     w, h, x, y = map(int, match.groups())
                     new_w = w + sidebar_width
-                    new_x = x - sidebar_width
+                    new_x = x - sidebar_width  # Move left edge to keep right edge fixed
                     # Ensure window doesn't go off-screen left
                     if new_x < 0:
                         new_x = 0
