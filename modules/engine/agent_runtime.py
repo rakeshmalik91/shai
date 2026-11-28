@@ -98,7 +98,7 @@ def set_project_root(path):
 # In-memory task checklist for the current agent session/request.
 TASK_PLAN = []
 
-MAX_FILE_SIZE = 200_000
+MAX_FILE_SIZE = 1_000_000
 DEFAULT_MAX_TOOL_CALL_ITERATIONS = 80
 HARD_MAX_TOOL_CALL_ITERATIONS = 1000
 MAX_PLAN_CONTINUATIONS = 2

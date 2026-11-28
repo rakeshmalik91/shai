@@ -4,7 +4,7 @@ import json
 import pathlib
 
 ROOT = pathlib.Path.cwd().resolve()
-MAX_FILE_SIZE = 200_000
+MAX_FILE_SIZE = 1_000_000
 GENERIC_CONFIG_FILE = pathlib.Path(__file__).resolve().parents[2] / "assets" / "project_access_config.json"
 PROJECT_GRANTS_FILE = None
 DEFAULT_ACCESS_POLICY = {

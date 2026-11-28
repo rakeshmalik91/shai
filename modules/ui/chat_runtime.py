@@ -122,7 +122,7 @@ def load_api_timeout_seconds():
         return DEFAULT_API_TIMEOUT_SECONDS
     return value
 
-API_TIMEOUT_SECONDS = load_api_timeout_seconds()
+MAX_FILE_SIZE = 1_000_000
 MAX_FILE_SIZE = 200_000
 
 
