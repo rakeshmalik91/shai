@@ -751,6 +751,84 @@ class _ChoiceDialog(tk.Toplevel):
         self.destroy()
 
 
+class HelpDialog(tk.Toplevel):
+    """Modal dialog showing help text."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("ShAI — Help")
+        self.configure(bg=THEME["bg"])
+        self.geometry("600x500")
+        self.minsize(480, 380)
+
+        container = tk.Frame(self, bg=THEME["bg"], padx=14, pady=12)
+        container.pack(fill="both", expand=True)
+
+        # Title
+        title_label = tk.Label(
+            container,
+            text="ShAI Commands & Usage",
+            bg=THEME["bg"],
+            fg=THEME["fg"],
+            font=("Segoe UI", 12, "bold"),
+        )
+        title_label.pack(anchor="w", pady=(0, 10))
+
+        # Scrollable text area
+        text_frame = tk.Frame(container, bg=THEME["bg"])
+        text_frame.pack(fill="both", expand=True)
+
+        self.text_widget = tk.Text(
+            text_frame,
+            wrap="word",
+            bg=THEME["surface"],
+            fg=THEME["fg"],
+            relief="flat",
+            padx=10,
+            pady=8,
+            font=("Consolas", 9),
+            state="disabled",
+        )
+        self.text_widget.pack(side="left", fill="both", expand=True)
+
+        scrollbar = ttk.Scrollbar(
+            text_frame,
+            orient="vertical",
+            style="ShAI.Vertical.TScrollbar",
+            command=self.text_widget.yview,
+        )
+        scrollbar.pack(side="right", fill="y")
+        self.text_widget.config(yscrollcommand=scrollbar.set)
+
+        # Insert help text
+        self.text_widget.config(state="normal")
+        self.text_widget.insert("1.0", HELP_TEXT)
+        self.text_widget.config(state="disabled")
+
+        # Close button
+        btn_frame = tk.Frame(container, bg=THEME["bg"])
+        btn_frame.pack(fill="x", pady=(12, 0))
+        close_btn = tk.Button(
+            btn_frame,
+            cursor="hand2",
+            text="Close",
+            command=self.destroy,
+            bg=THEME["button_bg"],
+            fg=THEME["fg"],
+            activebackground=THEME["button_active"],
+            activeforeground=THEME["fg"],
+            relief="flat",
+            padx=16,
+            pady=6,
+            font=("Segoe UI", 9),
+        )
+        close_btn.pack(side="right")
+
+        self.grab_set()
+        self.transient(parent)
+        self.wait_window(self)
+
+
 class ModelPickerDialog(tk.Toplevel):
     """Dialog to choose a provider and model without blocking the UI."""
 
@@ -1740,7 +1818,7 @@ class ShaiGuiApp:
             actions,
             cursor="hand2",
             text="?",
-            command=lambda: self._submit_text("/help"),
+            command=lambda: HelpDialog(self.root),
             bg=THEME["surface_alt"],
             fg=THEME["muted"],
             activebackground=THEME["button_active"],
@@ -1751,7 +1829,7 @@ class ShaiGuiApp:
             font=("Segoe UI", 8, "bold"),
         )
         help_btn.pack(side="right", padx=(0, 5))
-        ToolTip(help_btn, "Show available commands (/help)")
+        ToolTip(help_btn, "Show available commands")
         self._action_buttons.append(help_btn)
 
         # Transcript area
