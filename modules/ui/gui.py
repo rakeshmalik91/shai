@@ -1437,6 +1437,7 @@ class ShaiGuiApp:
         self._disable_listening = False
         self._turn_had_error = False
         self._settings_geometry: dict | None = None
+        self._modal_dialog_open = False
         self._wake_word_enabled = bool(enable_wake_word) and sys.platform == "win32"
         self._wake_session: WakeWordSession | None = None
 
@@ -3320,7 +3321,10 @@ class ShaiGuiApp:
                     if self._sound_cues:
                         try:
                             from modules.ui.speech import play_completion_sound
-                            play_completion_sound(self._turn_had_error, self._sound_cue_success, self._sound_cue_error)
+                            if self._turn_had_error and self._sound_cue_error:
+                                play_completion_sound("error")
+                            elif not self._turn_had_error and self._sound_cue_success:
+                                play_completion_sound("success")
                         except Exception:
                             LOGGER.exception("Error playing completion sound")
                     self._turn_had_error = False
@@ -3530,7 +3534,11 @@ class ShaiGuiApp:
 
     def _choose_model_dialog(self):
         dialog = ModelPickerDialog(self.root, engine.PROVIDER, engine.MODEL)
-        self.root.wait_window(dialog)
+        self._modal_dialog_open = True
+        try:
+            self.root.wait_window(dialog)
+        finally:
+            self._modal_dialog_open = False
         if not dialog.selected:
             return
         self._apply_provider_model(*dialog.selected)
@@ -3549,7 +3557,11 @@ class ShaiGuiApp:
             },
             geometry_state=self._settings_geometry,
         )
-        self.root.wait_window(dialog)
+        self._modal_dialog_open = True
+        try:
+            self.root.wait_window(dialog)
+        finally:
+            self._modal_dialog_open = False
         state_dirty = False
         if dialog.saved_geometry is not None:
             self._settings_geometry = dialog.saved_geometry
@@ -4168,6 +4180,15 @@ class ShaiGuiApp:
     def _check_focus_loss_hide(self):
         if self._tray is None or not self._minimize_on_focus_loss:
             return
+        # Don't minimize if a modal dialog is open (e.g., settings, model picker)
+        if self._modal_dialog_open:
+            return
+        # Don't minimize if any modal dialog (grab) is active (e.g., confirmation dialogs)
+        try:
+            if self.root.grab_current() is not None:
+                return
+        except tk.TclError:
+            pass
         try:
             if self.root.state() in ("withdrawn", "iconic"):
                 return
