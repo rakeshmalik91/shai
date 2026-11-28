@@ -1148,6 +1148,8 @@ class SettingsDialog(tk.Toplevel):
             value=bool(cfg.get("minimize_on_focus_loss", False))
         )
         self._sound_cues_var = tk.BooleanVar(value=bool(cfg.get("sound_cues", True)))
+        self._sound_cue_success_var = tk.BooleanVar(value=bool(cfg.get("sound_cue_success", True)))
+        self._sound_cue_error_var = tk.BooleanVar(value=bool(cfg.get("sound_cue_error", True)))
         self._disable_listening_var = tk.BooleanVar(value=bool(cfg.get("disable_listening", False)))
 
         for label_text, var in (
@@ -1157,6 +1159,8 @@ class SettingsDialog(tk.Toplevel):
             ("Close to system tray", self._close_to_tray_var),
             ("Minimize to system tray when out of focus", self._minimize_on_focus_loss_var),
             ("Play sound on listen start/stop/send", self._sound_cues_var),
+            ("Play sound on task complete (success)", self._sound_cue_success_var),
+            ("Play sound on task error", self._sound_cue_error_var),
             ("Disable listening (speech input)", self._disable_listening_var),
         ):
             tk.Checkbutton(
@@ -1353,6 +1357,8 @@ class SettingsDialog(tk.Toplevel):
             "close_to_tray": bool(self._close_to_tray_var.get()),
             "minimize_on_focus_loss": bool(self._minimize_on_focus_loss_var.get()),
             "sound_cues": bool(self._sound_cues_var.get()),
+            "sound_cue_success": bool(self._sound_cue_success_var.get()),
+            "sound_cue_error": bool(self._sound_cue_error_var.get()),
             "disable_listening": bool(self._disable_listening_var.get()),
         }
         tokens = {env_name: var.get() for env_name, var in self._vars.items()}
@@ -1426,7 +1432,10 @@ class ShaiGuiApp:
         self._close_to_tray = True
         self._minimize_on_focus_loss = False
         self._sound_cues = True
+        self._sound_cue_success = True
+        self._sound_cue_error = True
         self._disable_listening = False
+        self._turn_had_error = False
         self._settings_geometry: dict | None = None
         self._wake_word_enabled = bool(enable_wake_word) and sys.platform == "win32"
         self._wake_session: WakeWordSession | None = None
@@ -2966,6 +2975,7 @@ class ShaiGuiApp:
 
         if error:
             batch["errors"] += 1
+            self._turn_had_error = True
             line = f"  [Tool] {tool_label} — ERROR\n"
             line_tag = "error"
         else:
@@ -3044,6 +3054,7 @@ class ShaiGuiApp:
 
         if error:
             batch["errors"] += 1
+            self._turn_had_error = True
             line = f"  [Tool] {tool_label} — ERROR\n"
             line_tag = "error"
         else:
@@ -3124,6 +3135,11 @@ class ShaiGuiApp:
                     self._has_progress = False
                     self._set_busy(False, "Idle")
                     self._refresh_header()
+                    # Play completion sound based on success/error
+                    if self._sound_cues:
+                        from modules.ui.speech import play_completion_sound
+                        play_completion_sound(self._turn_had_error, self._sound_cue_success, self._sound_cue_error)
+                    self._turn_had_error = False
                     if self._queued_messages:
                         next_msg = self._queued_messages.pop(0)
                         self._submit_text(next_msg)
@@ -3357,6 +3373,8 @@ class ShaiGuiApp:
                 dialog.saved_gui_settings.get("minimize_on_focus_loss", False)
             )
             self._sound_cues = bool(dialog.saved_gui_settings.get("sound_cues", True))
+            self._sound_cue_success = bool(dialog.saved_gui_settings.get("sound_cue_success", True))
+            self._sound_cue_error = bool(dialog.saved_gui_settings.get("sound_cue_error", True))
             self._disable_listening = bool(dialog.saved_gui_settings.get("disable_listening", False))
             self._set_speech_state(self._speech_mode)
             self._apply_always_on_top()
@@ -3539,6 +3557,7 @@ class ShaiGuiApp:
 
         # Commands or model turns that may do network/git/subprocess work run off the UI thread.
         self._cancel_event.clear()
+        self._turn_had_error = False
         self._append_output(f"\nYou: {user_text}\n", "user")
         self._set_busy(True, "Running...")
         threading.Thread(
@@ -3751,6 +3770,8 @@ class ShaiGuiApp:
         self._close_to_tray = saved.get("close_to_tray", True) is not False
         self._minimize_on_focus_loss = saved.get("minimize_on_focus_loss") is True
         self._sound_cues = saved.get("sound_cues", True) is not False
+        self._sound_cue_success = saved.get("sound_cue_success", True) is not False
+        self._sound_cue_error = saved.get("sound_cue_error", True) is not False
         self._disable_listening = saved.get("disable_listening") is True
         saved_settings_geo = saved.get("settings_geometry")
         self._settings_geometry = saved_settings_geo if isinstance(saved_settings_geo, dict) else None
@@ -3806,6 +3827,8 @@ class ShaiGuiApp:
                 "close_to_tray": self._close_to_tray,
                 "minimize_on_focus_loss": self._minimize_on_focus_loss,
                 "sound_cues": self._sound_cues,
+                "sound_cue_success": self._sound_cue_success,
+                "sound_cue_error": self._sound_cue_error,
                 "disable_listening": self._disable_listening,
                 "settings_geometry": self._settings_geometry,
             })

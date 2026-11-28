@@ -305,6 +305,8 @@ _CUE_TONES: dict[str, tuple[tuple[int, int], ...]] = {
     "start": ((587, 70), (880, 90)),
     "stop": ((659, 70), (440, 95)),
     "send": ((880, 55), (1175, 75)),
+    "success": ((523, 80), (659, 80), (784, 80), (1047, 120)),  # C5-E5-G5-C6 ascending
+    "error": ((523, 80), (494, 80), (440, 80), (392, 120)),  # C5-B4-A4-G4 descending
 }
 _CUE_WAV_CACHE: dict[str, bytes] = {}
 
@@ -346,7 +348,31 @@ def play_speech_cue(cue: str) -> None:
 
         def _play():
             try:
-                winsound.PlaySound(wav_bytes, winsound.SND_MEMORY)
+                winsound.PlaySound(wav_bytes, winsound.SND_MEMORY | winsound.SND_ASYNC)
+            except Exception:
+                pass
+
+        threading.Thread(target=_play, daemon=True).start()
+    except Exception:
+        pass
+
+
+def play_completion_sound(cue: str) -> None:
+    """Play a non-blocking completion sound ('success' or 'error') on Windows."""
+    tones = _CUE_TONES.get(cue)
+    if not tones or sys.platform != "win32":
+        return
+    try:
+        import winsound
+
+        wav_bytes = _CUE_WAV_CACHE.get(cue)
+        if wav_bytes is None:
+            wav_bytes = build_chime_wav_bytes(tones)
+            _CUE_WAV_CACHE[cue] = wav_bytes
+
+        def _play():
+            try:
+                winsound.PlaySound(wav_bytes, winsound.SND_MEMORY | winsound.SND_ASYNC)
             except Exception:
                 pass
 
