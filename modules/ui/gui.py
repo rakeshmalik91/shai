@@ -3648,6 +3648,8 @@ class ShaiGuiApp:
                 "close_to_tray": self._close_to_tray,
                 "minimize_on_focus_loss": self._minimize_on_focus_loss,
                 "sound_cues": self._sound_cues,
+                "sound_cue_success": self._sound_cue_success,
+                "sound_cue_error": self._sound_cue_error,
                 "disable_listening": self._disable_listening,
             },
             geometry_state=self._settings_geometry,

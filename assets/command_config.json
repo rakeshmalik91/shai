@@ -58,7 +58,9 @@
             "branch --list",
             "branch --show-current",
             "branch -a",
-            "branch -r"
+            "branch -r",
+            "add",
+            "commit"
           ]
         }
       },
