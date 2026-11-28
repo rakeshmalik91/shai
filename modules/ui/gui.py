@@ -3306,7 +3306,10 @@ class ShaiGuiApp:
                         if self._busy:
                             self.status_var.set("Working...")
                 elif kind == "call":
-                    payload()
+                    try:
+                        payload()
+                    except Exception:
+                        LOGGER.exception("Error in queued call")
                 elif kind == "done":
                     self._collapse_active_tool_batch()
                     self._has_progress = False
@@ -3314,13 +3317,19 @@ class ShaiGuiApp:
                     self._refresh_header()
                     # Play completion sound based on success/error
                     if self._sound_cues:
-                        from modules.ui.speech import play_completion_sound
-                        play_completion_sound(self._turn_had_error, self._sound_cue_success, self._sound_cue_error)
+                        try:
+                            from modules.ui.speech import play_completion_sound
+                            play_completion_sound(self._turn_had_error, self._sound_cue_success, self._sound_cue_error)
+                        except Exception:
+                            LOGGER.exception("Error playing completion sound")
                     self._turn_had_error = False
                     if self._queued_messages:
-                        next_msg = self._queued_messages.pop(0)
-                        self._submit_text(next_msg)
-                        self._refresh_queue_panel(force=True)
+                        try:
+                            next_msg = self._queued_messages.pop(0)
+                            self._submit_text(next_msg)
+                            self._refresh_queue_panel(force=True)
+                        except Exception:
+                            LOGGER.exception("Error sending queued message")
                     elif self._speech_mode == "continuous":
                         self.status_var.set("Listening (continuous)...")
                         if self._speech_pending_auto_send:
@@ -3368,6 +3377,8 @@ class ShaiGuiApp:
                         self._set_speech_state(None)
         except queue.Empty:
             pass
+        except Exception:
+            LOGGER.exception("Error in _poll_events")
 
         if self._busy and self._mode == "agent" and not self._has_progress:
             phase = getattr(engine.STATUS, "phase", "Working")
