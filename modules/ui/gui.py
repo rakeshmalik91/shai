@@ -601,9 +601,10 @@ class QueueTextStream:
 class GuiInteractionHandler(InteractionHandler):
     """Thread-safe InteractionHandler that prompts via Tkinter modal dialogs."""
 
-    def __init__(self, ui_call):
+    def __init__(self, ui_call, root):
         """ui_call(fn) executes fn on the Tk main thread and returns its result."""
         self._ui_call = ui_call
+        self._root = root
 
     def confirm_action(
         self, prompt: str, category: str | None = None, tool: str | None = None
@@ -633,7 +634,9 @@ class GuiInteractionHandler(InteractionHandler):
         self, prompt: str, category: str | None = None, tool: str | None = None
     ) -> bool:
         def _ask():
-            return messagebox.askyesno("ShAI — Risky Action Confirmation", prompt.strip())
+            return messagebox.askyesno(
+                "ShAI — Risky Action Confirmation", prompt.strip(), parent=self._root
+            )
 
         return bool(self._ui_call(_ask))
 
@@ -657,6 +660,7 @@ class GuiInteractionHandler(InteractionHandler):
             return messagebox.askyesno(
                 "ShAI — OS Command Approval",
                 f"Run this exact command?\n\n{preview}",
+                parent=self._root,
             )
 
         return bool(self._ui_call(_ask))
@@ -693,6 +697,7 @@ class GuiInteractionHandler(InteractionHandler):
                 "ShAI — Allowlist Command",
                 f"Command is not in command_config.json's allowed_commands:\n\n{command}\n\n"
                 "Allow this executable in future?",
+                parent=self._root,
             )
 
         return bool(self._ui_call(_ask))
@@ -1540,7 +1545,7 @@ class ShaiGuiApp:
         sys.stderr = QueueTextStream(self._event_queue, "error")
 
         init_default_logging(engine.load_config())
-        set_interaction_handler(GuiInteractionHandler(self._run_on_ui_thread))
+        set_interaction_handler(GuiInteractionHandler(self._run_on_ui_thread, self.root))
         set_external_cancel_event(self._cancel_event)
         engine.STATUS.on_tool_event = self._on_tool_event
         load_saved_tokens_into_env()
@@ -3808,12 +3813,19 @@ class ShaiGuiApp:
             self._append_output("\n" + HELP_TEXT + "\n", "system", collapse_long=False)
             return
         if user_text == "/reset":
-            if not messagebox.askyesno(
-                "ShAI — Confirm Reset",
-                "Clear conversation history and current task plan?",
-                parent=self.root,
-            ):
+            self._modal_dialog_open = True
+            try:
+                confirmed = messagebox.askyesno(
+                    "ShAI — Confirm Reset",
+                    "Clear conversation history and current task plan?",
+                    parent=self.root,
+                )
+            finally:
+                self._modal_dialog_open = False
+            if not confirmed:
+                self._focus_input()
                 return
+            self._focus_input()
             self.history = [{"role": "system", "content": engine.SYSTEM_PROMPT}]
             self.history_store.clear()
             engine.TASK_PLAN = []
