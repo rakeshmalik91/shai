@@ -17,7 +17,8 @@ def git_status():
             ["git", "status", "--porcelain"],
             cwd=common.ROOT,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
             **_no_window_kwargs(),
         )
@@ -35,7 +36,8 @@ def git_diff():
             ["git", "diff"],
             cwd=common.ROOT,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
             **_no_window_kwargs(),
         )

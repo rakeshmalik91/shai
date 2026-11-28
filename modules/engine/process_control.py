@@ -359,7 +359,7 @@ def run_interruptible_command(command, cwd, timeout):
     """Run a command with a timeout and terminate it on Ctrl+D."""
     process = subprocess.Popen(
         command, cwd=str(cwd), stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, text=True, **_no_window_kwargs()
+        stderr=subprocess.PIPE, encoding="utf-8", errors="replace", **_no_window_kwargs()
     )
     started = time.monotonic()
     try:

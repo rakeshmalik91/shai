@@ -209,9 +209,6 @@ class WakeWordSession:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
                 creationflags=creationflags,
             )
         except OSError:
@@ -223,9 +220,11 @@ class WakeWordSession:
     def _read_loop(self, proc: subprocess.Popen):
         try:
             assert proc.stdout is not None
-            for line in proc.stdout:
-                if self._stopped:
+            while not self._stopped:
+                line_bytes = proc.stdout.readline()
+                if not line_bytes:
                     break
+                line = line_bytes.decode("utf-8", errors="replace")
                 event = parse_speech_event(line)
                 if event and event.get("type") == "wake" and self._on_wake:
                     self._on_wake(str(event.get("text") or "").strip())
@@ -738,9 +737,6 @@ class SpeechToTextSession:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 stdin=subprocess.DEVNULL,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
                 creationflags=creationflags,
             )
         except OSError as exc:
@@ -761,9 +757,11 @@ class SpeechToTextSession:
         saw_error = False
         try:
             assert proc.stdout is not None
-            for line in proc.stdout:
-                if self._stopped:
+            while not self._stopped:
+                line_bytes = proc.stdout.readline()
+                if not line_bytes:
                     break
+                line = line_bytes.decode("utf-8", errors="replace")
                 event = parse_speech_event(line)
                 if not event:
                     continue
@@ -792,7 +790,8 @@ class SpeechToTextSession:
                 stderr_text = ""
                 try:
                     if proc.stderr is not None:
-                        stderr_text = proc.stderr.read().strip()
+                        stderr_bytes = proc.stderr.read()
+                        stderr_text = stderr_bytes.decode("utf-8", errors="replace").strip()
                 except Exception:
                     pass
                 if self._on_error:
