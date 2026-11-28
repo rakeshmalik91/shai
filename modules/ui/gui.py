@@ -10,6 +10,7 @@ from datetime import datetime
 import json
 import os
 import pathlib
+from pathlib import Path
 import queue
 import re
 import subprocess
@@ -1041,6 +1042,248 @@ class ModelPickerDialog(tk.Toplevel):
         self.destroy()
 
 
+class FileExplorer(tk.Frame):
+    """File explorer panel embedded in the main window (left sidebar)."""
+
+    def __init__(self, parent, engine, on_close=None):
+        super().__init__(parent, bg=THEME["bg"])
+        self.engine = engine
+        self._tree_items = {}  # Map tree item IDs to file paths
+        self._on_close = on_close
+
+        # Main container
+        container = tk.Frame(self, bg=THEME["bg"], padx=8, pady=8)
+        container.pack(fill="both", expand=True)
+
+        # Toolbar (styled like main GUI tab bar)
+        toolbar = tk.Frame(container, bg=THEME["surface"])
+        toolbar.pack(fill="x", pady=(0, 8))
+
+        # Refresh button (styled like active tab)
+        refresh_btn = tk.Button(
+            toolbar,
+            cursor="hand2",
+            text="⟳ Refresh",
+            command=self._refresh_tree,
+            bg=THEME["surface_alt"],
+            fg=THEME["accent"],
+            activebackground=THEME["surface_alt"],
+            activeforeground=THEME["fg"],
+            relief="flat",
+            padx=14,
+            pady=8,
+            font=("Segoe UI", 9, "bold"),
+        )
+        refresh_btn.pack(side="left")
+
+        # Path label
+        self.path_label = tk.Label(
+            toolbar,
+            text="Project Root",
+            bg=THEME["surface"],
+            fg=THEME["fg"],
+            font=("Segoe UI", 9),
+        )
+        self.path_label.pack(side="left", padx=(10, 0))
+
+        # Treeview with scrollbar
+        tree_frame = tk.Frame(container, bg=THEME["surface"])
+        tree_frame.pack(fill="both", expand=True)
+
+        # Configure Treeview style
+        style = ttk.Style()
+        style.configure(
+            "ShAI.Treeview",
+            background=THEME["surface"],
+            foreground=THEME["fg"],
+            fieldbackground=THEME["surface"],
+            borderwidth=0,
+            font=("Consolas", 9),
+        )
+        style.map(
+            "ShAI.Treeview",
+            background=[("selected", THEME["accent"])],
+            foreground=[("selected", "#11111b")],
+        )
+        style.configure(
+            "ShAI.Treeview.Heading",
+            background=THEME["bg"],
+            foreground=THEME["fg"],
+            relief="flat",
+            font=("Segoe UI", 9, "bold"),
+        )
+
+        self.tree = ttk.Treeview(
+            tree_frame,
+            style="ShAI.Treeview",
+            show="tree",
+            selectmode="browse",
+        )
+        self.tree.pack(side="left", fill="both", expand=True)
+
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(
+            tree_frame,
+            orient="vertical",
+            style="ShAI.Vertical.TScrollbar",
+            command=self.tree.yview,
+        )
+        scrollbar.pack(side="right", fill="y")
+        self.tree.configure(yscrollcommand=scrollbar.set)
+
+        # Bind events
+        self.tree.bind("<<TreeviewOpen>>", self._on_tree_open)
+        self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
+        self.tree.bind("<Double-Button-1>", self._on_double_click)
+        self.tree.bind("<Button-3>", self._on_right_click)  # Context menu
+
+        # Context menu
+        self._create_context_menu()
+
+        # Load initial tree
+        self._refresh_tree()
+
+    def close(self):
+        """Close the file explorer panel."""
+        if self._on_close:
+            self._on_close()
+        self.destroy()
+
+    def _refresh_tree(self):
+        """Refresh the file tree from the project root."""
+        self.tree.delete(*self.tree.get_children())
+        self._tree_items.clear()
+
+        # Get project root
+        try:
+            from modules.tools.filesystem import common
+            root_path = common.ROOT
+        except Exception:
+            root_path = Path(".").resolve()
+
+        root_name = root_path.name or str(root_path)
+        root_item = self.tree.insert("", "end", text=f"📁 {root_name}", open=True)
+        self._tree_items[root_item] = str(root_path)
+        self._populate_tree(root_item, root_path)
+
+        self.path_label.config(text=str(root_path))
+
+    def _populate_tree(self, parent_item, parent_path):
+        """Populate tree with immediate children of parent_path."""
+        try:
+            entries = sorted(parent_path.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
+        except (PermissionError, OSError):
+            return
+
+        for entry in entries:
+            # Skip hidden files/dirs
+            if entry.name.startswith("."):
+                continue
+
+            # Check access
+            try:
+                relative = entry.relative_to(Path(self._tree_items[parent_item])).as_posix()
+                from modules.tools.filesystem import require_access
+                require_access(relative, "view")
+            except (ValueError, Exception):
+                continue
+
+            if entry.is_dir():
+                text = f"📁 {entry.name}"
+                item = self.tree.insert(parent_item, "end", text=text, open=False)
+                self._tree_items[item] = str(entry)
+                # Add dummy child to show expand arrow
+                self.tree.insert(item, "end", text="")
+            else:
+                text = f"📄 {entry.name}"
+                item = self.tree.insert(parent_item, "end", text=text)
+                self._tree_items[item] = str(entry)
+
+    def _on_tree_open(self, event):
+        """Load children when a directory is expanded."""
+        item = self.tree.focus()
+        if not item:
+            return
+
+        # Check if already populated (has real children, not dummy)
+        children = self.tree.get_children(item)
+        if children and self.tree.item(children[0], "text") == "":
+            # Remove dummy and populate
+            self.tree.delete(children[0])
+            path = Path(self._tree_items[item])
+            self._populate_tree(item, path)
+
+    def _on_tree_select(self, event):
+        """Update path label on selection."""
+        item = self.tree.focus()
+        if item and item in self._tree_items:
+            path = self._tree_items[item]
+            self.path_label.config(text=path)
+
+    def _on_double_click(self, event):
+        """Open file on double-click."""
+        item = self.tree.identify_row(event.y)
+        if item and item in self._tree_items:
+            path = self._tree_items[item]
+            if Path(path).is_file():
+                self._open_file(path)
+
+    def _on_right_click(self, event):
+        """Show context menu on right-click."""
+        item = self.tree.identify_row(event.y)
+        if item:
+            self.tree.selection_set(item)
+            self.tree.focus(item)
+            self.context_menu.tk_popup(event.x_root, event.y_root)
+
+    def _create_context_menu(self):
+        """Create right-click context menu."""
+        self.context_menu = tk.Menu(self, tearoff=0, bg=THEME["surface"], fg=THEME["fg"],
+                                     activebackground=THEME["accent"], activeforeground="#11111b",
+                                     relief="flat", font=("Segoe UI", 9))
+        self.context_menu.add_command(label="Open", command=self._open_selected)
+        self.context_menu.add_command(label="Open in Editor", command=self._open_in_editor)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Copy Path", command=self._copy_path)
+        self.context_menu.add_command(label="Refresh", command=self._refresh_tree)
+
+    def _open_selected(self):
+        """Open the selected file or folder."""
+        item = self.tree.focus()
+        if item and item in self._tree_items:
+            path = self._tree_items[item]
+            if Path(path).is_file():
+                self._open_file(path)
+            else:
+                # Toggle folder
+                self.tree.item(item, open=not self.tree.item(item, "open"))
+
+    def _open_in_editor(self):
+        """Open the selected file in the main editor."""
+        item = self.tree.focus()
+        if item and item in self._tree_items:
+            path = self._tree_items[item]
+            if Path(path).is_file():
+                # Send command to main window to open file
+                self.engine.handle_command(f"/open {path}")
+
+    def _open_file(self, path):
+        """Open a file in the main window."""
+        self.engine.handle_command(f"/open {path}")
+
+    def _copy_path(self):
+        """Copy the selected file path to clipboard."""
+        item = self.tree.focus()
+        if item and item in self._tree_items:
+            path = self._tree_items[item]
+            self.clipboard_clear()
+            self.clipboard_append(path)
+
+    def _on_close(self):
+        """Handle window close."""
+        self.destroy()
+
+
 def center_window(
     window: tk.Misc,
     parent: tk.Misc | None = None,
@@ -1595,6 +1838,8 @@ class ShaiGuiApp:
         for target in (self.root, self.input_box):
             target.bind("<Control-m>", self._on_mic_cont_shortcut)
             target.bind("<Control-M>", self._on_mic_cont_shortcut)
+            target.bind("<Control-e>", self._toggle_file_explorer)
+            target.bind("<Control-E>", self._toggle_file_explorer)
         self.root.after(50, self._poll_events)
         self.root.after_idle(self._focus_input)
         self._set_speech_state(self._speech_mode)
@@ -1786,13 +2031,30 @@ class ShaiGuiApp:
         self.project_btn.pack(side="right", padx=(0, 6))
         self._project_tooltip = ToolTip(self.project_btn, "Select working project folder (/project <path>)")
 
+        # File Explorer toggle button
+        self.file_explorer_btn = tk.Button(
+            top,
+            cursor="hand2",
+            text="📁 Files",
+            command=self._toggle_file_explorer,
+            bg=THEME["button_bg"],
+            fg=THEME["fg"],
+            activebackground=THEME["button_active"],
+            activeforeground=THEME["fg"],
+            relief="flat",
+            padx=8,
+            pady=3,
+            font=("Segoe UI", 9),
+        )
+        self.file_explorer_btn.pack(side="right", padx=(0, 6))
+        ToolTip(self.file_explorer_btn, "Toggle file explorer panel (Ctrl+E)")
+
         # Quick action bar
         actions = tk.Frame(self.root, bg=THEME["bg"], padx=10, pady=4)
         actions.pack(fill="x")
         self._action_buttons: list[tk.Button] = []
         for label, cmd, tip in (
             ("Status", "/status", "Show Git status (/status)"),
-            ("Files", "/files", "List project files (/files)"),
             ("Diff", "/diff", "Show Git diff (/diff)"),
             ("Commit", "/commit", "Stage and commit changes (/commit)"),
             ("Push", "/push", "Push commits to remote (/push)"),
@@ -1851,8 +2113,23 @@ class ShaiGuiApp:
         ToolTip(self.help_btn, "Show available commands")
         self._action_buttons.append(self.help_btn)
 
-        # Transcript area
-        self.transcript_frame = tk.Frame(self.root, bg=THEME["bg"], padx=10, pady=4)
+        # Main container for sidebar + content
+        self.main_container = tk.Frame(self.root, bg=THEME["bg"])
+        self.main_container.pack(fill="both", expand=True)
+
+        # Left sidebar (File Explorer) - initially hidden
+        self.sidebar_frame = tk.Frame(self.main_container, bg=THEME["surface"], width=280)
+        self.sidebar_frame.pack(side="left", fill="y")
+        self.sidebar_frame.pack_propagate(False)  # Maintain width
+        self._sidebar_visible = False
+        self.sidebar_frame.pack_forget()  # Hide initially
+
+        # Right main content area
+        self.content_frame = tk.Frame(self.main_container, bg=THEME["bg"])
+        self.content_frame.pack(side="left", fill="both", expand=True)
+
+        # Transcript area (now in content_frame)
+        self.transcript_frame = tk.Frame(self.content_frame, bg=THEME["bg"], padx=10, pady=4)
         self.transcript_frame.pack(fill="both", expand=True)
         transcript_frame = self.transcript_frame
 
@@ -1995,7 +2272,7 @@ class ShaiGuiApp:
 
         # Message queue panel (shown below task list when messages are queued)
         self.queue_panel = tk.Frame(
-            self.root, bg=THEME["surface"], padx=10, pady=5, highlightthickness=1,
+            self.content_frame, bg=THEME["surface"], padx=10, pady=5, highlightthickness=1,
             highlightbackground=THEME["border"],
         )
         queue_header_frame = tk.Frame(self.queue_panel, bg=THEME["surface"])
@@ -2046,7 +2323,7 @@ class ShaiGuiApp:
         self.queue_items_frame.pack(fill="x", pady=(2, 0))
 
         # Context window meter (above prompt input box)
-        self.context_bar = tk.Frame(self.root, bg=THEME["bg"], padx=10, pady=2)
+        self.context_bar = tk.Frame(self.content_frame, bg=THEME["bg"], padx=10, pady=2)
         self.context_bar.pack(fill="x")
         self.context_var = tk.StringVar(value="Context: —")
         tk.Label(
@@ -2068,7 +2345,7 @@ class ShaiGuiApp:
         self.context_progress.pack(side="left", fill="x", expand=True, padx=(10, 0))
 
         # Provider & Model selector bar (right above prompt input box)
-        model_bar = tk.Frame(self.root, bg=THEME["bg"], padx=10, pady=2)
+        model_bar = tk.Frame(self.content_frame, bg=THEME["bg"], padx=10, pady=2)
         model_bar.pack(fill="x")
         tk.Label(
             model_bar, text="Provider:", bg=THEME["bg"], fg=THEME["muted"], font=("Segoe UI", 8)
@@ -2106,7 +2383,7 @@ class ShaiGuiApp:
         self._models_loading_for: str | None = None
 
         # Input area
-        self.input_frame = tk.Frame(self.root, bg=THEME["bg"], padx=10, pady=6)
+        self.input_frame = tk.Frame(self.content_frame, bg=THEME["bg"], padx=10, pady=6)
         self.input_frame.pack(fill="x")
         input_frame = self.input_frame
 
@@ -3513,6 +3790,52 @@ class ShaiGuiApp:
         if chosen:
             self._switch_project(chosen)
 
+    def _toggle_file_explorer(self):
+        """Toggle the file explorer panel."""
+        sidebar_width = 280
+        if self._sidebar_visible:
+            # Hide sidebar - shrink window from left
+            self.sidebar_frame.pack_forget()
+            self._sidebar_visible = False
+            self.file_explorer_btn.config(text="📁 Files")
+            # Resize window: reduce width, move right
+            try:
+                geo = self.root.geometry()
+                # Parse geometry: "WxH+X+Y"
+                import re
+                match = re.match(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", geo)
+                if match:
+                    w, h, x, y = map(int, match.groups())
+                    new_w = max(420, w - sidebar_width)
+                    new_x = x + sidebar_width
+                    self.root.geometry(f"{new_w}x{h}+{new_x}+{y}")
+            except Exception:
+                pass
+        else:
+            # Show sidebar - extend window to left
+            self.sidebar_frame.pack(side="left", fill="y", before=self.content_frame)
+            self._sidebar_visible = True
+            self.file_explorer_btn.config(text="📁 Files ✓")
+            # Create FileExplorer if not exists
+            if not hasattr(self, "_file_explorer") or self._file_explorer is None:
+                self._file_explorer = FileExplorer(self.sidebar_frame, self)
+                self._file_explorer.pack(fill="both", expand=True)
+            # Resize window: increase width, move left
+            try:
+                geo = self.root.geometry()
+                import re
+                match = re.match(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)", geo)
+                if match:
+                    w, h, x, y = map(int, match.groups())
+                    new_w = w + sidebar_width
+                    new_x = x - sidebar_width
+                    # Ensure window doesn't go off-screen left
+                    if new_x < 0:
+                        new_x = 0
+                    self.root.geometry(f"{new_w}x{h}+{new_x}+{y}")
+            except Exception:
+                pass
+
     def _switch_project(self, path_str: str):
         try:
             new_root = pathlib.Path(path_str).expanduser().resolve()
@@ -4562,6 +4885,30 @@ class ShaiGuiApp:
             self._play_cue("stop")
         if resume_wake_word and self._wake_word_enabled:
             self._start_wake_word_listening()
+
+    def handle_command(self, command: str):
+        """Handle slash commands from the file explorer."""
+        if command.startswith("/open "):
+            path = command[6:].strip()
+            if path:
+                self._open_file_in_editor(path)
+
+    def _open_file_in_editor(self, path: str):
+        """Open a file in the system's default editor."""
+        import subprocess
+        import sys
+        try:
+            file_path = pathlib.Path(path)
+            if not file_path.is_absolute():
+                file_path = pathlib.Path(engine.ROOT) / path
+            if sys.platform == "win32":
+                os.startfile(file_path)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", file_path])
+            else:
+                subprocess.Popen(["xdg-open", file_path])
+        except Exception as e:
+            self.status_var.set(f"Failed to open file: {e}")
 
     def _exit_app(self):
         self._save_current_gui_state()
