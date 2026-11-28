@@ -1814,7 +1814,7 @@ class ShaiGuiApp:
         ToolTip(reset_btn, "Clear conversation history and task plan (/reset)")
         self._action_buttons.append(reset_btn)
 
-        help_btn = tk.Button(
+        self.help_btn = tk.Button(
             actions,
             cursor="hand2",
             text="?",
@@ -1828,9 +1828,9 @@ class ShaiGuiApp:
             pady=2,
             font=("Segoe UI", 8, "bold"),
         )
-        help_btn.pack(side="right", padx=(0, 5))
-        ToolTip(help_btn, "Show available commands")
-        self._action_buttons.append(help_btn)
+        self.help_btn.pack(side="right", padx=(0, 5))
+        ToolTip(self.help_btn, "Show available commands")
+        self._action_buttons.append(self.help_btn)
 
         # Transcript area
         self.transcript_frame = tk.Frame(self.root, bg=THEME["bg"], padx=10, pady=4)
@@ -3353,6 +3353,8 @@ class ShaiGuiApp:
         self.project_btn.config(state=state)
         # Allow opening settings even while busy
         self.settings_btn.config(state="normal")
+        # Allow opening help even while busy
+        self.help_btn.config(state="normal")
         self.provider_combo.config(state="disabled" if busy else "readonly")
         self.model_combo.config(state="disabled" if busy else "readonly")
         for btn in self._action_buttons:
