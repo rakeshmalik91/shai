@@ -1895,6 +1895,58 @@ class ShaiGuiApp:
         self.task_items_frame = tk.Frame(self.task_panel, bg=THEME["surface"])
         self.task_items_frame.pack(fill="x", pady=(2, 0))
 
+        # Message queue panel (shown below task list when messages are queued)
+        self.queue_panel = tk.Frame(
+            self.root, bg=THEME["surface"], padx=10, pady=5, highlightthickness=1,
+            highlightbackground=THEME["border"],
+        )
+        queue_header_frame = tk.Frame(self.queue_panel, bg=THEME["surface"])
+        queue_header_frame.pack(fill="x")
+        self.queue_header_var = tk.StringVar(value="Message Queue")
+        tk.Label(
+            queue_header_frame,
+            textvariable=self.queue_header_var,
+            bg=THEME["surface"],
+            fg=THEME["accent"],
+            font=("Segoe UI", 8, "bold"),
+            anchor="w",
+        ).pack(side="left")
+        # Queue control buttons
+        self.queue_clear_btn = tk.Button(
+            queue_header_frame,
+            cursor="hand2",
+            text="Clear",
+            command=self._clear_message_queue,
+            bg=THEME["button_bg"],
+            fg=THEME["fg"],
+            activebackground=THEME["button_active"],
+            activeforeground=THEME["fg"],
+            relief="flat",
+            padx=6,
+            pady=1,
+            font=("Segoe UI", 7),
+        )
+        self.queue_clear_btn.pack(side="right", padx=(4, 0))
+        ToolTip(self.queue_clear_btn, "Clear all queued messages")
+        self.queue_send_all_btn = tk.Button(
+            queue_header_frame,
+            cursor="hand2",
+            text="Send All",
+            command=self._send_all_queued,
+            bg=THEME["accent"],
+            fg="#11111b",
+            activebackground="#b4befe",
+            activeforeground="#11111b",
+            relief="flat",
+            padx=6,
+            pady=1,
+            font=("Segoe UI", 7, "bold"),
+        )
+        self.queue_send_all_btn.pack(side="right", padx=(4, 0))
+        ToolTip(self.queue_send_all_btn, "Send all queued messages sequentially")
+        self.queue_items_frame = tk.Frame(self.queue_panel, bg=THEME["surface"])
+        self.queue_items_frame.pack(fill="x", pady=(2, 0))
+
         # Context window meter (above prompt input box)
         self.context_bar = tk.Frame(self.root, bg=THEME["bg"], padx=10, pady=2)
         self.context_bar.pack(fill="x")
@@ -2101,6 +2153,130 @@ class ShaiGuiApp:
 
         if not self.task_panel.winfo_manager():
             self.task_panel.pack(fill="x", padx=10, pady=(2, 2), before=self.context_bar)
+
+    def _refresh_queue_panel(self, force: bool = False):
+        """Refresh the message queue panel display."""
+        queue = list(self._queued_messages)
+        snapshot = [(i, msg) for i, msg in enumerate(queue)]
+        if not force and snapshot == getattr(self, "_last_queue_snapshot", None):
+            return
+        self._last_queue_snapshot = snapshot
+
+        for child in self.queue_items_frame.winfo_children():
+            child.destroy()
+
+        if not snapshot:
+            self.queue_panel.pack_forget()
+            return
+
+        self.queue_header_var.set(f"Message Queue ({len(snapshot)}):")
+        for idx, msg in snapshot:
+            item_frame = tk.Frame(self.queue_items_frame, bg=THEME["surface"])
+            item_frame.pack(fill="x", pady=1)
+
+            # Message preview (truncated)
+            preview = msg[:80] + ("..." if len(msg) > 80 else "")
+            tk.Label(
+                item_frame,
+                text=f"  {idx + 1}. {preview}",
+                bg=THEME["surface"],
+                fg=THEME["fg"],
+                font=("Consolas", 8),
+                anchor="w",
+                cursor="hand2",
+            ).pack(side="left", fill="x", expand=True)
+
+            # Move up button
+            up_btn = tk.Button(
+                item_frame,
+                text="▲",
+                command=lambda i=idx: self._move_queued_message(i, -1),
+                bg=THEME["button_bg"],
+                fg=THEME["fg"],
+                activebackground=THEME["button_active"],
+                activeforeground=THEME["fg"],
+                relief="flat",
+                padx=4,
+                pady=0,
+                font=("Segoe UI", 7),
+                state="normal" if idx > 0 else "disabled",
+            )
+            up_btn.pack(side="right", padx=(2, 0))
+            ToolTip(up_btn, "Move up")
+
+            # Move down button
+            down_btn = tk.Button(
+                item_frame,
+                text="▼",
+                command=lambda i=idx: self._move_queued_message(i, 1),
+                bg=THEME["button_bg"],
+                fg=THEME["fg"],
+                activebackground=THEME["button_active"],
+                activeforeground=THEME["fg"],
+                relief="flat",
+                padx=4,
+                pady=0,
+                font=("Segoe UI", 7),
+                state="normal" if idx < len(snapshot) - 1 else "disabled",
+            )
+            down_btn.pack(side="right", padx=(2, 0))
+            ToolTip(down_btn, "Move down")
+
+            # Remove button
+            remove_btn = tk.Button(
+                item_frame,
+                text="✕",
+                command=lambda i=idx: self._remove_queued_message(i),
+                bg=THEME["error"],
+                fg="#11111b",
+                activebackground="#f38ba8",
+                activeforeground="#11111b",
+                relief="flat",
+                padx=4,
+                pady=0,
+                font=("Segoe UI", 7, "bold"),
+            )
+            remove_btn.pack(side="right", padx=(2, 0))
+            ToolTip(remove_btn, "Remove from queue")
+
+        # Pack queue panel before context_bar (after task_panel if visible)
+        if not self.queue_panel.winfo_manager():
+            if self.task_panel.winfo_manager():
+                self.queue_panel.pack(fill="x", padx=10, pady=(2, 2), before=self.context_bar)
+            else:
+                self.queue_panel.pack(fill="x", padx=10, pady=(2, 2), before=self.context_bar)
+
+    def _clear_message_queue(self):
+        """Clear all queued messages."""
+        self._queued_messages.clear()
+        self._refresh_queue_panel(force=True)
+
+    def _send_all_queued(self):
+        """Send all queued messages sequentially."""
+        if not self._queued_messages:
+            return
+        # The _poll_events already handles sending queued messages one by one
+        # when a turn completes. This just ensures the first one starts if idle.
+        if not self._busy:
+            next_msg = self._queued_messages.pop(0)
+            self._submit_text(next_msg)
+        self._refresh_queue_panel(force=True)
+
+    def _remove_queued_message(self, index: int):
+        """Remove a specific message from the queue."""
+        if 0 <= index < len(self._queued_messages):
+            self._queued_messages.pop(index)
+            self._refresh_queue_panel(force=True)
+
+    def _move_queued_message(self, index: int, direction: int):
+        """Move a queued message up or down."""
+        new_index = index + direction
+        if 0 <= new_index < len(self._queued_messages):
+            self._queued_messages[index], self._queued_messages[new_index] = (
+                self._queued_messages[new_index],
+                self._queued_messages[index],
+            )
+            self._refresh_queue_panel(force=True)
 
     def _collapse_active_tool_batch(self):
         batch = self._active_tool_batch
@@ -3108,6 +3284,7 @@ class ShaiGuiApp:
         if not self._busy:
             return
         self._queued_messages.clear()
+        self._refresh_queue_panel(force=True)
         self._cancel_event.set()
         self.send_btn.config(state="disabled")
         self.status_var.set("Stopping...")
@@ -3143,6 +3320,7 @@ class ShaiGuiApp:
                     if self._queued_messages:
                         next_msg = self._queued_messages.pop(0)
                         self._submit_text(next_msg)
+                        self._refresh_queue_panel(force=True)
                     elif self._speech_mode == "continuous":
                         self.status_var.set("Listening (continuous)...")
                         if self._speech_pending_auto_send:
@@ -3475,6 +3653,7 @@ class ShaiGuiApp:
                 f"\n[ShAI] Queued ({len(self._queued_messages)}): {user_text}\n",
                 "system",
             )
+            self._refresh_queue_panel(force=True)
             return
 
         natural_command = resolve_shai_command(user_text, self._mode)
