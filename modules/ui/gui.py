@@ -2145,6 +2145,7 @@ class ShaiGuiApp:
         self.input_box.bind("<Return>", self._on_enter_key)
         self.input_box.bind("<Up>", self._on_history_up)
         self.input_box.bind("<Down>", self._on_history_down)
+        self.input_box.bind("<Control-BackSpace>", self._on_ctrl_backspace)
         self.input_box.focus_set()
 
         # Status bar
@@ -3701,6 +3702,17 @@ class ShaiGuiApp:
             text = ""
         self.input_box.delete("1.0", tk.END)
         self.input_box.insert("1.0", text)
+        return "break"
+
+    def _on_ctrl_backspace(self, _event=None):
+        """Delete the word before the cursor (Ctrl+Backspace)."""
+        cursor = self.input_box.index("insert")
+        # Find start of previous word
+        start = self.input_box.index(f"{cursor} wordstart")
+        # If cursor is already at word start, go to previous word
+        if start == cursor:
+            start = self.input_box.index(f"{cursor} -1c wordstart")
+        self.input_box.delete(start, cursor)
         return "break"
 
     def _sync_input_history(self):
