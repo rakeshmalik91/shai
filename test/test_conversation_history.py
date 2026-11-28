@@ -1,9 +1,10 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
-from modules.conversation_history import ConversationHistory
+from modules.conversation_history import ConversationHistory, input_without_history
 
 
 class ConversationHistoryTests(unittest.TestCase):
@@ -39,6 +40,52 @@ class ConversationHistoryTests(unittest.TestCase):
                 )
             )
             self.assertEqual(data["input_history"], ["first", "second"])
+
+    def test_selection_input_does_not_enter_readline_history(self):
+        class FakeReadline:
+            def __init__(self):
+                self.items = []
+                self.auto_history = True
+
+            def get_auto_history(self):
+                return self.auto_history
+
+            def set_auto_history(self, enabled):
+                self.auto_history = enabled
+
+            def get_current_history_length(self):
+                return len(self.items)
+
+            def remove_history_item(self, index):
+                del self.items[index]
+
+        fake_readline = FakeReadline()
+
+        def fake_input(prompt):
+            if fake_readline.auto_history:
+                fake_readline.items.append("2")
+            return "2"
+
+        with patch.dict("sys.modules", {"readline": fake_readline}):
+            with patch("builtins.input", side_effect=fake_input):
+                self.assertEqual(input_without_history("Choose: "), "2")
+
+        self.assertEqual(fake_readline.items, [])
+        self.assertTrue(fake_readline.auto_history)
+
+    def test_command_execution_inputs_are_in_prompt_history(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = ConversationHistory(root, "agent", "system")
+            store.add_input("inspect the project")
+            store.add_input("/exec git status")
+            store.add_input("/os-command pwd")
+            store.add_input("/status")
+
+            data = json.loads(store.path.read_text(encoding="utf-8"))
+            self.assertEqual(data["input_history"], [
+                "inspect the project", "/exec git status",
+                "/os-command pwd", "/status"
+            ])
 
     def test_clear_preserves_prompt_and_other_mode_history(self):
         with tempfile.TemporaryDirectory() as root:

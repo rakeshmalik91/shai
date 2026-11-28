@@ -1,0 +1,14 @@
+{
+  "all": true,
+  "file_edit": true,
+  "file_delete": true,
+  "file_truncate": true,
+  "execution": true,
+  "git_commit": true,
+  "git_push": false,
+  "tools": {
+    "run_checks": true,
+    "edit_file": true,
+    "os_command": false
+  }
+}

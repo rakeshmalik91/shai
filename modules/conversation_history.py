@@ -98,6 +98,11 @@ class ConversationHistory:
         self._refresh()
         return dict(self._data["conversation_meta"].get(self.mode, {}))
 
+    def input_history(self):
+        """Return persisted prompt input history entries."""
+        self._refresh()
+        return list(self._data["input_history"])
+
     def save(self, messages, provider=None, model=None):
         """Persist the full provider message history for this mode."""
         if not isinstance(messages, list):
@@ -126,11 +131,6 @@ class ConversationHistory:
         self._refresh()
 
         entries = self._data["input_history"]
-        if value.startswith("/"):
-            # input() may already have added this command to readline.
-            self._remove_current_readline_line(value)
-            return
-
         if entries and entries[-1] == value:
             # Avoid duplicate consecutive prompts in both persistent and
             # in-memory readline history.
@@ -204,8 +204,11 @@ class ConversationHistory:
 
 def _fallback_input(prompt, history):
     """Small readline fallback for terminals where Python lacks readline."""
-    import termios
-    import tty
+    try:
+        import termios
+        import tty
+    except ImportError:
+        return input(prompt)
 
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         return input(prompt)
@@ -291,8 +294,42 @@ def _fallback_input(prompt, history):
         termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, original)
 
 
+def input_without_history(prompt):
+    """Read an interactive selection/confirmation without adding it to Up/Down history."""
+    readline_module = None
+    previous_auto_history = None
+    try:
+        import readline as readline_module
+        getter = getattr(readline_module, "get_auto_history", None)
+        setter = getattr(readline_module, "set_auto_history", None)
+        if callable(setter):
+            previous_auto_history = getter() if callable(getter) else True
+            setter(False)
+        before = readline_module.get_current_history_length()
+    except (ImportError, AttributeError, RuntimeError):
+        readline_module = None
+        before = 0
+
+    try:
+        return input(prompt)
+    finally:
+        if readline_module is not None:
+            try:
+                after = readline_module.get_current_history_length()
+                if after > before:
+                    readline_module.remove_history_item(after - 1)
+            except (AttributeError, RuntimeError, ValueError):
+                pass
+            setter = getattr(readline_module, "set_auto_history", None)
+            if callable(setter) and previous_auto_history is not None:
+                try:
+                    setter(previous_auto_history)
+                except (RuntimeError, ValueError):
+                    pass
+
+
 def input_with_history(prompt, history_store):
-    """Read a prompt, supporting persistent Up/Down message navigation."""
+    """Read a user message/command, supporting persistent Up/Down navigation."""
     if history_store._readline is None:
         value = _fallback_input(prompt, history_store._data["input_history"])
     else:

@@ -6,6 +6,28 @@ TERM=dumb, or SHAI_COLOR=0. No external dependency is required.
 import os
 import sys
 
+_WINDOWS_VT_ENABLED = False
+
+
+def _enable_windows_ansi():
+    """Enable ANSI escape processing on Windows consoles when available."""
+    global _WINDOWS_VT_ENABLED
+    if _WINDOWS_VT_ENABLED or os.name != "nt":
+        return
+    _WINDOWS_VT_ENABLED = True
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        for handle_id in (-11, -12):  # STD_OUTPUT_HANDLE, STD_ERROR_HANDLE
+            handle = kernel32.GetStdHandle(handle_id)
+            if handle in (0, -1):
+                continue
+            mode = ctypes.c_uint32()
+            if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+    except Exception:
+        pass
+
 RESET = "\033[0m"
 STYLES = {
     "user": "\033[1;32m",       # green
@@ -29,7 +51,12 @@ def supports_color(stream=None):
     if os.environ.get("TERM", "").lower() == "dumb":
         return False
     try:
-        return bool(stream.isatty())
+        if getattr(stream, "supports_ansi_colors", False):
+            return True
+        if bool(stream.isatty()):
+            _enable_windows_ansi()
+            return True
+        return False
     except (AttributeError, OSError):
         return False
 

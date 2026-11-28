@@ -30,6 +30,7 @@ class LiveStatusPanel:
         self.batch_position = 0
         self.line_open = False
         self.batch_tool_counts = {}
+        self.on_tool_event = None
 
     def start(self):
         with self.lock:
@@ -127,6 +128,8 @@ class LiveStatusPanel:
                     name, self.batch_tool_counts[name]
                 )
             self._render_tool_line("running")
+            if self.on_tool_event is not None:
+                self.on_tool_event("started", self.current_tool, False)
 
     def tool_finished(self, name, error=False):
         with self.lock:
@@ -138,6 +141,8 @@ class LiveStatusPanel:
                 self.current_tool = "{} ({} calls)".format(name, count)
             self.phase = "Executing tools"
             self._render_tool_line("ERROR" if error else "done")
+            if self.on_tool_event is not None:
+                self.on_tool_event("finished", self.current_tool, bool(error))
 
 
 STATUS = LiveStatusPanel()

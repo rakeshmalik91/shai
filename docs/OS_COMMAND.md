@@ -67,9 +67,7 @@ exception, the interactive prompt offers:
    different script or different Python code.
 5. **Deny** — do not start the process.
 
-Permanent choices are stored in `approved_commands`, `approved_subcommands`,
-and `approved_invocations`. For a blocked operation, the matching exception is
-also stored in `blocked_commands`/`blocked_command_rules` exception settings.
+Permanent choices are stored in the active project's `.shai/os_command_approvals.json` (the Shai installation's `.shai/` directory is never used) under `approved_commands`, `approved_subcommands`, and `approved_invocations`. For a blocked operation, the matching exception is stored as a project-local overlay. The shared `assets/command_config.json` policy is never modified by interactive approvals.
 Subcommand approval is deliberately unavailable for ordinary utilities such as
 `rm`, where the first positional argument is a file target rather than a
 subcommand. The subcommand menu is enabled only for known command-oriented
@@ -405,8 +403,7 @@ Shai displays the complete command and asks whether to whitelist it:
 2. Every parameter for that Git subcommand (`approved_subcommands`).
 3. Every Git command and subcommand (`allow_unrestricted`).
 
-The selected permission is persisted in `assets/command_config.json`, then the command is
-retried. Explicit blacklist rules (`blocked_subcommands`, forbidden options,
+The selected permission is persisted in `.shai/os_command_approvals.json`, then the command is retried. Explicit blacklist rules (`blocked_subcommands`, forbidden options,
 option prefixes, and argument patterns) are evaluated first and cannot be
 bypassed by any whitelist choice. The approval preview also displays the full
 resolved command, including injected Git options.
@@ -420,9 +417,9 @@ unrestricted commands, and blocked-command policy are grouped under
 `os_command.platforms.common`, `os_command.platforms.unix`, and
 `os_command.platforms.windows`.
 The legacy `assets/shai_config.json` file is not consulted for command
-enablement. Interactive Git whitelist choices are persisted back to
-`assets/command_config.json` (never to the core configuration file), then the
-policy is reloaded before the blocked command is retried.
+enablement. Interactive CLI whitelist and approval choices are stored as
+project-local overlays in `.shai/os_command_approvals.json`; the static policy
+in `assets/command_config.json` remains unchanged.
 
 
 ## Project path access policy

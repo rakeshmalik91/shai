@@ -1,0 +1,6 @@
+# BEGIN SHAI MANAGED IGNORE RULES
+/logs/
+/shai_backups/
+/task.json
+/history.json
+# END SHAI MANAGED IGNORE RULES

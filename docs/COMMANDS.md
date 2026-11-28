@@ -109,7 +109,7 @@ Available when running `python3 chat.py`.
 
 Commands and behavior are customized across split configuration files under `assets/`:
 
-- `assets/shai_config.json` — Core settings: `max_tool_call_iterations` (iteration ceiling), `tool_safeguards` (repeat call detection, timeout bounds), `retry` (HTTP retry and recovery policy), and `approve` (granular tool/category approval permissions).
+- `assets/shai_config.json` — Core settings: `max_tool_call_iterations` (iteration ceiling), `tool_safeguards` (repeat call detection, timeout bounds), `retry` (HTTP retry and recovery policy), and other runtime settings. The approval baseline is the installation's `assets/approval_config.json`; only interactive CLI overrides are stored in the active project's `.shai/approval_config.json`. All `.shai/` state follows the currently selected project.
 - `assets/command_config.json` — Execution policies: `shai_command` (enable/disable natural language routing) and `os_command` (allowlisted command profiles, subcommands, and bounds).
 - `assets/command_registry.json` — Canonical slash command metadata, aliases, and exact trigger phrases.
 - `assets/cli_config.json` — Terminal interface settings: `tool_call_display` (`show_parameters`, `max_argument_chars`), file change diff previews, and reasoning display.

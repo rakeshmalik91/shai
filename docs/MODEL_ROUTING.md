@@ -2,9 +2,11 @@
 
 ## Status
 
-The initial project-scoped routing layer is implemented. It selects models
-from per-role candidate lists using provider registration, provider model
-discovery, and explicit priority. It is currently integrated with:
+The project-scoped routing layer is implemented. It selects models from
+per-role candidate lists using provider registration and explicit priority.
+It does not query provider model catalogues during startup or route resolution.
+Unavailable inactive candidates are skipped silently at request time. It is
+currently integrated with:
 
 - Chat (`chat`).
 - Agent orchestration and tool decisions (`orchestrator`).
@@ -16,17 +18,20 @@ runtime call sites. See [the remaining implementation plan](plans/MODEL_ROUTING_
 
 ## Configuration locations
 
-- `assets/model_routing.json` is the tracked empty template and defines the
-  supported roles and default configuration shape.
-- `<project>/.shai/model_routing.json` is the active project's override.
-- The project file overrides only roles it explicitly defines. Other roles
-  retain their template values (currently empty candidate lists).
-- The provider/model selected through the normal ShAI configuration remains
-  the fallback when no configured candidate is usable.
+- `assets/model_routing.json` is the tracked shared default configuration.
+  Its `default.provider` and `default.model` values provide the fallback model;
+  its `models` object defines the supported task roles.
+- `<project>/.shai/model_routing.json` is the active project's override and
+  stores both its selected default provider/model and task-specific routes.
+- A project `default` overrides the shared `default`; project role lists
+  override only the roles they explicitly define. Other roles retain their
+  template values (normally empty candidate lists).
+- There is no separate provider/model selection file. Interactive selection
+  updates the project's `default` object in this same routing file.
 - Provider credentials, API endpoints, and provider-specific settings remain
   in provider configuration; they do not belong in the routing file.
 
-The directory name is consistently lowercase `.shai/` across runtime code,
+The `.shai/` directory is always rooted in the selected working project, not the Shai installation. The directory name is consistently lowercase `.shai/` across runtime code,
 tests, and documentation. This is the same project-local directory used for
 access grants, logs, task state, and backups.
 
@@ -35,6 +40,10 @@ access grants, logs, task state, and backups.
 ```json
 {
   "version": 1,
+  "default": {
+    "provider": "openrouter",
+    "model": "vendor/default-model"
+  },
   "models": {
     "orchestrator": [
       {"provider": "ollama", "model": "qwen2.5:14b", "priority": 1},
@@ -56,10 +65,12 @@ access grants, logs, task state, and backups.
 }
 ```
 
-Lower positive `priority` values are preferred. Candidate order is stable for
-equal priorities. Duplicate provider/model pairs are ignored after the first
-entry. A candidate is eligible only when its provider is registered and the
-model appears in that provider's discovered model list.
+When no role-specific candidate is usable, Shai uses the configured default
+provider/model. Lower positive `priority` values are preferred. Candidate
+order is stable for equal priorities. Duplicate provider/model pairs are ignored after the first
+entry. A candidate is eligible when its provider is registered and its
+configuration entry is structurally valid. The model name is trusted until an
+actual request is made; this avoids slow catalogue calls.
 
 ## How ShAI decides which model to use
 
@@ -76,17 +87,18 @@ which provider/model it should call:
    output reliability, modality, latency, cost, privacy, and where the model
    runs. These are configuration/design considerations today; the current
    resolver does not benchmark models or infer these capabilities.
-3. **The resolver checks eligibility.** It skips malformed entries and
-   unregistered providers, then checks the provider's discovered model list.
-   Discovery is a lightweight availability check; it does not send the task
-   prompt to a model.
-4. **Priority chooses among eligible candidates.** The lowest numeric
-   priority wins. Use priority to express the preferred order after deciding
-   that each candidate is suitable for that role. Do not treat priority as an
-   automatic quality score.
-5. **The normal default is the final fallback.** If the role has no valid
-   configured candidate, or none is discoverable, ShAI uses the provider/model
-   selected by the normal project configuration.
+3. **The resolver checks configuration only.** It skips malformed entries
+   and unregistered providers. It does not call a provider's model-list API,
+   so startup and route resolution are independent of catalogue latency.
+4. **Priority chooses the request order.** The lowest numeric priority is
+   tried first. If a provider explicitly reports that a routed model does not
+   exist or is unavailable, ShAI silently tries the next configured candidate.
+   Other errors (authentication, rate limits, network failures, and malformed
+   requests) are not treated as discontinued-model signals.
+5. **The normal active model is the final fallback.** After routed candidates
+   are exhausted, ShAI tries the saved provider/model. Errors from this active
+   model are surfaced normally; only inactive routed candidates are silently
+   skipped.
 
 This means model *suitability* is currently established by the person
 maintaining the project configuration; model *availability* is checked by
@@ -98,19 +110,19 @@ window, or structured output merely because it appears in discovery.
 ## Runtime behavior currently delivered
 
 1. Load the tracked template and apply active-project role overrides.
-2. Validate candidates and sort by ascending priority.
-3. Discover available models through the provider model catalogue.
-4. Cache discovery results briefly (30 seconds) per project/provider.
-5. Select the first configured candidate whose provider is registered and
-   whose model is discoverable.
-6. Fall back to the normal configured default when the role is unknown,
-   unconfigured, malformed, or has no currently discoverable candidate.
-7. Log selected routes and fallback reasons without logging credentials.
+2. Validate candidate structure/provider registration and sort by ascending
+   priority. No model-list API calls are made here.
+3. Attempt configured candidates in priority order when a real request occurs.
+4. If a routed candidate returns an explicit model-not-found or model-
+   unavailable response, suppress the warning/error output and try the next
+   configured candidate.
+5. After routed candidates are exhausted, try the saved active provider/model.
+   If that model fails, show its error normally.
+6. Authentication, rate-limit, network, and unrelated API errors are not
+   silently skipped; they are surfaced without changing models.
 
-The resolver does not send the user's full prompt as an availability probe.
-A discovery exception makes that provider unavailable for a short cache
-period; the default model remains usable. Runtime failover after a dispatched
-request fails is not implemented yet.
+This makes discontinued inactive routes harmless without introducing startup
+catalogue requests or silently hiding failures from the active model.
 
 ## Supported roles and integrations
 
@@ -156,10 +168,10 @@ request is needed.
 
 ## Known limitations and pending work
 
-- Runtime failover after a selected model request fails is not implemented.
-  The current fallback happens before dispatch, based on discovery.
-- Availability caching has a fixed short TTL; configurable cooldowns and
-  provider-specific health/preflight checks are not implemented.
+- Failover is limited to provider errors that clearly identify an unavailable
+  model. Provider-specific error formats may require additional recognition.
+- Catalogue-based model selection is intentionally reserved for explicit
+  interactive model selection (`/model`); it is not part of startup or routing.
 - Capability-aware filtering (tool support, context window, modalities,
   structured output, and task-specific constraints) is not implemented.
 - Planner, code, debug, test, review, documentation, and research roles need
@@ -178,6 +190,7 @@ python3 -m unittest test.test_model_routing -v
 ```
 
 The routing tests cover template loading, project overrides, candidate
-validation/priority, discovery-based selection, default fallback, and cache
-behavior. Commit-message routing has a separate helper-level test. These tests
-do not establish runtime request failover or capability-aware selection.
+validation/priority, no-catalogue resolution, silent failover for unavailable
+inactive candidates, active-model error propagation, and default fallback.
+Commit-message routing has a separate helper-level test. Capability-aware
+selection is not implemented.

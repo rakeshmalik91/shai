@@ -1,6 +1,15 @@
 """Git inspection commands exposed as read-only tools."""
+import os
 import subprocess
 from . import common
+
+
+def _no_window_kwargs():
+    if os.name == "nt" and hasattr(subprocess, "CREATE_NO_WINDOW"):
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
 def git_status():
     """Show current Git status."""
     try:
@@ -8,8 +17,10 @@ def git_status():
             ["git", "status", "--porcelain"],
             cwd=common.ROOT,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
+            **_no_window_kwargs(),
         )
         if result.returncode != 0:
             return "Git status failed: " + result.stderr.strip()
@@ -25,8 +36,10 @@ def git_diff():
             ["git", "diff"],
             cwd=common.ROOT,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
+            **_no_window_kwargs(),
         )
         if result.returncode != 0:
             return "Git diff failed: " + result.stderr.strip()

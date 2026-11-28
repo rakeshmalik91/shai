@@ -4,11 +4,21 @@ import select
 import signal
 import subprocess
 import sys
-import termios
 import threading
 import time
-import tty
 import _thread
+
+try:
+    import termios
+    import tty
+except ImportError:
+    termios = None
+    tty = None
+
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
 
 class BoundedOutputCapture:
     """Capture small output completely; for large output retain head and tail."""
@@ -97,6 +107,28 @@ def _terminate_process_tree(process, process_group):
         process.kill()
         process.wait()
 
+def _no_window_kwargs():
+    """Return Popen kwargs to prevent flashing a console window on Windows."""
+    if os.name == "nt" and hasattr(subprocess, "CREATE_NO_WINDOW"):
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
+_EXTERNAL_CANCEL_EVENT = None
+
+
+def set_external_cancel_event(event):
+    """Register an external threading.Event (e.g. GUI Stop button) for cancellation."""
+    global _EXTERNAL_CANCEL_EVENT
+    _EXTERNAL_CANCEL_EVENT = event
+
+
+def _is_cancelled(monitor):
+    return monitor.cancelled.is_set() or (
+        _EXTERNAL_CANCEL_EVENT is not None and _EXTERNAL_CANCEL_EVENT.is_set()
+    )
+
+
 def run_bounded_interruptible_command(
     command, cwd, timeout, output_settings, env=None
 ):
@@ -114,6 +146,7 @@ def run_bounded_interruptible_command(
         popen_options["env"] = env
     if process_group:
         popen_options["start_new_session"] = True
+    popen_options.update(_no_window_kwargs())
 
     process = subprocess.Popen(command, **popen_options)
     stdout_capture = BoundedOutputCapture(
@@ -162,7 +195,7 @@ def run_bounded_interruptible_command(
     try:
         with CtrlDMonitor() as monitor:
             while process.poll() is None:
-                if monitor.cancelled.is_set():
+                if _is_cancelled(monitor):
                     interrupted = True
                     _terminate_process_tree(process, process_group)
                     break
@@ -230,19 +263,31 @@ class CtrlDMonitor:
         self.enabled = False
 
     def __enter__(self):
-        try:
-            if not sys.stdin.isatty():
-                return self
-            self.fd = sys.stdin.fileno()
-            self.original_settings = termios.tcgetattr(self.fd)
-            tty.setraw(self.fd)
-            self.enabled = True
-            self.thread = threading.Thread(
-                target=self._watch, name="shai-ctrl-d", daemon=True
-            )
-            self.thread.start()
-        except (AttributeError, OSError, termios.error):
-            self._restore()
+        if termios is not None and tty is not None:
+            try:
+                if not sys.stdin.isatty():
+                    return self
+                self.fd = sys.stdin.fileno()
+                self.original_settings = termios.tcgetattr(self.fd)
+                tty.setraw(self.fd)
+                self.enabled = True
+                self.thread = threading.Thread(
+                    target=self._watch, name="shai-ctrl-d", daemon=True
+                )
+                self.thread.start()
+            except (AttributeError, OSError, termios.error):
+                self._restore()
+        elif msvcrt is not None:
+            try:
+                if not sys.stdin.isatty():
+                    return self
+                self.enabled = True
+                self.thread = threading.Thread(
+                    target=self._watch_windows, name="shai-ctrl-d", daemon=True
+                )
+                self.thread.start()
+            except (AttributeError, OSError):
+                self.enabled = False
         return self
 
     def _watch(self):
@@ -258,8 +303,21 @@ class CtrlDMonitor:
             except (OSError, ValueError):
                 return
 
+    def _watch_windows(self):
+        while not self.stop_event.is_set():
+            try:
+                if msvcrt.kbhit():
+                    value = msvcrt.getch()
+                    if value in (b"\x04", b"\x03"):
+                        self.cancelled.set()
+                        return
+                else:
+                    time.sleep(0.05)
+            except OSError:
+                return
+
     def _restore(self):
-        if self.enabled and self.original_settings is not None:
+        if termios is not None and self.enabled and self.original_settings is not None:
             try:
                 termios.tcsetattr(
                     self.fd, termios.TCSADRAIN, self.original_settings
@@ -290,7 +348,7 @@ def run_interruptible_call(function, *args):
         worker.start()
         while worker.is_alive():
             worker.join(timeout=0.1)
-            if monitor.cancelled.is_set():
+            if _is_cancelled(monitor):
                 raise IterationInterrupted()
 
     if "error" in result:
@@ -301,13 +359,13 @@ def run_interruptible_command(command, cwd, timeout):
     """Run a command with a timeout and terminate it on Ctrl+D."""
     process = subprocess.Popen(
         command, cwd=str(cwd), stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, text=True
+        stderr=subprocess.PIPE, encoding="utf-8", errors="replace", **_no_window_kwargs()
     )
     started = time.monotonic()
     try:
         with CtrlDMonitor() as monitor:
             while True:
-                if monitor.cancelled.is_set():
+                if _is_cancelled(monitor):
                     if process.poll() is None:
                         process.kill()
                     process.communicate()

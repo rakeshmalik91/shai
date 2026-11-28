@@ -204,8 +204,7 @@ def main() -> int:
                 except Exception as error:
                     print("[Shai] Error: Invalid path '{}': {}".format(new_path, error))
                     continue
-                engine.ROOT = new_root
-                configure_tools_root(engine.ROOT)
+                engine.set_project_root(new_root)
                 history_store = ConversationHistory(engine.ROOT, "agent", engine.SYSTEM_PROMPT)
                 history = history_store.load()
                 history_store.save(history, provider=engine.PROVIDER, model=engine.MODEL)

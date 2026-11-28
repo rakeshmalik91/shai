@@ -84,12 +84,12 @@ def find_symbol(symbol, path="."):
         for node in ast.walk(tree):
             if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
                 if node.name == symbol:
-                    rel = file_path.relative_to(common.ROOT)
+                    rel = file_path.relative_to(common.ROOT).as_posix()
                     results.append("{} at line {} in {}".format(node.name, node.lineno, rel))
             elif isinstance(node, ast.Assign):
                 for target_node in node.targets:
                     if isinstance(target_node, ast.Name) and target_node.id == symbol:
-                        rel = file_path.relative_to(common.ROOT)
+                        rel = file_path.relative_to(common.ROOT).as_posix()
                         results.append("{} = ... at line {} in {}".format(symbol, node.lineno, rel))
     return "\n".join(results) if results else "No definitions found for '{}'.".format(symbol)
 
@@ -111,7 +111,7 @@ def find_references(symbol, path="."):
             continue
         for i, line in enumerate(text.splitlines(), 1):
             if symbol in line:
-                rel = file_path.relative_to(common.ROOT)
+                rel = file_path.relative_to(common.ROOT).as_posix()
                 results.append("{}:{}: {}".format(rel, i, line.strip()))
                 if len(results) >= 100:
                     return "\n".join(results) + "\n... (truncated at 100 results)"
@@ -141,7 +141,7 @@ def get_project_map(path="."):
             try:
                 text = entry.read_text(encoding="utf-8")
                 if "if __name__ == \"__main__\":" in text or "def main(" in text:
-                    entry_points.append(str(entry.relative_to(common.ROOT)))
+                    entry_points.append(entry.relative_to(common.ROOT).as_posix())
             except (UnicodeDecodeError, OSError):
                 pass
     if entry_points:
@@ -159,9 +159,9 @@ def get_test_map(path="."):
         return "Test map path must be a directory."
     test_files = []
     for entry in _walk_visible_files(target, "test_*.py"):
-        test_files.append(str(entry.relative_to(common.ROOT)))
+        test_files.append(entry.relative_to(common.ROOT).as_posix())
     for entry in _walk_visible_files(target, "*_test.py"):
-        test_files.append(str(entry.relative_to(common.ROOT)))
+        test_files.append(entry.relative_to(common.ROOT).as_posix())
     if not test_files:
         return "No test files found (looking for test_*.py or *_test.py)."
     result = ["Test files found:"]

@@ -99,7 +99,7 @@ def search_files(query, path="."):
             continue
         for i, line in enumerate(text.splitlines(), 1):
             if str(query).lower() in line.lower():
-                results.append("{}:{}: {}".format(file_path.relative_to(common.ROOT), i, line.strip()))
+                results.append("{}:{}: {}".format(file_path.relative_to(common.ROOT).as_posix(), i, line.strip()))
                 if len(results) >= 100:
                     return "\\n".join(results) + "\\n... (truncated at 100 results)"
     return "\\n".join(results) if results else "No matches found."
