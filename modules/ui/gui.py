@@ -4302,7 +4302,7 @@ class ShaiGuiApp:
                 return
             if self.root.focus_displayof() is None:
                 self._hide_to_tray()
-        except tk.TclError:
+        except (tk.TclError, KeyError):
             pass
 
     def restart_app(self):

@@ -20,7 +20,7 @@
   "retry": {
     "enabled": true,
     "max_retries": 10,
-    "initial_backoff_seconds": 5.0,
+    "initial_backoff_seconds": 10.0,
     "backoff_multiplier": 2.0,
     "max_backoff_seconds": 600.0,
     "jitter": true,

@@ -106,10 +106,27 @@
       "supports_structured_output": true,
       "supports_reasoning": true
     },
+    "kilo::aion-labs/aion-2.0": {
+      "context_window": 131072,
+      "max_output_tokens": 32768,
+      "supported_input_types": [
+        "text"
+      ],
+      "supported_output_types": [
+        "text"
+      ],
+      "supports_tools": true,
+      "supports_structured_output": true,
+      "supports_reasoning": true
+    },
     "ollama::deepseek-coder-v2:latest": {},
     "ollama::gemma4:12b": {},
     "ollama::qwen3.5:4b": {},
     "ollama::qwen3:latest": {}
   },
-  "overrides": {}
+  "overrides": {
+    "ollama::qwen3.5:4b": {
+      "context_window": 1000000
+    }
+  }
 }
