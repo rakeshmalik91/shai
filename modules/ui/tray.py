@@ -409,7 +409,12 @@ class WindowsTrayIcon:
             user32.AppendMenuW(menu, MF_STRING, self.MENU_EXIT, "Exit")
             pt = wintypes.POINT()
             user32.GetCursorPos(ctypes.byref(pt))
-            user32.SetForegroundWindow(hwnd)
+            # SetForegroundWindow can hang if process doesn't have foreground rights;
+            # use a non-blocking approach instead
+            try:
+                user32.SetForegroundWindow(hwnd)
+            except Exception:
+                pass
             user32.TrackPopupMenu(
                 menu,
                 TPM_LEFTALIGN | TPM_BOTTOMALIGN | TPM_RIGHTBUTTON,
@@ -427,20 +432,33 @@ class WindowsTrayIcon:
                 event = lparam & 0xFFFF
                 if event == WM_LBUTTONUP:
                     if self.on_toggle_window:
-                        self.on_toggle_window()
+                        try:
+                            self.on_toggle_window()
+                        except Exception:
+                            pass
                     elif self.on_show:
-                        self.on_show()
+                        try:
+                            self.on_show()
+                        except Exception:
+                            pass
                 elif event == WM_LBUTTONDBLCLK and not self.on_toggle_window:
                     if self.on_show:
-                        self.on_show()
+                        try:
+                            self.on_show()
+                        except Exception:
+                            pass
                 elif event in (WM_RBUTTONUP, WM_CONTEXTMENU):
-                    _show_context_menu(hwnd)
+                    try:
+                        _show_context_menu(hwnd)
+                    except Exception:
+                        pass
                 return 0
             if msg == WM_UPDATE_ICON:
                 with self._state_lock:
                     new_path = self._pending_icon_path
                     new_tip = self._pending_tooltip
                     self._pending_icon_path = None
+                    self._pending_tooltip = None
                 mod = NOTIFYICONDATAW()
                 mod.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
                 mod.hWnd = hwnd
@@ -482,15 +500,30 @@ class WindowsTrayIcon:
             if msg == WM_COMMAND:
                 cmd_id = wparam & 0xFFFF
                 if cmd_id == self.MENU_SHOW and self.on_show:
-                    self.on_show()
+                    try:
+                        self.on_show()
+                    except Exception:
+                        pass
                 elif cmd_id == self.MENU_TOGGLE_LISTENING and self.on_toggle_listening:
-                    self.on_toggle_listening()
+                    try:
+                        self.on_toggle_listening()
+                    except Exception:
+                        pass
                 elif cmd_id == self.MENU_SETTINGS and self.on_settings:
-                    self.on_settings()
+                    try:
+                        self.on_settings()
+                    except Exception:
+                        pass
                 elif cmd_id == self.MENU_RESTART and self.on_restart:
-                    self.on_restart()
+                    try:
+                        self.on_restart()
+                    except Exception:
+                        pass
                 elif cmd_id == self.MENU_EXIT and self.on_exit:
-                    self.on_exit()
+                    try:
+                        self.on_exit()
+                    except Exception:
+                        pass
                 return 0
             if msg == WM_DESTROY:
                 user32.PostQuitMessage(0)
@@ -524,11 +557,15 @@ class WindowsTrayIcon:
         shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
 
         msg = wintypes.MSG()
-        while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
-            user32.TranslateMessage(ctypes.byref(msg))
-            user32.DispatchMessageW(ctypes.byref(msg))
-
-        shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
-        if hicon:
-            user32.DestroyIcon(hicon)
-        user32.UnregisterClassW(class_name, hinstance)
+        try:
+            while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+                user32.TranslateMessage(ctypes.byref(msg))
+                user32.DispatchMessageW(ctypes.byref(msg))
+        except Exception:
+            # Prevent tray thread from crashing silently
+            pass
+        finally:
+            shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+            if hicon:
+                user32.DestroyIcon(hicon)
+            user32.UnregisterClassW(class_name, hinstance)
