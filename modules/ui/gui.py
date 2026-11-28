@@ -1148,6 +1148,7 @@ class SettingsDialog(tk.Toplevel):
             value=bool(cfg.get("minimize_on_focus_loss", False))
         )
         self._sound_cues_var = tk.BooleanVar(value=bool(cfg.get("sound_cues", True)))
+        self._disable_listening_var = tk.BooleanVar(value=bool(cfg.get("disable_listening", False)))
 
         for label_text, var in (
             ("Always on top", self._always_on_top_var),
@@ -1156,6 +1157,7 @@ class SettingsDialog(tk.Toplevel):
             ("Close to system tray", self._close_to_tray_var),
             ("Minimize to system tray when out of focus", self._minimize_on_focus_loss_var),
             ("Play sound on listen start/stop/send", self._sound_cues_var),
+            ("Disable listening (speech input)", self._disable_listening_var),
         ):
             tk.Checkbutton(
                 gui_tab,
@@ -1351,6 +1353,7 @@ class SettingsDialog(tk.Toplevel):
             "close_to_tray": bool(self._close_to_tray_var.get()),
             "minimize_on_focus_loss": bool(self._minimize_on_focus_loss_var.get()),
             "sound_cues": bool(self._sound_cues_var.get()),
+            "disable_listening": bool(self._disable_listening_var.get()),
         }
         tokens = {env_name: var.get() for env_name, var in self._vars.items()}
         if tokens != self._initial_tokens:
@@ -1423,6 +1426,7 @@ class ShaiGuiApp:
         self._close_to_tray = True
         self._minimize_on_focus_loss = False
         self._sound_cues = True
+        self._disable_listening = False
         self._settings_geometry: dict | None = None
         self._wake_word_enabled = bool(enable_wake_word) and sys.platform == "win32"
         self._wake_session: WakeWordSession | None = None
@@ -1486,10 +1490,12 @@ class ShaiGuiApp:
             target.bind("<Control-M>", self._on_mic_cont_shortcut)
         self.root.after(50, self._poll_events)
         self.root.after_idle(self._focus_input)
-        if self._restore_listening:
-            self.root.after_idle(lambda: self.start_speech_listening(continuous=True))
-        elif self._wake_word_enabled:
-            self.root.after_idle(self._start_wake_word_listening)
+        self._set_speech_state(self._speech_mode)
+        if not self._disable_listening:
+            if self._restore_listening:
+                self.root.after_idle(lambda: self.start_speech_listening(continuous=True))
+            elif self._wake_word_enabled:
+                self.root.after_idle(self._start_wake_word_listening)
 
     def _init_provider_state(self):
         saved = load_provider_config()
@@ -3126,6 +3132,8 @@ class ShaiGuiApp:
                         if self._speech_pending_auto_send:
                             self._auto_send_continuous_speech()
                 elif kind == "wake_word":
+                    if self._disable_listening:
+                        return
                     if self._speech_mode != "continuous":
                         self.start_speech_listening(continuous=True)
                 elif kind == "speech_text":
@@ -3331,6 +3339,7 @@ class ShaiGuiApp:
                 "close_to_tray": self._close_to_tray,
                 "minimize_on_focus_loss": self._minimize_on_focus_loss,
                 "sound_cues": self._sound_cues,
+                "disable_listening": self._disable_listening,
             },
             geometry_state=self._settings_geometry,
         )
@@ -3348,6 +3357,8 @@ class ShaiGuiApp:
                 dialog.saved_gui_settings.get("minimize_on_focus_loss", False)
             )
             self._sound_cues = bool(dialog.saved_gui_settings.get("sound_cues", True))
+            self._disable_listening = bool(dialog.saved_gui_settings.get("disable_listening", False))
+            self._set_speech_state(self._speech_mode)
             self._apply_always_on_top()
             state_dirty = True
         if state_dirty:
@@ -3740,6 +3751,7 @@ class ShaiGuiApp:
         self._close_to_tray = saved.get("close_to_tray", True) is not False
         self._minimize_on_focus_loss = saved.get("minimize_on_focus_loss") is True
         self._sound_cues = saved.get("sound_cues", True) is not False
+        self._disable_listening = saved.get("disable_listening") is True
         saved_settings_geo = saved.get("settings_geometry")
         self._settings_geometry = saved_settings_geo if isinstance(saved_settings_geo, dict) else None
         self._apply_always_on_top()
@@ -3794,6 +3806,7 @@ class ShaiGuiApp:
                 "close_to_tray": self._close_to_tray,
                 "minimize_on_focus_loss": self._minimize_on_focus_loss,
                 "sound_cues": self._sound_cues,
+                "disable_listening": self._disable_listening,
                 "settings_geometry": self._settings_geometry,
             })
             if hasattr(self, "history_store") and hasattr(self, "history"):
@@ -3984,6 +3997,8 @@ class ShaiGuiApp:
         return "break"
 
     def _on_mic_cont_clicked(self):
+        if self._disable_listening:
+            return
         if (
             self._speech_mode == "continuous"
             and self._speech_session is not None
@@ -4034,7 +4049,20 @@ class ShaiGuiApp:
             "activebackground": "#eba0ac",
             "activeforeground": "#11111b",
         }
-        if mode == "continuous":
+        disabled_cfg = {
+            "bg": THEME["surface"],
+            "fg": THEME["muted"],
+            "activebackground": THEME["surface"],
+            "activeforeground": THEME["muted"],
+        }
+        if self._disable_listening:
+            self.mic_cont_btn.config(**disabled_cfg)
+            self._mic_cont_tooltip.text = (
+                "Listening disabled — enable it from Settings"
+            )
+            self._stop_speech_animation()
+            self._update_taskbar_listening_icon(False)
+        elif mode == "continuous":
             self.mic_cont_btn.config(**active_cfg)
             self._mic_cont_tooltip.text = (
                 "Listening continuously — click or press Ctrl+M to stop"
@@ -4133,6 +4161,8 @@ class ShaiGuiApp:
         self.input_box.focus_set()
 
     def _start_wake_word_listening(self):
+        if self._disable_listening:
+            return
         if not self._wake_word_enabled or self._speech_mode == "continuous":
             return
         if self._wake_session is not None and self._wake_session.is_running:

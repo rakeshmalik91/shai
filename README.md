@@ -86,6 +86,12 @@ pythonw gui.pyw
 
 Choose a provider/model when prompted. Shai remembers the last selection. During requests, it shows an estimated context size and, when available, the model context percentage; after a response it shows provider-reported token usage. Use `/help` inside either mode for available commands; `/model` switches provider/model and `/exit` quits.
 
+## Screenshots
+
+| Desktop GUI | iPad CLI with iSh and Lectra |
+|-------------|-------------------|
+| ![ShAI desktop GUI](assets/media/gui-ss1.jpg) | ![ShAI iPad-style layout](assets/media/ipad-ish-ss1.jpg) |
+
 ## Commands (Agent Mode)
 
 | Command | Description |

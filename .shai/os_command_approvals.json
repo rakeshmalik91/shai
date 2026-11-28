@@ -11,5 +11,9 @@
         "config"
       ]
     ]
-  }
+  },
+  "approved_commands": [
+    "python",
+    "git"
+  ]
 }
