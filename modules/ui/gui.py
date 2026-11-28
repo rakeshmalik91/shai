@@ -4293,7 +4293,7 @@ class ShaiGuiApp:
         try:
             if self.root.grab_current() is not None:
                 return
-        except tk.TclError:
+        except (tk.TclError, KeyError):
             pass
         try:
             if self.root.state() in ("withdrawn", "iconic"):
