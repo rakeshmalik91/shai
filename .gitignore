@@ -247,3 +247,6 @@ log
 *.log
 
 *.zip
+
+
+docs/TODO.md

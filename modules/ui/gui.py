@@ -826,7 +826,21 @@ class HelpDialog(tk.Toplevel):
 
         self.grab_set()
         self.transient(parent)
+        self._center_on_parent(parent)
         self.wait_window(self)
+
+    def _center_on_parent(self, parent):
+        """Center this dialog on the parent window."""
+        self.update_idletasks()
+        parent_x = parent.winfo_rootx()
+        parent_y = parent.winfo_rooty()
+        parent_w = parent.winfo_width()
+        parent_h = parent.winfo_height()
+        self_w = self.winfo_width()
+        self_h = self.winfo_height()
+        x = parent_x + (parent_w - self_w) // 2
+        y = parent_y + (parent_h - self_h) // 2
+        self.geometry(f"+{x}+{y}")
 
 
 class ModelPickerDialog(tk.Toplevel):
